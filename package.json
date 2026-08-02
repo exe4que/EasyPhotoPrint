@@ -1,0 +1,38 @@
+{
+  "name": "easy-photo-print",
+  "private": true,
+  "type": "module",
+  "main": "out/main/index.js",
+  "workspaces": [
+    "packages/layout-engine",
+    "packages/migrations"
+  ],
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "npm run build --workspace @epp/layout-engine && npm run build --workspace @epp/migrations",
+    "build:desktop": "electron-vite build",
+    "preview": "electron-vite preview",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.web.json && tsc --noEmit -p packages/layout-engine/tsconfig.json && tsc --noEmit -p packages/migrations/tsconfig.json"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^5.1.4",
+    "autoprefixer": "^10.4.20",
+    "electron": "^31.7.7",
+    "electron-vite": "^5.0.0",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.10",
+    "typescript": "^5.9.2",
+    "vite": "^6.4.3",
+    "vitest": "^3.2.7"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "zundo": "^2.3.0",
+    "zustand": "^5.0.14"
+  }
+}

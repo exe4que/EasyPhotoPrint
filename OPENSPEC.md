@@ -6,7 +6,7 @@
 | **Estado** | Draft / Proposed |
 | **Autor** | Software Architecture Team |
 | **Fecha** | 2026-08-02 |
-| **Versión** | 0.2.0 |
+| **Versión** | 0.3.0 |
 
 ---
 
@@ -39,7 +39,7 @@ La impresión doméstica de fotografías enfrenta tres fricciones recurrentes qu
 >
 > 1. Abre EPP → selecciona tamaño de hoja A4, orientación vertical, márgenes de 5mm (internamente, el `paddingMm` del nodo raíz de la página).
 > 2. Arrastra 10 fotos desde su explorador de archivos al panel de biblioteca.
-> 3. Selecciona el modo **Grid**, configura 2 columnas x 3 filas con gap de 3mm.
+> 3. Selecciona el modo **Simple**, cambia el tipo del nodo raíz a `grid`, y configura 2 columnas x 3 filas con gap de 3mm.
 > 4. Arrastra 6 fotos desde la biblioteca a las celdas de la grilla; por defecto cada una se ajusta con `fitInParent` (sin recortar, respetando su aspect ratio) — María cambia una de ellas a `envelopeParent` para que llene la celda por completo recortando el sobrante.
 > 5. Guarda esta estructura como template `"Grid 2x3 Vacaciones"` (sin las imágenes, solo la estructura).
 > 6. Crea una segunda página, cambia a modo **Freeform**, arrastra 4 fotos libremente, las rota y escala usando los gizmos interactivos que muestran cotas en tiempo real (mm y grados).
@@ -132,7 +132,7 @@ interface EPPStore {
     activePageId: string;
     selectedElementIds: string[];
     activeTool: 'select' | 'pan' | 'crop';
-    layoutMode: 'grid' | 'nested' | 'freeform';
+    layoutMode: 'simple' | 'nested' | 'freeform';
   };
 
   // --- Biblioteca de imágenes cargadas (pool) ---
@@ -152,6 +152,8 @@ interface EPPStore {
 ```
 
 > **Decisión de diseño — `pageConfig` (tamaño, orientación, DPI) es por página, no global.** Antes `pageSize`/`orientation`/`dpi` vivían en `document` como un único valor para todo el proyecto — pero eso no permite mezclar, por ejemplo, una hoja A4 con una 4x6 en el mismo `.eppproj` (algo perfectamente normal: portada + fotos sueltas). Cada `Page` ahora trae su propio `pageConfig` (mismo shape que `EPPTemplate.page`, ver §3.3), y `applyTemplate(pageId, template)` solo modifica el `pageConfig` de la página indicada, nunca del documento completo. Una página nueva copia el `pageConfig` de la página activa como punto de partida, pero queda desde ese momento completamente independiente.
+
+> **Decisión de diseño — El modo `Simple` reemplaza al modo `Grid` como entrada por defecto y es un subconjunto restringido del editor nested.** El selector de modos de la UI pasa a ser `simple | nested | freeform`. `Simple` admite **solo dos niveles**: el nodo raíz de la página y, si el nodo raíz es un contenedor (`grid`, `horizontal` o `vertical`), únicamente `imageSlot`s como hijos directos — nunca contenedores anidados ni `freeformCanvas`. El panel `LayoutTree` no se muestra en `Simple`, y el usuario cambia el tipo del nodo raíz desde el inspector contextual. El tipo inicial de una página nueva es `imageSlot`, para cubrir el caso más simple de “una sola foto que ocupa toda la hoja respetando márgenes”; si el usuario cambia el tipo raíz a `grid`/`horizontal`/`vertical`, se crean o reutilizan `imageSlot`s directos sin introducir más profundidad en el árbol.
 
 > **Decisión de diseño — Reemplazo vs. Swap al asignar imagen a un slot ocupado:** `assignImageToSlot` resuelve así:
 > - Si `imageAssetId` **no** está asignado a ningún otro slot de la página (viene "libre" del pool, o ya está usado en **otra** página) → **reemplaza** directamente la imagen del slot destino; la imagen reemplazada vuelve a quedar disponible (desasignada) en el `imagePool`. Las imágenes no son exclusivas: la misma foto puede estar asignada a varios slots a la vez, incluso en páginas distintas.
@@ -1059,7 +1061,7 @@ easy-photo-print/
 │       └── project.schema.json
 │
 ├── electron-builder.yml
-├── vite.config.ts
+├── electron.vite.config.ts
 ├── tsconfig.json
 └── package.json
 ```

@@ -1143,6 +1143,83 @@ gantt
 | Mezclar tamaños de hoja/DPI distintos en un mismo proyecto no era representable | `pageConfig` movido de `document` (global) a cada `Page` individualmente (§2.3) |
 | Un solo `deltaMm` de arrastre podría generar cientos de pasos de undo | `pauseHistory()`/`resumeHistory()` (wrapper de `zundo.temporal().pause()/resume()`) alrededor de todo el gesto de drag, tanto en divisorias como en freeform (§4.1.1, §4.2) |
 
+### 6.4 Diagrama de Arquitectura Pretendida (Guía de Implementación)
+
+> Este diagrama es la referencia visual a consultar **antes** de crear un archivo nuevo o de decidir en qué capa vive una función durante la implementación (Fase 0 en adelante, §6.2). No introduce ninguna decisión nueva — es una proyección gráfica de las mismas capas y dependencias ya descritas en §2.2 (procesos de Electron) y §6.1 (estructura de carpetas); si diverge de esas secciones, esas secciones ganan y este diagrama se corrige para reflejarlas.
+
+Regla de dependencia que el diagrama codifica: las flechas siempre apuntan **hacia adentro**, hacia `packages/` — tanto el renderer (vía `hooks/`) como el proceso Main (vía `services/`) dependen de `layout-engine` y `migrations`, pero esos dos paquetes nunca importan nada de `src/` ni de `electron/`. Es lo que permite testear el motor de layout de forma aislada y reutilizarlo tal cual en el proceso Main durante la exportación a PDF (§5.2).
+
+```mermaid
+graph TB
+    subgraph UI["src/ — Renderer (React + Konva)"]
+        COMP_CANVAS["components/canvas
+PageStage, GridRenderer, NestedNodeRenderer,
+FreeformElement, DimensionOverlay, NodeDivider"]
+        COMP_PANELS["components/panels
+ImageLibraryPanel, LayoutTreePanel,
+PropertiesPanel, PageSetupPanel"]
+        COMP_TEMPLATES["components/templates
+TemplateGallery, TemplateThumbnail,
+SaveTemplateDialog"]
+        COMP_SETTINGS["components/settings
+UnitToggle"]
+        HOOKS["hooks
+useLayoutResolution, useUndoRedo, useDragAndDrop"]
+        STORE["store — Zustand + zundo
+documentSlice, uiSlice,
+imagePoolSlice, settingsSlice"]
+        LIB["lib
+units.ts, ipc-client.ts"]
+    end
+
+    subgraph SHARED["packages/ — TypeScript puro, SIN deps de Electron ni React"]
+        LAYOUT_ENGINE["layout-engine
+resolveLayout, grid.ts, flexDistribution.ts,
+imageFit.ts, feasibility.ts, reconcileTemplate.ts"]
+        MIGRATIONS["migrations
+migrateTemplate / migrateProject"]
+    end
+
+    subgraph ELECTRON["electron/ — Proceso Main + Preload"]
+        PRELOAD["preload/index.ts
+contextBridge → window.eppAPI"]
+        IPC["main/ipc
+fs · pdf · print · templates · settings handlers"]
+        SERVICES["main/services
+image-processor.ts (sharp)
+pdf-builder.ts (pdf-lib)"]
+    end
+
+    subgraph DISK["Filesystem"]
+        FILES[".epptemplate / .eppproj
+settings.json / assets/"]
+    end
+
+    COMP_CANVAS --> HOOKS
+    COMP_PANELS --> STORE
+    COMP_TEMPLATES --> STORE
+    COMP_SETTINGS --> STORE
+    HOOKS --> LAYOUT_ENGINE
+    STORE --> LIB
+    STORE -- "window.eppAPI.*" --> PRELOAD
+    PRELOAD -- "ipcRenderer.invoke" --> IPC
+    IPC --> SERVICES
+    IPC --> MIGRATIONS
+    SERVICES --> LAYOUT_ENGINE
+    MIGRATIONS --> FILES
+    IPC --> FILES
+
+    style LAYOUT_ENGINE fill:#e8f4ff,stroke:#4a90d9
+    style MIGRATIONS fill:#e8f4ff,stroke:#4a90d9
+```
+
+**Cómo leer las capas:**
+
+- **`packages/` (celeste)** — sin dependencias de Electron ni de React; es lo primero que se construye en Fase 0 (§6.2) porque todo lo demás depende de esto y no al revés.
+- **`electron/`** — el único lugar del repo con acceso a Node.js/filesystem/impresión nativa; `preload` es la única puerta entre este mundo y el renderer (contextIsolation, §2.2).
+- **`src/`** — UI pura; nunca importa `electron/` directamente, solo habla con Main a través de `window.eppAPI` (expuesto por `preload`).
+- **Filesystem** — el único estado persistente fuera de la sesión en memoria; tanto `main/ipc` (lectura/escritura de `.eppproj`/`.epptemplate`/`settings.json`) como `migrations` (que corre al leer un archivo viejo) lo tocan directamente.
+
 ---
 
 ## 7. Spec Anchoring & Trazabilidad

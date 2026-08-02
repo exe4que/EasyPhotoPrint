@@ -51,6 +51,13 @@ Antes de dar una tarea por terminada:
 - **No tomes decisiones de arquitectura nuevas directamente en el código.** Elegir una librería nueva, agregar un campo de schema, cambiar un algoritmo — eso son decisiones que primero se documentan en `OPENSPEC.md` (con su "Decisión de diseño" si corresponde) y después se implementan. El código no es el lugar para arquitectura no documentada en este repo.
 - **Si un pedido del usuario entra en conflicto con `OPENSPEC.md`** y el usuario no pidió explícitamente cambiar el spec, señalá el conflicto en vez de implementar en silencio algo distinto a lo documentado. Puede que el usuario quiera actualizar el spec, o puede que no supiera que ya había una decisión tomada al respecto.
 - **No dupliques este archivo.** `CLAUDE.md` y `.github/copilot-instructions.md` son puntos de entrada cortos que remiten acá — si necesitás agregar una regla de comportamiento nueva, se agrega en `AGENTS.md`, no en los archivos específicos de herramienta.
+- **Al terminar un cambio independiente (una tarea, un fix, una feature — no cada mensaje suelto de la conversación), hacé commit y push vos mismo, sin esperar a que el usuario lo pida.** Esta es una autorización permanente y aplica a cualquier agente que trabaje en este repo (Claude Code, GitHub Copilot CLI, u otro): no hace falta confirmación puntual para el `git push` cada vez, ese es justamente el propósito de dejarlo escrito acá. Concretamente:
+  1. Revisá `git status`/`git diff` antes de stagear — si aparece algo que no reconocés (archivos de credenciales, `.env`, claves) no lo commitees sin preguntar, aunque el resto sí se suba.
+  2. `git add -A` (salvo que haya algo a excluir por el punto anterior).
+  3. Redactá vos el mensaje de commit en base al diff real — qué cambió y por qué, en el estilo del historial existente (`git log`). Nada de mensajes genéricos tipo timestamp o "auto-commit": si no podés justificar en una línea qué hace el cambio, no está listo para commitear.
+  4. `git push` a la rama activa contra `origin`.
+  - Si el cambio deja el repo en un estado roto o a mitad de camino (tests rotos, build roto, tarea incompleta a pedido explícito de pausar), no commitees todavía — dejalo para cuando cierre en un estado coherente.
+  - Esto no reemplaza el checklist de spec-anchoring de §2.3 — ambos corren al cerrar una tarea: primero sincronizás spec↔código, después commiteás el resultado ya sincronizado.
 
 ## 4. Mapa de archivos de este repo
 

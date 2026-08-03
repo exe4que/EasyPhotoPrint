@@ -14,7 +14,12 @@ interface NodeDividerProps {
   crossLengthPx: number;
   previewZoom: number;
   onDragStart: () => void;
-  /** Called with the delta accumulated since the drag started (not per-frame). */
+  /**
+   * Called with the delta since the *previous* call (not since the drag started) — the store
+   * action re-derives each sibling's current size from the live tree on every call, so handing
+   * it an already-cumulative delta on top of that would double-count and make the divider
+   * drift away from the cursor, compounding with every mousemove event fired during the drag.
+   */
   onDragDeltaMm: (deltaMm: number) => void;
   onDragEnd: () => void;
 }
@@ -37,12 +42,14 @@ export function NodeDivider({
     event.stopPropagation();
     event.preventDefault();
 
-    const startClientPos = direction === 'horizontal' ? event.clientX : event.clientY;
+    let lastClientPos = direction === 'horizontal' ? event.clientX : event.clientY;
     onDragStart();
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
       const currentClientPos = direction === 'horizontal' ? moveEvent.clientX : moveEvent.clientY;
-      onDragDeltaMm(pxToMm(currentClientPos - startClientPos, previewZoom));
+      const deltaPx = currentClientPos - lastClientPos;
+      lastClientPos = currentClientPos;
+      onDragDeltaMm(pxToMm(deltaPx, previewZoom));
     };
     const handleMouseUp = () => {
       window.removeEventListener('mousemove', handleMouseMove);

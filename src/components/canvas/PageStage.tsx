@@ -1,12 +1,14 @@
 // @spec OPENSPEC.md §1.3, §2.3, §4.1, §6.1 — page preview shell backed by the shared layout engine
-import { computeFitInParent, type BoxMm, type ImageAsset, type LayoutNode, type ScalingRule } from '@epp/layout-engine';
+import type { LayoutNode } from '@epp/layout-engine';
 import { useEffect, useRef, useState } from 'react';
 
 import { useDragAndDrop } from '../../hooks/useDragAndDrop.js';
-import { formatLength, mmToPx } from '../../lib/units.js';
+import { computeImageDisplayRectMm, scalingRuleToObjectFit } from '../../lib/imageDisplay.js';
+import { formatLength, mmToPx, pxToMm } from '../../lib/units.js';
 import { useLayoutResolution } from '../../hooks/useLayoutResolution.js';
 import { useEPPStore } from '../../store/index.js';
 import { DimensionOverlay } from './DimensionOverlay.js';
+import { FreeformElementView } from './FreeformElement.js';
 
 const PREVIEW_ZOOM_FALLBACK = 0.38;
 const PREVIEW_INNER_PADDING_PX = 48;
@@ -19,26 +21,12 @@ function collectImageSlotNodes(node: LayoutNode): LayoutNode[] {
   return nodes;
 }
 
-function scalingRuleToObjectFit(scalingRule: ScalingRule | undefined): 'contain' | 'cover' | 'fill' {
-  switch (scalingRule) {
-    case 'envelopeParent':
-      return 'cover';
-    case 'stretch':
-      return 'fill';
-    default:
-      return 'contain';
+function collectFreeformCanvasNodes(node: LayoutNode): LayoutNode[] {
+  const nodes = node.type === 'freeformCanvas' ? [node] : [];
+  for (const child of node.children ?? []) {
+    nodes.push(...collectFreeformCanvasNodes(child));
   }
-}
-
-function computeImageDisplayRectMm(
-  asset: ImageAsset,
-  slotBox: BoxMm,
-  scalingRule: ScalingRule | undefined,
-): { offsetXMm: number; offsetYMm: number; widthMm: number; heightMm: number } {
-  if (scalingRule === 'fitInParent' || scalingRule == null) {
-    return computeFitInParent(asset, slotBox);
-  }
-  return { offsetXMm: 0, offsetYMm: 0, widthMm: slotBox.w, heightMm: slotBox.h };
+  return nodes;
 }
 
 interface PageStageProps {
@@ -48,6 +36,7 @@ interface PageStageProps {
 export function PageStage({ selectedImageAssetId }: PageStageProps) {
   const { page, pageBox, layout } = useLayoutResolution();
   const viewportRef = useRef<HTMLDivElement | null>(null);
+  const suppressCanvasClickRef = useRef(false);
   const [previewZoom, setPreviewZoom] = useState(PREVIEW_ZOOM_FALLBACK);
   const [hoveredSlotId, setHoveredSlotId] = useState<string | null>(null);
   const [hoveredImageSlotId, setHoveredImageSlotId] = useState<string | null>(null);
@@ -59,6 +48,11 @@ export function PageStage({ selectedImageAssetId }: PageStageProps) {
   const clearSelection = useEPPStore((state) => state.clearSelection);
   const assignImageToSlot = useEPPStore((state) => state.assignImageToSlot);
   const clearImageFromSlot = useEPPStore((state) => state.clearImageFromSlot);
+  const addFreeformElement = useEPPStore((state) => state.addFreeformElement);
+  const removeFreeformElement = useEPPStore((state) => state.removeFreeformElement);
+  const updateFreeformElementTransform = useEPPStore((state) => state.updateFreeformElementTransform);
+  const pauseHistory = useEPPStore((state) => state.pauseHistory);
+  const resumeHistory = useEPPStore((state) => state.resumeHistory);
   const { createSlotDropProps } = useDragAndDrop();
   const pageWidthAtZoomOne = mmToPx(pageBox.w, 1);
   const pageHeightAtZoomOne = mmToPx(pageBox.h, 1);
@@ -66,6 +60,7 @@ export function PageStage({ selectedImageAssetId }: PageStageProps) {
   const previewHeightPx = mmToPx(pageBox.h, previewZoom);
   const imageSlots = collectImageSlotNodes(page.rootNode);
   const imageSlotMap = new Map(imageSlots.map((node) => [node.id, node]));
+  const freeformCanvasMap = new Map(collectFreeformCanvasNodes(page.rootNode).map((node) => [node.id, node]));
   const imageAssetMap = new Map(imagePool.map((asset) => [asset.id, asset]));
 
   useEffect(() => {
@@ -131,7 +126,7 @@ export function PageStage({ selectedImageAssetId }: PageStageProps) {
 
           {layoutMode === 'nested'
             ? Array.from(layout.entries())
-                .filter(([id]) => id !== page.rootNode.id && !imageSlotMap.has(id))
+                .filter(([id]) => id !== page.rootNode.id && !imageSlotMap.has(id) && !freeformCanvasMap.has(id))
                 .map(([id, box]) => (
                   <div
                     key={`container-${id}`}
@@ -304,6 +299,103 @@ export function PageStage({ selectedImageAssetId }: PageStageProps) {
                 ) : null}
               </div>
             ))}
+
+          {Array.from(layout.entries())
+            .filter(([id]) => freeformCanvasMap.has(id))
+            .map(([id, box]) => {
+              const freeformCanvasNode = freeformCanvasMap.get(id);
+              if (!freeformCanvasNode) {
+                return null;
+              }
+
+              const padding = freeformCanvasNode.paddingMm ?? {};
+              const paddingTopPx = mmToPx(padding.top ?? 0, previewZoom);
+              const paddingRightPx = mmToPx(padding.right ?? 0, previewZoom);
+              const paddingBottomPx = mmToPx(padding.bottom ?? 0, previewZoom);
+              const paddingLeftPx = mmToPx(padding.left ?? 0, previewZoom);
+
+              return (
+                <div
+                  key={`freeform-${id}`}
+                  className="absolute"
+                  style={{
+                    left: mmToPx(box.x, previewZoom),
+                    top: mmToPx(box.y, previewZoom),
+                    width: mmToPx(box.w, previewZoom),
+                    height: mmToPx(box.h, previewZoom),
+                  }}
+                  onClick={(event) => {
+                    // A move/resize/rotate drag on a FreeformElementView can end (mouseup) past
+                    // its own small bounding box, over this background — the trailing native
+                    // "click" then bubbles up here. Ignore it so a drag never also drops a
+                    // stray new element under the cursor.
+                    if (suppressCanvasClickRef.current) {
+                      suppressCanvasClickRef.current = false;
+                      return;
+                    }
+
+                    if (!selectedImageAssetId) {
+                      setSelectedElementIds([id]);
+                      return;
+                    }
+
+                    const rect = event.currentTarget.getBoundingClientRect();
+                    addFreeformElement(page.id, id, selectedImageAssetId, {
+                      xMm: pxToMm(event.clientX - rect.left, previewZoom),
+                      yMm: pxToMm(event.clientY - rect.top, previewZoom),
+                    });
+                  }}
+                >
+                  <div
+                    className="pointer-events-none absolute border border-dashed border-slate-400/70"
+                    style={{
+                      left: paddingLeftPx,
+                      top: paddingTopPx,
+                      width: mmToPx(box.w, previewZoom) - paddingLeftPx - paddingRightPx,
+                      height: mmToPx(box.h, previewZoom) - paddingTopPx - paddingBottomPx,
+                    }}
+                  />
+
+                  <div
+                    className="absolute overflow-hidden"
+                    style={{ left: paddingLeftPx, top: paddingTopPx, right: paddingRightPx, bottom: paddingBottomPx }}
+                  >
+                    {(freeformCanvasNode.freeformElements ?? []).map((element) => (
+                      <FreeformElementView
+                        key={element.id}
+                        element={element}
+                        offsetXMm={-(padding.left ?? 0)}
+                        offsetYMm={-(padding.top ?? 0)}
+                        asset={imageAssetMap.get(page.assignments[element.imageNodeId] ?? '')}
+                        scalingRule={imageSlotMap.get(element.imageNodeId)?.imageSlotConfig?.scalingRule}
+                        isSelected={selectedSlotId === element.imageNodeId}
+                        previewZoom={previewZoom}
+                        unitSystem={unitSystem}
+                        onSelect={() => setSelectedElementIds([element.imageNodeId])}
+                        onRemove={() => removeFreeformElement(page.id, id, element.id)}
+                        onTransform={(patch) => updateFreeformElementTransform(page.id, id, element.id, patch)}
+                        onDragStart={() => {
+                          suppressCanvasClickRef.current = true;
+                          pauseHistory();
+                        }}
+                        onDragEnd={() => {
+                          resumeHistory();
+                          setTimeout(() => {
+                            suppressCanvasClickRef.current = false;
+                          }, 0);
+                        }}
+                      />
+                    ))}
+                  </div>
+
+                  {(freeformCanvasNode.freeformElements ?? []).length === 0 ? (
+                    <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-4 text-center text-xs font-medium text-slate-500">
+                      {selectedImageAssetId ? 'Click anywhere to place the selected image' : 'Select a library image, then click to place it'}
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>

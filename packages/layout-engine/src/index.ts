@@ -1,5 +1,6 @@
 export * from './feasibility.js';
 export * from './flexDistribution.js';
+export * from './freeform.js';
 export * from './grid.js';
 export * from './imageFit.js';
 export * from './reconcileTemplate.js';

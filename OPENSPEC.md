@@ -6,7 +6,7 @@
 | **Estado** | Draft / Proposed |
 | **Autor** | Software Architecture Team |
 | **Fecha** | 2026-08-02 |
-| **Versión** | 0.7.0 |
+| **Versión** | 0.8.0 |
 
 ---
 
@@ -64,12 +64,14 @@ La impresión doméstica de fotografías enfrenta tres fricciones recurrentes qu
 | UI Framework | **React 18 + TypeScript** | Tipado fuerte para el schema de layout; ecosistema maduro |
 | Estilos | **Tailwind CSS + Radix UI / shadcn-ui** | Velocidad de desarrollo, componentes accesibles sin bloatware |
 | Estado global | **Zustand** (+ `zundo` para undo/redo) | Menor boilerplate que Redux; middleware de historial listo |
-| Motor de Canvas | **Konva.js / react-konva** (sobre `<canvas>`) | Rendering performante de transformaciones, hit-testing, gizmos |
+| Motor de Canvas | **DOM + CSS** (`<div>` con `position: absolute` y `transform: translate()/rotate()/scale()`) | Ya es el enfoque que usan Simple y Nested (`PageStage.tsx`); Freeform lo reutiliza en vez de introducir un segundo paradigma de render — ver nota de diseño abajo |
 | Generación de PDF | **pdf-lib** (renderer principal) + `sharp` (main process, procesamiento de imagen) | Control de bajo nivel en puntos PDF (pt), soporte de embebido de imágenes a resolución completa sin pasar por el DOM |
 | Build/Bundling | **Vite + electron-vite** | HMR rápido para el renderer, config unificada main/preload/renderer |
 | Empaquetado | **electron-builder** | Instaladores multiplataforma (NSIS, dmg, AppImage/deb) |
 
 > **Nota de diseño**: se descarta `@react-pdf/renderer` como motor principal porque su modelo de layout (Yoga/Flexbox) compite con nuestro propio motor de layout ya definido en el dominio; usarlo forzaría a re-expresar el árbol de nodos dos veces. `pdf-lib` permite un mapeo 1:1 directo entre nuestras coordenadas de dominio (mm) y las coordenadas PDF (pt), que es el enfoque descrito en la Sección 5.
+
+> **Nota de diseño — Se descarta Konva.js/react-konva, incluido para Freeform.** Versiones anteriores de este documento elegían Konva (con `Konva.Transformer` para los gizmos de mover/rotar/escalar) como motor de canvas general. En la implementación real, Simple y Nested nunca necesitaron un motor de canvas dedicado — `PageStage.tsx` resuelve todo con `<div>`s posicionados vía `resolveLayout()` + `mmToPx()`, sin `<canvas>` de por medio — y ese mismo enfoque alcanza para Freeform: mover es `left`/`top` (o `transform: translate()`), rotar y escalar son `transform: rotate()/scale()`, y el hit-testing de click/drag es el de siempre en el DOM. Sumar Konva únicamente para Freeform mezclaría dos paradigmas de render en la misma app y una dependencia nueva sin necesidad real (el volumen de elementos por página es de decenas, no miles, donde un motor de canvas dedicado empieza a justificarse). Todas las menciones a `Konva`/`Konva.Transformer`/`Konva.Group` en versiones previas de este documento (§4.2, §6.1) quedan reemplazadas por su equivalente en DOM + CSS.
 
 ### 2.2 Arquitectura de Procesos de Electron
 
@@ -92,7 +94,7 @@ flowchart TB
         R1[UI Components]
         R2[Zustand Store: canvas / layoutTree / history]
         R3[Layout Engine - pure TS, framework-agnostic]
-        R4[Konva Canvas Renderer]
+        R4[DOM Canvas Renderer]
     end
 
     RENDERER -- "invoke via contextBridge (no nodeIntegration)" --> PRELOAD
@@ -483,7 +485,7 @@ El motor de layout es un **algoritmo de layout de dos pasadas** (medir → posic
 > - **`envelopeParent`**: la imagen se escala para cubrir el slot por completo manteniendo su aspect ratio, recortando el sobrante según el `focalPoint` (mismo mecanismo que el anterior `cover`/`crop-to-fill`, ver §5.4).
 > - **`stretch`**: la imagen se deforma (escala X e Y de forma independiente) para ocupar exactamente el `slotBoxMm`, ignorando su aspect ratio original. No hay recorte ni espacio vacío, pero la imagen puede verse distorsionada si el aspect ratio del slot difiere mucho del original — el `PropertiesPanel` debe mostrar una advertencia no bloqueante cuando la distorsión resultante supera un umbral (p. ej. >15% de diferencia entre aspect ratios).
 >
-> Los tres modos se implementan como funciones puras en el `layout-engine` compartido (`computeFitInParent` / `computeEnvelopeCrop` / `computeStretch`, §5.4) para garantizar paridad WYSIWYG entre la vista previa (Konva) y la exportación (PDF).
+> Los tres modos se implementan como funciones puras en el `layout-engine` compartido (`computeFitInParent` / `computeEnvelopeCrop` / `computeStretch`, §5.4) para garantizar paridad WYSIWYG entre la vista previa (DOM) y la exportación (PDF).
 
 ```mermaid
 flowchart TD
@@ -748,7 +750,7 @@ function resolveDimensions(gridConfig: GridConfig, childrenCount: number, boxAsp
 
 Cada celda resultante se pasa recursivamente a `resolveLayout(children[i], cell)`. Si `autoFit: true`, `rows`/`columns` se derivan de `ceil(sqrt(n))` ajustado al aspect ratio de la página, como en `resolveDimensions` arriba.
 
-El resultado de `resolveLayout()` es un `Map<nodeId, BoxMm>` **puro y determinístico** — el mismo árbol + mismo box de página siempre produce el mismo resultado. Esto es lo que permite reutilizar exactamente esta función tanto en el renderer (Konva, en píxeles de pantalla vía un factor de escala) como en el proceso Main durante la exportación a PDF (en puntos, vía otro factor — ver §5).
+El resultado de `resolveLayout()` es un `Map<nodeId, BoxMm>` **puro y determinístico** — el mismo árbol + mismo box de página siempre produce el mismo resultado. Esto es lo que permite reutilizar exactamente esta función tanto en el renderer (DOM, en píxeles de pantalla vía un factor de escala) como en el proceso Main durante la exportación a PDF (en puntos, vía otro factor — ver §5).
 
 ### 4.1.2 Validación de Layout Infactible
 
@@ -786,31 +788,31 @@ function validateLayoutFeasibility(node: LayoutNode, assignedBox: BoxMm, resultM
 
 ### 4.2 Transform Libre y Recorte al Área Imprimible en Modo `freeformCanvas`
 
-En un nodo `freeformCanvas`, cada `FreeformElement` se renderiza como un `Konva.Group` con un `Konva.Transformer` adjunto al seleccionarlo. Reglas de posicionamiento e interacción (las etiquetas de dimensión al hacer hover, incluida la de `FreeformElement`s, están definidas de forma general en el requisito funcional de §4.1 — acá solo lo específico de este tipo de nodo):
+En un nodo `freeformCanvas`, cada `FreeformElement` se renderiza como un `<div>` posicionado con `position: absolute` (`left`/`top`/`width`/`height` en px derivados de `transform.{xMm,yMm,widthMm,heightMm}`) y `transform: rotate(rotationDeg)` con `transform-origin: center` — mover, rotar y escalar son gestos de mouse (`mousedown` + `mousemove` en `window` + `mouseup`) que actualizan `transform` en vivo, sin ningún motor de canvas de por medio (§2.1). Al seleccionarlo aparecen tres controles: un handle de rotación (arriba), un handle de escala (esquina inferior derecha) y un botón de eliminar. Reglas de posicionamiento e interacción (las etiquetas de dimensión al hacer hover, incluida la de `FreeformElement`s, están definidas de forma general en el requisito funcional de §4.1 — acá solo lo específico de este tipo de nodo):
 
-> **Decisión de diseño — Posicionamiento libre con recorte al área imprimible:** el `paddingMm` del nodo `freeformCanvas` (§3.2 unificación margen/padding) define el **área imprimible** de esa página. Las reglas de posicionamiento son:
-> - El usuario puede mover/escalar/rotar una imagen libremente **sin restricción de límites** — incluso puede quedar parcialmente (o totalmente) fuera de los bordes físicos de la hoja.
-> - Sin embargo, en render (pantalla) y en export (PDF), cada imagen se **recorta (clip)** exactamente al rectángulo del área imprimible (`pageBoxMm` menos `paddingMm`). Ninguna imagen puede "pintar" dentro de la franja de margen ni fuera del borde de la hoja — esa franja y el exterior de la hoja siempre quedan en blanco.
-> - En pantalla, esto se implementa con `clipFunc` en el `Konva.Layer` del `freeformCanvas` (clip = rect del área imprimible). En PDF, se implementa envolviendo cada `page.drawImage(...)` entre `pushGraphicsState()` + un rectángulo de clip (`clip()`) + `popGraphicsState()` en `pdf-lib` (ver §5.4), usando el mismo rectángulo para garantizar paridad WYSIWYG (objetivo O1).
+> **Decisión de diseño — Posicionamiento libre, pero sin poder salir por completo del área del nodo.** El `paddingMm` del nodo `freeformCanvas` (§3.2 unificación margen/padding) define el **área imprimible** de esa página. Las reglas de posicionamiento son:
+> - El usuario puede mover/escalar/rotar una imagen libremente dentro y más allá del área imprimible — puede quedar **parcialmente** fuera de los bordes físicos de la hoja (para sangrado, composiciones editoriales, etc.).
+> - **Pero nunca puede quedar completamente afuera del área del propio nodo `freeformCanvas`** (su `BoxMm` completo, sin descontar el `paddingMm` — no solo el área imprimible): si eso se permitiera, el elemento se volvería inalcanzable, porque no hay ningún panel tipo `LayoutTree` para volver a seleccionarlo por id una vez que sale del viewport del nodo. Concretamente, `clampFreeformPosition` (`packages/layout-engine/src/freeform.ts`) exige que el *bounding box ya rotado* del elemento mantenga como mínimo `MIN_FREEFORM_OVERLAP_MM` (20mm) de superposición con el nodo en ambos ejes — se recalcula en cada actualización de posición, tamaño o rotación, así que ningún gesto (arrastrar, escalar, rotar) puede sacarlo de esa cota, sin importar cuán rápido o lejos se mueva el mouse. El tamaño también tiene un piso (`MIN_FREEFORM_SIZE_MM`, 10mm) por la misma razón: un elemento escalado a 0 sería igual de inalcanzable.
+> - En render (pantalla) y en export (PDF), cada imagen se **recorta (clip)** exactamente al rectángulo del área imprimible (`pageBoxMm` menos `paddingMm`) — ninguna imagen "pinta" dentro de la franja de margen ni fuera del borde de la hoja, esa franja y el exterior de la hoja siempre quedan en blanco. En pantalla esto se implementa con un contenedor `overflow: hidden` del tamaño exacto del área imprimible envolviendo a todos los `FreeformElement`s del nodo (los elementos mantienen sus coordenadas relativas al `BoxMm` completo del nodo, no al área recortada). En PDF, se implementa envolviendo cada `page.drawImage(...)` entre `pushGraphicsState()` + un rectángulo de clip (`clip()`) + `popGraphicsState()` en `pdf-lib` (ver §5.4), usando el mismo rectángulo para garantizar paridad WYSIWYG (objetivo O1).
 > - El borde del área imprimible se dibuja en el editor como una guía discontinua (no imprimible) para que el usuario entienda visualmente qué porción de cada imagen se va a recortar antes de exportar.
 
-1. **Fuente de verdad en mm**: el store guarda `transform.{xMm, yMm, widthMm, heightMm, rotationDeg}`. Konva trabaja en píxeles de pantalla; existe una capa de conversión `mmToPx(valueMm, zoomLevel, screenDpi)` aplicada solo en el punto de renderizado, nunca persistida.
-2. **Snapping opcional**: durante `onDragMove`, se calculan deltas contra: bordes de página, centro de página, y bordes/centros de otros elementos, con tolerancia de ~3px en pantalla → se ajusta el `xMm/yMm` y se muestra una guía magenta (patrón estándar tipo Figma/Sketch).
-3. **Bloqueo de aspect ratio**: si `lockAspectRatio: true`, el handler de `onTransform` del `Konva.Transformer` restringe `widthMm`/`heightMm` recalculando el segundo valor a partir del primero y el aspect ratio original de la imagen, en vez de dejar que Konva aplique escalado libre.
+1. **Fuente de verdad en mm**: el store guarda `transform.{xMm, yMm, widthMm, heightMm, rotationDeg}`. El DOM trabaja en píxeles de pantalla; existe una capa de conversión `mmToPx`/`pxToMm(valueMm, zoomLevel, screenDpi)` aplicada solo en el punto de renderizado/interacción, nunca persistida.
+2. **Contención (§4.2 arriba)**: cada actualización de `transform` pasa por `clampFreeformPosition` antes de guardarse — no es opcional ni se puede desactivar por gesto.
+3. **Bloqueo de aspect ratio**: si `lockAspectRatio: true` (default), arrastrar el handle de escala calcula un único factor de escala a partir del delta horizontal y lo aplica a ambos ejes (`widthMm`/`heightMm`) en vez de permitir estirar los ejes de forma independiente.
+4. **Snapping** (fuera de alcance v1 de esta implementación inicial; queda documentado como extensión futura): durante el arrastre, calcular deltas contra bordes/centro de página y de otros elementos, con tolerancia de ~3px en pantalla, y mostrar una guía magenta (patrón estándar tipo Figma/Sketch).
 
 ```mermaid
 sequenceDiagram
     participant User
-    participant Konva as Konva.Transformer
+    participant Gizmo as FreeformElementView (DOM)
     participant Store as Zustand Store
 
-    User->>Konva: mousedown (onDragStart/onTransformStart)
-    Konva->>Store: pauseHistory() [zundo.temporal().pause()]
-    User->>Konva: drag / resize / rotate handle
-    Konva->>Store: onTransform(evt) → deltas en px
-    Store->>Store: pxToMm(deltas, zoom) → patch {xMm,yMm,widthMm,heightMm,rotationDeg}
-    User->>Konva: mouseup (onTransformEnd)
-    Konva->>Store: resumeHistory() [zundo.temporal().resume()] → 1 solo checkpoint para todo el gesto
+    User->>Gizmo: mousedown (body = mover, handle = rotar/escalar)
+    Gizmo->>Store: pauseHistory() [zundo.temporal().pause()]
+    User->>Gizmo: mousemove (en window, hasta el mouseup)
+    Gizmo->>Store: updateFreeformElementTransform(patch) → clampFreeformPosition + clamp de tamaño
+    User->>Gizmo: mouseup
+    Gizmo->>Store: resumeHistory() [zundo.temporal().resume()] → 1 solo checkpoint para todo el gesto
 ```
 
 ---
@@ -824,7 +826,7 @@ Existen tres sistemas de coordenadas en juego:
 | Sistema | Unidad | Origen | Uso |
 |---|---|---|---|
 | **Dominio (canónico)** | milímetros (mm) | esquina superior-izquierda de la página | Fuente de verdad, persistido en JSON |
-| **Pantalla (renderer)** | píxeles CSS | esquina superior-izquierda del `<Stage>` Konva | Solo para interacción/rendering en vivo |
+| **Pantalla (renderer)** | píxeles CSS | esquina superior-izquierda del contenedor de la página en el DOM | Solo para interacción/rendering en vivo |
 | **PDF** | puntos (pt), 1pt = 1/72" | esquina **inferior-izquierda** (convención PDF) | Solo en el momento de exportación |
 
 **Fórmulas de conversión:**
@@ -957,7 +959,7 @@ function computeStretch(asset: ImageAsset, slotBoxMm: BoxMm): { widthMm: number;
 }
 ```
 
-Las tres funciones viven en el `layout-engine` compartido y se usan tanto para la vista previa (Konva `crop`/tamaño de `Konva.Image`, con `scaleX`/`scaleY` independientes en el caso de `stretch`) como para el recorte/escalado real vía `sharp` en la exportación — garantizando **paridad WYSIWYG** entre pantalla y PDF. Ni `computeFitInParent` ni `computeStretch` requieren clip adicional (ninguno de los dos excede el `slotBoxMm`), a diferencia del clip de márgenes en un nodo `freeformCanvas` (§5.5), que sigue aplicando independientemente del `scalingRule` elegido.
+Las tres funciones viven en el `layout-engine` compartido y se usan tanto para la vista previa (estilos CSS `object-fit`/`transform` del `<img>` en pantalla, con `scaleX`/`scaleY` independientes en el caso de `stretch`) como para el recorte/escalado real vía `sharp` en la exportación — garantizando **paridad WYSIWYG** entre pantalla y PDF. Ni `computeFitInParent` ni `computeStretch` requieren clip adicional (ninguno de los dos excede el `slotBoxMm`), a diferencia del clip de márgenes en un nodo `freeformCanvas` (§5.5), que sigue aplicando independientemente del `scalingRule` elegido.
 
 ### 5.5 Clip al Área Imprimible (`freeformCanvas`)
 
@@ -1027,7 +1029,7 @@ easy-photo-print/
 │   ├── App.tsx
 │   ├── components/
 │   │   ├── canvas/
-│   │   │   ├── PageStage.tsx        # Konva.Stage wrapper
+│   │   │   ├── PageStage.tsx        # DOM canvas wrapper (resolveLayout + CSS)
 │   │   │   ├── GridRenderer.tsx
 │   │   │   ├── NestedNodeRenderer.tsx
 │   │   │   ├── NodeDivider.tsx      # drag entre hermanos → resizeSiblingsByDrag (sizeRatio)
@@ -1090,7 +1092,7 @@ gantt
     Sistema de unidades métrico/imperial (§2.4) :f1e, after f0b, 6d
     Ingesta imágenes (dialog + DnD + pool)   :f1b, after f0b, 8d
     Motor Grid (filas/cols/gap)              :f1c, after f0c, 10d
-    Render Konva de Grid + asignación imágenes :f1d, after f1c, 8d
+    Render DOM de Grid + asignación imágenes :f1d, after f1c, 8d
 
     section Fase 2 — Nested Layouts
     Modelo de árbol (horizontal/vertical/grid) :f2a, after f1d, 10d
@@ -1100,7 +1102,7 @@ gantt
     Panel visual de árbol (editar nesting)   :f2e, after f2d, 10d
 
     section Fase 3 — Modo Freeform
-    Transform (move/scale/rotate) con Konva  :f3a, after f1d, 10d
+    Transform (move/scale/rotate) con DOM+CSS :f3a, after f1d, 10d
     DimensionOverlay (etiquetas por hover)   :f3b, after f3a, 8d
     Z-index / capas                          :f3c, after f3a, 5d
     Snapping guides                          :f3d, after f3b, 6d
@@ -1140,7 +1142,7 @@ gantt
 
 | Riesgo | Mitigación |
 |---|---|
-| Discrepancia WYSIWYG entre Konva (pantalla) y pdf-lib (export) | Compartir el mismo `layout-engine` y las mismas funciones de `imageFit` (`fitInParent`/`envelopeParent`) en ambos contextos (ver §5.4) |
+| Discrepancia WYSIWYG entre DOM (pantalla) y pdf-lib (export) | Compartir el mismo `layout-engine` y las mismas funciones de `imageFit` (`fitInParent`/`envelopeParent`) en ambos contextos (ver §5.4) |
 | Imágenes de baja resolución generan PDFs borrosos | Validación proactiva de DPI efectivo con warning visual antes de exportar (§5.3) |
 | Rendimiento con documentos multi-página y muchas imágenes de alta resolución | Thumbnails en el pool para preview; carga del buffer full-res solo en el momento de exportación (Main process) |
 | Complejidad del árbol anidado para usuarios no técnicos | Panel de árbol visual con drag-and-drop + templates predefinidos como punto de partida |
@@ -1157,7 +1159,7 @@ Regla de dependencia que el diagrama codifica: las flechas siempre apuntan **hac
 
 ```mermaid
 graph TB
-    subgraph UI["src/ — Renderer (React + Konva)"]
+    subgraph UI["src/ — Renderer (React + DOM/CSS)"]
         COMP_CANVAS["components/canvas
 PageStage, GridRenderer, NestedNodeRenderer,
 FreeformElement, DimensionOverlay, NodeDivider"]

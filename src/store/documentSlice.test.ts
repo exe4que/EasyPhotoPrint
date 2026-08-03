@@ -216,4 +216,62 @@ describe('document slice helpers', () => {
     expect(page.rootNode.type).toBe('imageSlot');
     expect(page.rootNode.id).toBe('root-grid');
   });
+
+  it('adds a freeform element centered in the node, referencing a new imageSlot child', () => {
+    type StoreState = ReturnType<typeof createDocumentSlice>;
+    let state = createDocumentSlice((updater) => {
+      state = { ...state, ...updater(state) };
+    }, () => state) as StoreState;
+
+    state.setSimpleRootType('page-1', 'freeformCanvas');
+    state.addFreeformElement('page-1', 'root-grid', 'image-a');
+
+    const page = state.document.pages[0];
+    expect(page.rootNode.freeformElements).toHaveLength(1);
+    expect(page.rootNode.children).toHaveLength(1);
+
+    const element = page.rootNode.freeformElements![0];
+    expect(page.rootNode.children![0].id).toBe(element.imageNodeId);
+    expect(page.rootNode.children![0].type).toBe('imageSlot');
+    expect(page.assignments[element.imageNodeId]).toBe('image-a');
+    expect(element.transform.widthMm).toBeGreaterThan(0);
+    expect(element.transform.rotationDeg).toBe(0);
+  });
+
+  it('removes a freeform element along with its imageSlot child and assignment', () => {
+    type StoreState = ReturnType<typeof createDocumentSlice>;
+    let state = createDocumentSlice((updater) => {
+      state = { ...state, ...updater(state) };
+    }, () => state) as StoreState;
+
+    state.setSimpleRootType('page-1', 'freeformCanvas');
+    state.addFreeformElement('page-1', 'root-grid', 'image-a');
+    const elementId = state.document.pages[0].rootNode.freeformElements![0].id;
+
+    state.removeFreeformElement('page-1', 'root-grid', elementId);
+
+    const page = state.document.pages[0];
+    expect(page.rootNode.freeformElements).toEqual([]);
+    expect(page.rootNode.children).toEqual([]);
+    expect(page.assignments).toEqual({});
+  });
+
+  it('clamps updateFreeformElementTransform so the element cannot be dragged fully outside the node', () => {
+    type StoreState = ReturnType<typeof createDocumentSlice>;
+    let state = createDocumentSlice((updater) => {
+      state = { ...state, ...updater(state) };
+    }, () => state) as StoreState;
+
+    state.setSimpleRootType('page-1', 'freeformCanvas');
+    state.addFreeformElement('page-1', 'root-grid', 'image-a');
+    const elementId = state.document.pages[0].rootNode.freeformElements![0].id;
+
+    state.updateFreeformElementTransform('page-1', 'root-grid', elementId, { xMm: 100000, yMm: 100000 });
+
+    const element = state.document.pages[0].rootNode.freeformElements![0];
+    // A4 is ~210mm wide — an element dragged to xMm=100000 must be clamped back near the
+    // node's edge, never left free to fly off completely (§4.2 containment requirement).
+    expect(element.transform.xMm).toBeLessThan(300);
+    expect(element.transform.yMm).toBeLessThan(400);
+  });
 });

@@ -1,11 +1,15 @@
-// @spec OPENSPEC.md §2.3, §4.1 — document slice, pageConfig per page, assignImageToSlot swap logic, freeformCanvas nesting
+// @spec OPENSPEC.md §2.3, §4.1, §4.2 — document slice, pageConfig per page, assignImageToSlot swap logic, freeformCanvas nesting + transforms
 import {
   applyPadding,
+  clampFreeformPosition,
+  MIN_FREEFORM_SIZE_MM,
   reconcileTemplateUpdate,
   resolveLayout,
   resizeSiblingsByDrag as resizeAdjacentSiblings,
   type EPPProjectPage,
   type EPPTemplate,
+  type FreeformElement,
+  type FreeformTransform,
   type GridConfig,
   type LayoutNode,
   type PageConfig,
@@ -598,6 +602,65 @@ function updateContainerChildCountById(node: LayoutNode, nodeId: string, count: 
   };
 }
 
+function addFreeformElementToNode(
+  node: LayoutNode,
+  freeformCanvasNodeId: string,
+  imageSlot: LayoutNode,
+  element: FreeformElement,
+): LayoutNode {
+  if (node.id === freeformCanvasNodeId) {
+    if (node.type !== 'freeformCanvas') {
+      throw new Error(`Node ${freeformCanvasNodeId} is not a freeformCanvas node.`);
+    }
+
+    return {
+      ...node,
+      children: [...(node.children ?? []), imageSlot],
+      freeformElements: [...(node.freeformElements ?? []), element],
+    };
+  }
+
+  return {
+    ...node,
+    children: node.children?.map((child) => addFreeformElementToNode(child, freeformCanvasNodeId, imageSlot, element)),
+  };
+}
+
+function removeFreeformElementEntryById(node: LayoutNode, freeformCanvasNodeId: string, freeformElementId: string): LayoutNode {
+  if (node.id === freeformCanvasNodeId) {
+    return {
+      ...node,
+      freeformElements: node.freeformElements?.filter((element) => element.id !== freeformElementId),
+    };
+  }
+
+  return {
+    ...node,
+    children: node.children?.map((child) => removeFreeformElementEntryById(child, freeformCanvasNodeId, freeformElementId)),
+  };
+}
+
+function setFreeformElementTransformById(
+  node: LayoutNode,
+  freeformCanvasNodeId: string,
+  freeformElementId: string,
+  transform: FreeformTransform,
+): LayoutNode {
+  if (node.id === freeformCanvasNodeId) {
+    return {
+      ...node,
+      freeformElements: node.freeformElements?.map((element) =>
+        element.id === freeformElementId ? { ...element, transform } : element,
+      ),
+    };
+  }
+
+  return {
+    ...node,
+    children: node.children?.map((child) => setFreeformElementTransformById(child, freeformCanvasNodeId, freeformElementId, transform)),
+  };
+}
+
 export function assignImageToPage(
   page: EPPProjectPage,
   nodeId: string,
@@ -706,6 +769,19 @@ export interface DocumentSlice {
   assignImageToSlot: (pageId: string, nodeId: string, imageAssetId: string) => void;
   clearImageFromSlot: (pageId: string, nodeId: string) => void;
   resizeSiblingsByDrag: (pageId: string, parentNodeId: string, siblingIndexA: number, deltaMm: number) => void;
+  addFreeformElement: (
+    pageId: string,
+    freeformCanvasNodeId: string,
+    imageAssetId: string,
+    centerAtMm?: { xMm: number; yMm: number },
+  ) => void;
+  removeFreeformElement: (pageId: string, freeformCanvasNodeId: string, freeformElementId: string) => void;
+  updateFreeformElementTransform: (
+    pageId: string,
+    freeformCanvasNodeId: string,
+    freeformElementId: string,
+    patch: Partial<FreeformTransform>,
+  ) => void;
   applyTemplate: (pageId: string, template: EPPTemplate) => void;
   exportTemplate: (pageId: string) => EPPTemplate;
   exportPdf: () => Promise<Uint8Array>;
@@ -951,6 +1027,121 @@ export function createDocumentSlice(
                     resizeAdjacentSiblings(children, siblingIndexA, deltaMm, availableMain, mainAxisKey, axis),
                   ),
                 }
+              : entry,
+          ),
+        },
+      }));
+    },
+    addFreeformElement: (pageId, freeformCanvasNodeId, imageAssetId, centerAtMm) => {
+      const page = get().document.pages.find((entry) => entry.id === pageId);
+      if (!page) {
+        throw new Error(`Page ${pageId} does not exist.`);
+      }
+
+      const freeformCanvasNode = findNodeById(page.rootNode, freeformCanvasNodeId);
+      if (!freeformCanvasNode || freeformCanvasNode.type !== 'freeformCanvas') {
+        throw new Error(`Node ${freeformCanvasNodeId} is not a freeformCanvas node.`);
+      }
+
+      const pageBox = createPageBoxMm(page.pageConfig);
+      const nodeBox = resolveLayout(page.rootNode, pageBox).get(freeformCanvasNodeId);
+      if (!nodeBox) {
+        throw new Error(`Could not resolve layout for freeformCanvas node ${freeformCanvasNodeId}.`);
+      }
+
+      const defaultSizeMm = Math.max(MIN_FREEFORM_SIZE_MM, Math.min(nodeBox.w, nodeBox.h) / 3);
+      const center = centerAtMm ?? { xMm: nodeBox.w / 2, yMm: nodeBox.h / 2 };
+      const rawTransform: FreeformTransform = {
+        xMm: center.xMm - defaultSizeMm / 2,
+        yMm: center.yMm - defaultSizeMm / 2,
+        widthMm: defaultSizeMm,
+        heightMm: defaultSizeMm,
+        rotationDeg: 0,
+        lockAspectRatio: true,
+      };
+      const clampedPosition = clampFreeformPosition(rawTransform, { w: nodeBox.w, h: nodeBox.h });
+      const transform: FreeformTransform = { ...rawTransform, ...clampedPosition };
+
+      const nextSlotId = createSlotIdGenerator(page.rootNode);
+      const imageSlotId = nextSlotId();
+      const imageSlot = createImageSlot(imageSlotId);
+      const element: FreeformElement = {
+        id: crypto.randomUUID(),
+        imageNodeId: imageSlotId,
+        zIndex: freeformCanvasNode.freeformElements?.length ?? 0,
+        transform,
+      };
+
+      set((state) => ({
+        document: {
+          pages: state.document.pages.map((entry) => {
+            if (entry.id !== pageId) {
+              return entry;
+            }
+
+            return {
+              ...entry,
+              rootNode: addFreeformElementToNode(entry.rootNode, freeformCanvasNodeId, imageSlot, element),
+              assignments: { ...entry.assignments, [imageSlotId]: imageAssetId },
+            };
+          }),
+        },
+      }));
+    },
+    removeFreeformElement: (pageId, freeformCanvasNodeId, freeformElementId) => {
+      set((state) => ({
+        document: {
+          pages: state.document.pages.map((page) => {
+            if (page.id !== pageId) {
+              return page;
+            }
+
+            const freeformCanvasNode = findNodeById(page.rootNode, freeformCanvasNodeId);
+            const targetElement = freeformCanvasNode?.freeformElements?.find((element) => element.id === freeformElementId);
+            let rootNode = removeFreeformElementEntryById(page.rootNode, freeformCanvasNodeId, freeformElementId);
+            const assignments = { ...page.assignments };
+            if (targetElement) {
+              rootNode = removeNodeById(rootNode, targetElement.imageNodeId);
+              delete assignments[targetElement.imageNodeId];
+            }
+
+            return { ...page, rootNode, assignments };
+          }),
+        },
+      }));
+    },
+    updateFreeformElementTransform: (pageId, freeformCanvasNodeId, freeformElementId, patch) => {
+      const page = get().document.pages.find((entry) => entry.id === pageId);
+      if (!page) {
+        throw new Error(`Page ${pageId} does not exist.`);
+      }
+
+      const freeformCanvasNode = findNodeById(page.rootNode, freeformCanvasNodeId);
+      const currentElement = freeformCanvasNode?.freeformElements?.find((element) => element.id === freeformElementId);
+      if (!currentElement) {
+        throw new Error(`Freeform element ${freeformElementId} does not exist.`);
+      }
+
+      const pageBox = createPageBoxMm(page.pageConfig);
+      const nodeBox = resolveLayout(page.rootNode, pageBox).get(freeformCanvasNodeId);
+      if (!nodeBox) {
+        throw new Error(`Could not resolve layout for freeformCanvas node ${freeformCanvasNodeId}.`);
+      }
+
+      const mergedTransform: FreeformTransform = { ...currentElement.transform, ...patch };
+      const sizedTransform: FreeformTransform = {
+        ...mergedTransform,
+        widthMm: Math.max(MIN_FREEFORM_SIZE_MM, mergedTransform.widthMm),
+        heightMm: Math.max(MIN_FREEFORM_SIZE_MM, mergedTransform.heightMm),
+      };
+      const clampedPosition = clampFreeformPosition(sizedTransform, { w: nodeBox.w, h: nodeBox.h });
+      const nextTransform: FreeformTransform = { ...sizedTransform, ...clampedPosition };
+
+      set((state) => ({
+        document: {
+          pages: state.document.pages.map((entry) =>
+            entry.id === pageId
+              ? { ...entry, rootNode: setFreeformElementTransformById(entry.rootNode, freeformCanvasNodeId, freeformElementId, nextTransform) }
               : entry,
           ),
         },

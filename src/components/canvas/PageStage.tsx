@@ -53,7 +53,7 @@ export function PageStage({ selectedImageAssetId }: PageStageProps) {
   const updateFreeformElementTransform = useEPPStore((state) => state.updateFreeformElementTransform);
   const pauseHistory = useEPPStore((state) => state.pauseHistory);
   const resumeHistory = useEPPStore((state) => state.resumeHistory);
-  const { createSlotDropProps } = useDragAndDrop();
+  const { createSlotDropProps, createPositionalDropProps } = useDragAndDrop();
   const pageWidthAtZoomOne = mmToPx(pageBox.w, 1);
   const pageHeightAtZoomOne = mmToPx(pageBox.h, 1);
   const previewWidthPx = mmToPx(pageBox.w, previewZoom);
@@ -324,27 +324,25 @@ export function PageStage({ selectedImageAssetId }: PageStageProps) {
                     width: mmToPx(box.w, previewZoom),
                     height: mmToPx(box.h, previewZoom),
                   }}
-                  onClick={(event) => {
+                  onClick={() => {
                     // A move/resize/rotate drag on a FreeformElementView can end (mouseup) past
                     // its own small bounding box, over this background — the trailing native
-                    // "click" then bubbles up here. Ignore it so a drag never also drops a
-                    // stray new element under the cursor.
+                    // "click" then bubbles up here. Ignore it so a drag never also selects the
+                    // canvas out from under an element the user was just transforming.
                     if (suppressCanvasClickRef.current) {
                       suppressCanvasClickRef.current = false;
                       return;
                     }
 
-                    if (!selectedImageAssetId) {
-                      setSelectedElementIds([id]);
-                      return;
-                    }
-
+                    setSelectedElementIds([id]);
+                  }}
+                  {...createPositionalDropProps((imageAssetId, event) => {
                     const rect = event.currentTarget.getBoundingClientRect();
-                    addFreeformElement(page.id, id, selectedImageAssetId, {
+                    addFreeformElement(page.id, id, imageAssetId, {
                       xMm: pxToMm(event.clientX - rect.left, previewZoom),
                       yMm: pxToMm(event.clientY - rect.top, previewZoom),
                     });
-                  }}
+                  })}
                 >
                   <div
                     className="pointer-events-none absolute border border-dashed border-slate-400/70"
@@ -390,7 +388,7 @@ export function PageStage({ selectedImageAssetId }: PageStageProps) {
 
                   {(freeformCanvasNode.freeformElements ?? []).length === 0 ? (
                     <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-4 text-center text-xs font-medium text-slate-500">
-                      {selectedImageAssetId ? 'Click anywhere to place the selected image' : 'Select a library image, then click to place it'}
+                      Drag an image here from the library
                     </div>
                   ) : null}
                 </div>

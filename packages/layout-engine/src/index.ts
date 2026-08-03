@@ -5,5 +5,6 @@ export * from './grid.js';
 export * from './imageFit.js';
 export * from './reconcileTemplate.js';
 export * from './resolveLayout.js';
+export * from './simpleMode.js';
 export * from './types.js';
 

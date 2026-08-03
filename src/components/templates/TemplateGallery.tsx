@@ -1,5 +1,5 @@
-// @spec OPENSPEC.md §3.1, §6.1 — template gallery with apply/delete flows and dynamic previews
-import type { EPPTemplate } from '@epp/layout-engine';
+// @spec OPENSPEC.md §2.3, §3.1, §6.1 — template gallery with apply/delete flows, dynamic previews, and Simple-mode compatibility gating
+import { isSimpleModeCompatible, type EPPTemplate } from '@epp/layout-engine';
 import { useState } from 'react';
 
 import { getEppApi } from '../../lib/ipc-client.js';
@@ -31,6 +31,14 @@ export function TemplateGallery({ templates, isLoading, errorMessage, onReload }
   const [isDeleting, setIsDeleting] = useState(false);
   const activePageId = useEPPStore((state) => state.ui.activePageId);
   const applyTemplate = useEPPStore((state) => state.applyTemplate);
+  const setLayoutMode = useEPPStore((state) => state.setLayoutMode);
+
+  const handleApply = (template: EPPTemplate) => {
+    applyTemplate(activePageId, template);
+    if (!isSimpleModeCompatible(template.rootNode)) {
+      setLayoutMode('nested');
+    }
+  };
 
   const handleConfirmDelete = async () => {
     if (!pendingDelete) {
@@ -98,7 +106,7 @@ export function TemplateGallery({ templates, isLoading, errorMessage, onReload }
               <div className="mt-3 flex gap-2">
                 <button
                   type="button"
-                  onClick={() => applyTemplate(activePageId, template)}
+                  onClick={() => handleApply(template)}
                   className="flex-1 rounded-lg border border-cyan-500/60 bg-cyan-500/10 px-3 py-2 text-sm font-medium text-cyan-200 hover:bg-cyan-500/20"
                 >
                   Apply to current page

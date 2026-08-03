@@ -1,6 +1,6 @@
 // @spec OPENSPEC.md §1.3, §2.3, §4.1, §4.1.1, §6.1 — page preview shell backed by the shared layout engine
 import { isDividerLocked, type LayoutNode } from '@epp/layout-engine';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useDragAndDrop } from '../../hooks/useDragAndDrop.js';
 import { computeImageDisplayRectMm, scalingRuleToObjectFit } from '../../lib/imageDisplay.js';
@@ -13,6 +13,13 @@ import { NodeDivider } from './NodeDivider.js';
 
 const PREVIEW_ZOOM_FALLBACK = 0.38;
 const PREVIEW_INNER_PADDING_PX = 48;
+const MIN_ZOOM = 0.1;
+const MAX_ZOOM = 3;
+const ZOOM_STEP_FACTOR = 1.25;
+
+function clampZoom(zoom: number): number {
+  return Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom));
+}
 
 function collectImageSlotNodes(node: LayoutNode): LayoutNode[] {
   const nodes = node.type === 'imageSlot' ? [node] : [];
@@ -47,6 +54,7 @@ export function PageStage({ selectedImageAssetId }: PageStageProps) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const suppressNextClickRef = useRef(false);
   const [previewZoom, setPreviewZoom] = useState(PREVIEW_ZOOM_FALLBACK);
+  const [isZoomFitted, setIsZoomFitted] = useState(true);
   const [hoveredSlotId, setHoveredSlotId] = useState<string | null>(null);
   const [hoveredImageSlotId, setHoveredImageSlotId] = useState<string | null>(null);
   const imagePool = useEPPStore((state) => state.imagePool);
@@ -74,6 +82,19 @@ export function PageStage({ selectedImageAssetId }: PageStageProps) {
   const flexContainers = collectFlexContainerNodes(page.rootNode);
   const imageAssetMap = new Map(imagePool.map((asset) => [asset.id, asset]));
 
+  const computeFitZoom = useCallback((): number | null => {
+    const element = viewportRef.current;
+    if (!element) {
+      return null;
+    }
+
+    const availableWidth = Math.max(1, element.clientWidth - PREVIEW_INNER_PADDING_PX);
+    const availableHeight = Math.max(1, element.clientHeight - PREVIEW_INNER_PADDING_PX);
+    const widthZoom = availableWidth / pageWidthAtZoomOne;
+    const heightZoom = availableHeight / pageHeightAtZoomOne;
+    return clampZoom(Math.min(widthZoom, heightZoom));
+  }, [pageWidthAtZoomOne, pageHeightAtZoomOne]);
+
   useEffect(() => {
     const element = viewportRef.current;
     if (!element) {
@@ -81,11 +102,13 @@ export function PageStage({ selectedImageAssetId }: PageStageProps) {
     }
 
     const recomputeZoom = () => {
-      const availableWidth = Math.max(1, element.clientWidth - PREVIEW_INNER_PADDING_PX);
-      const availableHeight = Math.max(1, element.clientHeight - PREVIEW_INNER_PADDING_PX);
-      const widthZoom = availableWidth / pageWidthAtZoomOne;
-      const heightZoom = availableHeight / pageHeightAtZoomOne;
-      setPreviewZoom(Math.max(0.05, Math.min(widthZoom, heightZoom)));
+      if (!isZoomFitted) {
+        return;
+      }
+      const fitZoom = computeFitZoom();
+      if (fitZoom != null) {
+        setPreviewZoom(fitZoom);
+      }
     };
 
     recomputeZoom();
@@ -94,7 +117,20 @@ export function PageStage({ selectedImageAssetId }: PageStageProps) {
     });
     observer.observe(element);
     return () => observer.disconnect();
-  }, [pageHeightAtZoomOne, pageWidthAtZoomOne]);
+  }, [computeFitZoom, isZoomFitted]);
+
+  const zoomBy = (factor: number) => {
+    setIsZoomFitted(false);
+    setPreviewZoom((current) => clampZoom(current * factor));
+  };
+
+  const resetZoomToFit = () => {
+    setIsZoomFitted(true);
+    const fitZoom = computeFitZoom();
+    if (fitZoom != null) {
+      setPreviewZoom(fitZoom);
+    }
+  };
 
   return (
     <section className="flex h-full min-h-0 flex-col rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
@@ -105,9 +141,39 @@ export function PageStage({ selectedImageAssetId }: PageStageProps) {
             Click a slot to select it. Drag or click a library image, then assign it into the current layout.
           </p>
         </div>
-        <span className="rounded-full border border-slate-700 px-3 py-1 text-xs text-slate-300">
-          {page.pageConfig.dpi} DPI
-        </span>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 rounded-lg border border-slate-700 bg-slate-950/60 p-1">
+            <button
+              type="button"
+              onClick={() => zoomBy(1 / ZOOM_STEP_FACTOR)}
+              disabled={previewZoom <= MIN_ZOOM}
+              aria-label="Zoom out"
+              className="flex h-6 w-6 items-center justify-center rounded text-sm text-slate-300 hover:bg-slate-800 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              −
+            </button>
+            <button
+              type="button"
+              onClick={resetZoomToFit}
+              title="Reset to fit"
+              className="min-w-12 rounded px-1 text-xs text-slate-300 hover:bg-slate-800 hover:text-white"
+            >
+              {Math.round(previewZoom * 100)}%
+            </button>
+            <button
+              type="button"
+              onClick={() => zoomBy(ZOOM_STEP_FACTOR)}
+              disabled={previewZoom >= MAX_ZOOM}
+              aria-label="Zoom in"
+              className="flex h-6 w-6 items-center justify-center rounded text-sm text-slate-300 hover:bg-slate-800 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              +
+            </button>
+          </div>
+          <span className="rounded-full border border-slate-700 px-3 py-1 text-xs text-slate-300">
+            {page.pageConfig.dpi} DPI
+          </span>
+        </div>
       </div>
 
       <div ref={viewportRef} className="min-h-0 flex-1 overflow-auto rounded-xl border border-slate-800 bg-slate-950/80 p-6">

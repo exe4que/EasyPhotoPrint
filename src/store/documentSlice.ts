@@ -580,6 +580,24 @@ function updateGridNodeById(
   };
 }
 
+function updateContainerChildCountById(node: LayoutNode, nodeId: string, count: number): LayoutNode {
+  if (node.id === nodeId) {
+    if (node.type !== 'horizontal' && node.type !== 'vertical') {
+      throw new Error(`Node ${nodeId} does not support setting a child count (only horizontal/vertical do).`);
+    }
+
+    return {
+      ...node,
+      children: reconcileGridChildren(node.children ?? [], Math.max(1, count)),
+    };
+  }
+
+  return {
+    ...node,
+    children: node.children?.map((child) => updateContainerChildCountById(child, nodeId, count)),
+  };
+}
+
 export function assignImageToPage(
   page: EPPProjectPage,
   nodeId: string,
@@ -679,6 +697,7 @@ export interface DocumentSlice {
       paddingMm?: Partial<Sides>;
     },
   ) => void;
+  setContainerChildCount: (pageId: string, nodeId: string, count: number) => void;
   normalizePageForSimpleMode: (pageId: string) => void;
   setSimpleRootType: (pageId: string, nextType: 'grid' | 'horizontal' | 'vertical' | 'imageSlot' | 'freeformCanvas') => void;
   retypeLayoutNode: (pageId: string, nodeId: string, nextType: NestedNodeType) => void;
@@ -747,6 +766,24 @@ export function createDocumentSlice(
             }
 
             const rootNode = updateGridNodeById(page.rootNode, nodeId, patch);
+            return {
+              ...page,
+              rootNode,
+              assignments: filterAssignmentsForRootNode(rootNode, page.assignments),
+            };
+          }),
+        },
+      }));
+    },
+    setContainerChildCount: (pageId, nodeId, count) => {
+      set((state) => ({
+        document: {
+          pages: state.document.pages.map((page) => {
+            if (page.id !== pageId) {
+              return page;
+            }
+
+            const rootNode = updateContainerChildCountById(page.rootNode, nodeId, count);
             return {
               ...page,
               rootNode,

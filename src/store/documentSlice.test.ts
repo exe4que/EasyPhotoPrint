@@ -161,6 +161,24 @@ describe('document slice helpers', () => {
     expect(state.document.pages[0].rootNode.children).toHaveLength(3);
   });
 
+  it('sets the child slot count of a horizontal/vertical container, preserving existing assignments', () => {
+    type StoreState = ReturnType<typeof createDocumentSlice>;
+    let state = createDocumentSlice((updater) => {
+      state = { ...state, ...updater(state) };
+    }, () => state) as StoreState;
+
+    state.retypeLayoutNode('page-1', 'root-grid', 'horizontal');
+    state.assignImageToSlot('page-1', 'slot-1', 'image-a');
+    state.setContainerChildCount('page-1', 'root-grid', 4);
+
+    expect(state.document.pages[0].rootNode.children).toHaveLength(4);
+    expect(state.document.pages[0].assignments).toEqual({ 'slot-1': 'image-a' });
+
+    state.setContainerChildCount('page-1', 'root-grid', 1);
+    expect(state.document.pages[0].rootNode.children).toHaveLength(1);
+    expect(state.document.pages[0].assignments).toEqual({ 'slot-1': 'image-a' });
+  });
+
   it('removes nested nodes and clears assignments for removed slot ids', () => {
     type StoreState = ReturnType<typeof createDocumentSlice>;
     let state = createDocumentSlice((updater) => {

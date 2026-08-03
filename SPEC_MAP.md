@@ -63,7 +63,7 @@ Estos archivos implementan funcionalidad descrita en el spec (schema de `ImageAs
 |---|---|---|---|
 | Ingesta de imágenes (dialog + DnD + pool) | `src/components/panels/ImageLibraryPanel.tsx`, `src/hooks/useDragAndDrop.ts`, `electron/main/ipc/fs.handlers.ts`, `src/store/imagePoolSlice.ts` | §1.3, §3.3 (`ImageAsset`) | Parcial |
 | Panel de árbol de layout editable | `src/components/panels/LayoutTreePanel.tsx` | §4.1, §6.1 | Parcial |
-| Inspector contextual (alignment, gap, `fixedSizeMm`) | `src/components/panels/PropertiesPanel.tsx` | §4.1, §4.1.1, §2.4 | Parcial |
+| Inspector contextual (alignment, gap, `fixedSizeMm`, cantidad de slots en `horizontal`/`vertical`) | `src/components/panels/PropertiesPanel.tsx`, `src/store/documentSlice.ts` (`setContainerChildCount`) | §4.1, §4.1.1, §2.4, §2.3 | Parcial |
 | Setup de página por página | `src/components/panels/PageSetupPanel.tsx` | §2.3, §2.4 | Completo |
 | Galería y miniaturas de templates (generadas dinámicamente) | `src/components/templates/TemplateGallery.tsx`, `src/components/templates/TemplateThumbnail.tsx` | §6.1 (decisión de diseño) | Completo |
 | CRUD de templates (diálogo de guardado) | `src/components/templates/SaveTemplateDialog.tsx`, `electron/main/ipc/templates.handlers.ts`, `electron/main/ipc/templates.helpers.ts` | §3.1, §3.3 | Parcial |

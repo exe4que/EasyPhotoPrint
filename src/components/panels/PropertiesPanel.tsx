@@ -142,6 +142,7 @@ export function PropertiesPanel() {
   const updateGridNodeConfig = useEPPStore((state) => state.updateGridNodeConfig);
   const updateLayoutNode = useEPPStore((state) => state.updateLayoutNode);
   const setSimpleRootType = useEPPStore((state) => state.setSimpleRootType);
+  const setContainerChildCount = useEPPStore((state) => state.setContainerChildCount);
   const imagePool = useEPPStore((state) => state.imagePool);
   const { layout } = useLayoutResolution();
 
@@ -334,6 +335,21 @@ export function PropertiesPanel() {
           <div className="mt-1 font-medium text-white">{contextNode.id}</div>
           <div className="mt-1 text-xs text-slate-400">{contextNode.type}</div>
         </div>
+
+        {contextNode.type === 'horizontal' || contextNode.type === 'vertical' ? (
+          <div>
+            <FieldLabel>Slots</FieldLabel>
+            <input
+              type="number"
+              min={1}
+              className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
+              value={contextNode.children?.length ?? 0}
+              onChange={(event) =>
+                setContainerChildCount(activePage.id, contextNode.id, Number(event.target.value))
+              }
+            />
+          </div>
+        ) : null}
 
         {contextNode.type !== 'freeformCanvas' ? (
           <div>

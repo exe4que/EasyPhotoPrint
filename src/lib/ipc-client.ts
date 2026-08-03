@@ -26,7 +26,8 @@ export interface EppAPI {
   };
   templates: {
     list: () => Promise<EPPTemplate[]>;
-    save: (template: EPPTemplate) => Promise<void>;
+    save: (template: EPPTemplate) => Promise<EPPTemplate>;
+    delete: (templateId: string) => Promise<void>;
   };
 }
 

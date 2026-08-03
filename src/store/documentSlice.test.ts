@@ -88,6 +88,17 @@ describe('document slice helpers', () => {
     expect(state.document.pages[0].templateRef).toBe('template-1');
   });
 
+  it('links a page to a newly saved template so "Save" can overwrite it afterwards', () => {
+    type StoreState = ReturnType<typeof createDocumentSlice>;
+    let state = createDocumentSlice((updater) => {
+      state = { ...state, ...updater(state) };
+    }, () => state) as StoreState;
+
+    expect(state.document.pages[0].templateRef).toBeUndefined();
+    state.linkPageToTemplate('page-1', 'template-42');
+    expect(state.document.pages[0].templateRef).toBe('template-42');
+  });
+
   it('reconciles grid children while preserving existing slot ids first', () => {
     expect(
       reconcileGridChildren(

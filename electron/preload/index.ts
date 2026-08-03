@@ -1,7 +1,7 @@
 // @spec OPENSPEC.md §2.2 — preload contextBridge with explicit API surface
 import { contextBridge, ipcRenderer } from 'electron';
 
-import type { ImageAsset } from '@epp/layout-engine';
+import type { EPPTemplate, ImageAsset } from '@epp/layout-engine';
 import type { AppSettings } from '../main/ipc/settings.handlers.js';
 
 const eppAPI = {
@@ -23,8 +23,9 @@ const eppAPI = {
     set: (patch: Partial<AppSettings>) => ipcRenderer.invoke('settings:set', patch) as Promise<AppSettings>,
   },
   templates: {
-    list: () => ipcRenderer.invoke('templates:list'),
-    save: (template: unknown) => ipcRenderer.invoke('templates:save', template),
+    list: () => ipcRenderer.invoke('templates:list') as Promise<EPPTemplate[]>,
+    save: (template: unknown) => ipcRenderer.invoke('templates:save', template) as Promise<EPPTemplate>,
+    delete: (templateId: string) => ipcRenderer.invoke('templates:delete', templateId) as Promise<void>,
   },
 };
 

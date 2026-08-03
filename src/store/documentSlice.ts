@@ -783,6 +783,7 @@ export interface DocumentSlice {
     patch: Partial<FreeformTransform>,
   ) => void;
   applyTemplate: (pageId: string, template: EPPTemplate) => void;
+  linkPageToTemplate: (pageId: string, templateId: string) => void;
   exportTemplate: (pageId: string) => EPPTemplate;
   exportPdf: () => Promise<Uint8Array>;
 }
@@ -1164,6 +1165,15 @@ export function createDocumentSlice(
               assignments: reconciled.assignments,
             };
           }),
+        },
+      }));
+    },
+    linkPageToTemplate: (pageId, templateId) => {
+      set((state) => ({
+        document: {
+          pages: state.document.pages.map((page) =>
+            page.id === pageId ? { ...page, templateRef: templateId } : page,
+          ),
         },
       }));
     },

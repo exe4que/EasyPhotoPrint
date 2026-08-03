@@ -11,13 +11,14 @@ import { SaveTemplateDialog } from './components/templates/SaveTemplateDialog.js
 import { TemplateGallery } from './components/templates/TemplateGallery.js';
 import { CollapsiblePanel } from './components/ui/CollapsiblePanel.js';
 import { useLayoutResolution } from './hooks/useLayoutResolution.js';
+import { useTemplateLibrary } from './hooks/useTemplateLibrary.js';
 import { useUndoRedo } from './hooks/useUndoRedo.js';
 import { formatLength } from './lib/units.js';
 import { useEPPStore } from './store/index.js';
 
 export function App() {
   const [selectedImageAssetId, setSelectedImageAssetId] = useState<string | null>(null);
-  const [templateRefreshKey, setTemplateRefreshKey] = useState(0);
+  const templateLibrary = useTemplateLibrary();
   const hydrateSettings = useEPPStore((state) => state.hydrateSettings);
   const unitSystem = useEPPStore((state) => state.settings.unitSystem);
   const layoutMode = useEPPStore((state) => state.ui.layoutMode);
@@ -129,8 +130,13 @@ export function App() {
             </CollapsiblePanel>
 
             <PageSetupPanel />
-            <SaveTemplateDialog onSaved={() => setTemplateRefreshKey((value) => value + 1)} />
-            <TemplateGallery refreshKey={templateRefreshKey} />
+            <SaveTemplateDialog templates={templateLibrary.templates} onSaved={templateLibrary.reload} />
+            <TemplateGallery
+              templates={templateLibrary.templates}
+              isLoading={templateLibrary.isLoading}
+              errorMessage={templateLibrary.errorMessage}
+              onReload={templateLibrary.reload}
+            />
             {layoutMode === 'nested' ? <LayoutTreePanel /> : null}
           </aside>
 

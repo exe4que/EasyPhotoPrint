@@ -30,6 +30,7 @@
 | §3.2 | Migración de schema por versión | `packages/migrations/src/index.ts` | Parcial |
 | §3.3 | Modelo `EPPProject`/`ImageAsset`/`PageConfig` (`.eppproj`) | `shared/schemas/project.schema.json`, `electron/main/ipc/fs.handlers.ts` | Parcial |
 | §3.3 | Reconciliación de templates (versionado in-place) | `packages/layout-engine/src/reconcileTemplate.ts` | Completo |
+| §3.3 | UI Save/Save as/Delete de templates + popup de confirmación reutilizado | `src/components/templates/SaveTemplateDialog.tsx`, `src/components/templates/TemplateGallery.tsx`, `src/components/ui/ConfirmDialog.tsx`, `src/hooks/useTemplateLibrary.ts`, `src/store/documentSlice.ts` (`linkPageToTemplate`) | Completo |
 
 ## §4 Layout Engine Design
 
@@ -68,7 +69,7 @@ Estos archivos implementan funcionalidad descrita en el spec (schema de `ImageAs
 | Inspector contextual (alignment, gap, `fixedSizeMm`, cantidad de slots en `horizontal`/`vertical`) | `src/components/panels/PropertiesPanel.tsx`, `src/store/documentSlice.ts` (`setContainerChildCount`) | §4.1, §4.1.1, §2.4, §2.3 | Parcial |
 | Setup de página por página | `src/components/panels/PageSetupPanel.tsx` | §2.3, §2.4 | Completo |
 | Galería y miniaturas de templates (generadas dinámicamente) | `src/components/templates/TemplateGallery.tsx`, `src/components/templates/TemplateThumbnail.tsx` | §6.1 (decisión de diseño) | Completo |
-| CRUD de templates (diálogo de guardado) | `src/components/templates/SaveTemplateDialog.tsx`, `electron/main/ipc/templates.handlers.ts`, `electron/main/ipc/templates.helpers.ts` | §3.1, §3.3 | Parcial |
+| CRUD de templates (list/save/delete) | `src/components/templates/SaveTemplateDialog.tsx`, `electron/main/ipc/templates.handlers.ts`, `electron/main/ipc/templates.helpers.ts` | §3.1, §3.3 | Completo |
 
 ---
 

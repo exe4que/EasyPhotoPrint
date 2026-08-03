@@ -1,9 +1,10 @@
-// @spec OPENSPEC.md §3.1, §6.1 — template gallery with apply flow and dynamic previews
+// @spec OPENSPEC.md §3.1, §6.1 — template gallery with apply/delete flows and dynamic previews
 import type { EPPTemplate } from '@epp/layout-engine';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { getEppApi } from '../../lib/ipc-client.js';
 import { useEPPStore } from '../../store/index.js';
+import { ConfirmDialog } from '../ui/ConfirmDialog.js';
 import { CollapsiblePanel } from '../ui/CollapsiblePanel.js';
 import { TemplateThumbnail } from './TemplateThumbnail.js';
 
@@ -17,29 +18,37 @@ function formatTimestamp(value?: string): string {
   }).format(new Date(value));
 }
 
-export function TemplateGallery({ refreshKey }: { refreshKey: number }) {
-  const [templates, setTemplates] = useState<EPPTemplate[]>([]);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+interface TemplateGalleryProps {
+  templates: EPPTemplate[];
+  isLoading: boolean;
+  errorMessage: string | null;
+  onReload: () => Promise<void> | void;
+}
+
+export function TemplateGallery({ templates, isLoading, errorMessage, onReload }: TemplateGalleryProps) {
+  const [pendingDelete, setPendingDelete] = useState<EPPTemplate | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const activePageId = useEPPStore((state) => state.ui.activePageId);
   const applyTemplate = useEPPStore((state) => state.applyTemplate);
 
-  const loadTemplates = async () => {
-    setIsLoading(true);
-    setErrorMessage(null);
+  const handleConfirmDelete = async () => {
+    if (!pendingDelete) {
+      return;
+    }
+
+    setIsDeleting(true);
+    setDeleteError(null);
     try {
-      const nextTemplates = await getEppApi().templates.list();
-      setTemplates(nextTemplates);
+      await getEppApi().templates.delete(pendingDelete.id);
+      setPendingDelete(null);
+      await onReload();
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Could not load templates.');
+      setDeleteError(error instanceof Error ? error.message : 'Could not delete the template.');
     } finally {
-      setIsLoading(false);
+      setIsDeleting(false);
     }
   };
-
-  useEffect(() => {
-    void loadTemplates();
-  }, [refreshKey]);
 
   return (
     <CollapsiblePanel
@@ -49,7 +58,7 @@ export function TemplateGallery({ refreshKey }: { refreshKey: number }) {
       actions={
         <button
           type="button"
-          onClick={() => void loadTemplates()}
+          onClick={() => void onReload()}
           className="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-200 hover:border-slate-600"
         >
           Refresh
@@ -86,17 +95,51 @@ export function TemplateGallery({ refreshKey }: { refreshKey: number }) {
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={() => applyTemplate(activePageId, template)}
-                className="mt-3 w-full rounded-lg border border-cyan-500/60 bg-cyan-500/10 px-3 py-2 text-sm font-medium text-cyan-200 hover:bg-cyan-500/20"
-              >
-                Apply to current page
-              </button>
+              <div className="mt-3 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => applyTemplate(activePageId, template)}
+                  className="flex-1 rounded-lg border border-cyan-500/60 bg-cyan-500/10 px-3 py-2 text-sm font-medium text-cyan-200 hover:bg-cyan-500/20"
+                >
+                  Apply to current page
+                </button>
+                <button
+                  type="button"
+                  aria-label={`Delete template ${template.name}`}
+                  onClick={() => {
+                    setDeleteError(null);
+                    setPendingDelete(template);
+                  }}
+                  className="rounded-lg border border-rose-500/40 px-3 py-2 text-sm font-medium text-rose-200 hover:bg-rose-500/10"
+                >
+                  Delete
+                </button>
+              </div>
             </div>
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        open={pendingDelete != null}
+        title="Delete template?"
+        description={pendingDelete ? `"${pendingDelete.name}" will be permanently deleted. This can't be undone.` : undefined}
+        confirmLabel="Delete"
+        destructive
+        isSubmitting={isDeleting}
+        onConfirm={() => void handleConfirmDelete()}
+        onCancel={() => {
+          if (isDeleting) {
+            return;
+          }
+          setPendingDelete(null);
+          setDeleteError(null);
+        }}
+      >
+        {deleteError ? (
+          <div className="rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">{deleteError}</div>
+        ) : null}
+      </ConfirmDialog>
     </CollapsiblePanel>
   );
 }

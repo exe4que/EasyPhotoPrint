@@ -6,7 +6,7 @@
 | **Estado** | Draft / Proposed |
 | **Autor** | Software Architecture Team |
 | **Fecha** | 2026-08-02 |
-| **Versión** | 0.9.0 |
+| **Versión** | 0.10.0 |
 
 ---
 
@@ -465,6 +465,12 @@ interface EPPProject {
 > 4. Para `id`s **nuevos** introducidos por la nueva versión del template, el slot queda vacío a la espera de que el usuario asigne una imagen.
 >
 > Esta reconciliación vive en el `layout-engine` compartido (`reconcileTemplateUpdate(oldRootNode, newRootNode, assignments)`) para poder testearse de forma aislada.
+
+> **Decisión de diseño — UI de `SaveTemplateDialog`: "Save" (sobrescribir) vs. "Save as" (nuevo), y confirmación siempre antes de escribir.** El panel expone dos botones en vez de un único campo de texto siempre visible:
+> - **"Save"** solo se muestra cuando `page.templateRef` apunta a un `id` que **todavía existe** en la galería (`getEppApi().templates.list()`) — es decir, la página fue cargada con "Apply to current page" desde un template existente, **o** ya se usó "Save as" antes en esta misma sesión de edición (ver abajo). Si el template fue borrado mientras tanto, `templateRef` queda "colgando" y el botón desaparece solo (no hace falta limpiarlo explícitamente). Al confirmar, sobrescribe ese mismo `id` sin pedir nombre — mismo mecanismo in-place que "Guardar cambios en template" arriba.
+> - **"Save as"** siempre está visible (haya o no `templateRef`). Abre el popup de confirmación con un campo de texto para el nombre; al confirmar, `exportTemplate` genera un template con un `id` nuevo (`crypto.randomUUID()`) y, al guardarse, la página queda **vinculada** a ese nuevo `id` (`linkPageToTemplate`) — así una segunda edición en la misma sesión ya puede usar "Save" en vez de repetir "Save as".
+> - Ambos botones, y el botón "Delete" de cada card en `TemplateGallery` (§6.1), abren **el mismo componente** `ConfirmDialog.tsx` — un popup genérico (título, descripción opcional, contenido opcional vía `children` para el campo de nombre de "Save as", botón de confirmar/cancelar, variante `destructive` para el de eliminar). Ninguna de las tres acciones escribe en disco sin pasar primero por esta confirmación.
+> - "Delete" llama al nuevo canal `templates:delete` (borra el archivo `.epptemplate` por `id`, idempotente) y no toca `page.templateRef` de ninguna página — si esa página vuelve a intentar "Save", el `find` contra la lista recién recargada ya no encuentra el template y el botón "Save" desaparece por la misma regla del primer punto.
 
 ---
 
@@ -1047,6 +1053,7 @@ easy-photo-print/
 │   │   ├── settings/
 │   │   │   └── UnitToggle.tsx       # switch mm/in en la toolbar global → setUnitSystem (§2.4)
 │   │   └── ui/                      # componentes shadcn/ui genéricos
+│   │       └── ConfirmDialog.tsx    # popup de confirmación reutilizado por Save/Save as/Delete de templates
 │   ├── store/
 │   │   ├── documentSlice.ts
 │   │   ├── uiSlice.ts
@@ -1056,6 +1063,7 @@ easy-photo-print/
 │   ├── hooks/
 │   │   ├── useLayoutResolution.ts   # memoiza resolveLayout() del árbol activo
 │   │   ├── useUndoRedo.ts           # pauseHistory()/resumeHistory() sobre zundo.temporal()
+│   │   ├── useTemplateLibrary.ts    # lista/reload de templates, compartido por SaveTemplateDialog y TemplateGallery
 │   │   └── useDragAndDrop.ts
 │   └── lib/
 │       ├── units.ts                 # mmToPx, pxToMm, mmToPt, mmToInches/inchesToMm, formatLength/parseLength (§2.4)

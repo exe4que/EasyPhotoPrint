@@ -17,6 +17,15 @@ export interface UiSlice {
   clearSelection: () => void;
 }
 
+export function createInitialUiState(): UiState {
+  return {
+    activePageId: 'page-1',
+    selectedElementIds: [],
+    activeTool: 'select',
+    layoutMode: 'simple',
+  };
+}
+
 interface UiSliceDependencies {
   ui: UiState;
   document: { pages: EPPProjectPage[] };
@@ -38,12 +47,7 @@ export function createUiSlice(
   get: () => UiSliceDependencies,
 ): UiSlice {
   return {
-    ui: {
-      activePageId: 'page-1',
-      selectedElementIds: [],
-      activeTool: 'select',
-      layoutMode: 'simple',
-    },
+    ui: createInitialUiState(),
     setActivePageId: (activePageId) => {
       const nextPage = get().document.pages.find((page) => page.id === activePageId);
       set((state) => ({

@@ -11,20 +11,24 @@ import { UnitToggle } from './components/settings/UnitToggle.js';
 import { SaveTemplateDialog } from './components/templates/SaveTemplateDialog.js';
 import { TemplateGallery } from './components/templates/TemplateGallery.js';
 import { CollapsiblePanel } from './components/ui/CollapsiblePanel.js';
+import { ConfirmDialog } from './components/ui/ConfirmDialog.js';
 import { useLayoutResolution } from './hooks/useLayoutResolution.js';
 import { useTemplateLibrary } from './hooks/useTemplateLibrary.js';
 import { useUndoRedo } from './hooks/useUndoRedo.js';
+import { getEppApi } from './lib/ipc-client.js';
 import { formatLength } from './lib/units.js';
 import { useEPPStore } from './store/index.js';
 
 export function App() {
   const [selectedImageAssetId, setSelectedImageAssetId] = useState<string | null>(null);
+  const [isNewProjectConfirmOpen, setIsNewProjectConfirmOpen] = useState(false);
   const templateLibrary = useTemplateLibrary();
   const hydrateSettings = useEPPStore((state) => state.hydrateSettings);
   const unitSystem = useEPPStore((state) => state.settings.unitSystem);
   const layoutMode = useEPPStore((state) => state.ui.layoutMode);
   const setLayoutMode = useEPPStore((state) => state.setLayoutMode);
   const normalizePageForSimpleMode = useEPPStore((state) => state.normalizePageForSimpleMode);
+  const startNewProject = useEPPStore((state) => state.startNewProject);
   const imageCount = useEPPStore((state) => state.imagePool.length);
   const pageCount = useEPPStore((state) => state.document.pages.length);
   const activePageId = useEPPStore((state) => state.ui.activePageId);
@@ -36,6 +40,12 @@ export function App() {
   useEffect(() => {
     void hydrateSettings();
   }, [hydrateSettings]);
+
+  useEffect(() => {
+    return getEppApi().menu.onNewProject(() => {
+      setIsNewProjectConfirmOpen(true);
+    });
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -172,6 +182,19 @@ export function App() {
           </aside>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={isNewProjectConfirmOpen}
+        title="Start a new project?"
+        description="This discards every page, image, and undo/redo history in the current document and starts over with a single blank page, as if the app had just been opened. This can't be undone."
+        confirmLabel="Start new project"
+        destructive
+        onConfirm={() => {
+          startNewProject();
+          setIsNewProjectConfirmOpen(false);
+        }}
+        onCancel={() => setIsNewProjectConfirmOpen(false)}
+      />
     </main>
   );
 }

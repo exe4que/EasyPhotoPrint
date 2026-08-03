@@ -858,6 +858,12 @@ export interface DocumentState {
   pages: EPPProjectPage[];
 }
 
+export function createInitialDocumentState(): DocumentState {
+  return {
+    pages: [createDefaultPage('page-1')],
+  };
+}
+
 export interface DocumentSlice {
   document: DocumentState;
   updatePageConfig: (pageId: string, patch: Partial<PageConfig>) => void;
@@ -912,9 +918,7 @@ export function createDocumentSlice(
   get: () => DocumentSliceDependencies,
 ): DocumentSlice {
   return {
-    document: {
-      pages: [createDefaultPage('page-1')],
-    },
+    document: createInitialDocumentState(),
     updatePageConfig: (pageId, patch) => {
       set((state) => ({
         document: {

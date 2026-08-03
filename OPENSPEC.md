@@ -6,7 +6,7 @@
 | **Estado** | Draft / Proposed |
 | **Autor** | Software Architecture Team |
 | **Fecha** | 2026-08-02 |
-| **Versión** | 0.12.0 |
+| **Versión** | 0.13.0 |
 
 ---
 
@@ -108,6 +108,14 @@ flowchart TB
 - `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true` en `BrowserWindow`.
 - Todo acceso a filesystem, diálogos e impresión pasa exclusivamente por `ipcMain.handle` con canales explícitamente listados (nunca `ipcRenderer.send` genérico con eval de comandos).
 - El **Layout Engine** (cálculo del árbol de nodos) vive como paquete TypeScript puro sin dependencias de Electron ni de React, para ser testeable de forma aislada y reutilizable en el proceso Main durante la exportación a PDF (ver §5).
+
+**Decisión de diseño — Menú de aplicación recortado a lo que este proyecto usa, con "File > New" resuelto en el renderer.** EPP reemplaza el menú por default de Electron (`Menu.setApplicationMenu`, `electron/main/menu.ts`) en vez de dejar el que Electron genera automáticamente cuando no se llama a ese método: los grupos `View` y `Window` no aportan nada a una app de una sola ventana sin recarga/DevTools de cara al usuario final, así que se **eliminan por completo** del template. Quedan `File` (con `New` + `Close`/`Quit` según plataforma), `Edit` (rol `editMenu` default, para que los inputs de texto de la app conserven cortar/copiar/pegar/deshacer nativos) y `Help`, más el menú de la app en macOS (`role: 'appMenu'`).
+
+`File > New` (`CmdOrCtrl+N`) no resetea el documento directamente desde el proceso Main — el Main no tiene acceso al store de Zustand del renderer, y la confirmación debe ser el mismo popup reutilizable de la app (`ConfirmDialog.tsx`, §3.3), no un `dialog.showMessageBox` nativo. El flujo completo:
+1. El click del `MenuItem` hace `BrowserWindow.getFocusedWindow()?.webContents.send('menu:new-project')` — un evento Main→Renderer, análogo en espíritu al resto de canales IPC de la app pero en la dirección opuesta (`ipcMain.handle`/`ipcRenderer.invoke` es Renderer→Main).
+2. El preload expone `window.eppAPI.menu.onNewProject(callback)`, que envuelve `ipcRenderer.on`/`.removeListener` y devuelve una función de desuscripción (mismo patrón que un `useEffect` de React esperaría).
+3. `App.tsx` se suscribe una vez al montar y, al recibir el evento, abre el `ConfirmDialog` ("Start a new project?"); no se toca el documento hasta que el usuario confirma explícitamente.
+4. Al confirmar, se llama a `startNewProject()` (acción de nivel de store combinado en `store/index.ts`, no de un slice individual — necesita tocar `document`, `ui` e `imagePool` a la vez): reemplaza los tres por exactamente los mismos factories que usa la inicialización del store (`createInitialDocumentState()`/`createInitialUiState()`, extraídos de `documentSlice.ts`/`uiSlice.ts` para no duplicar esa forma), y llama a `useEPPStore.temporal.getState().clear()` para vaciar también el historial de undo/redo — "como si recién abriéramos la app" incluye que no se pueda deshacer de vuelta al proyecto anterior.
 
 **Decisión de diseño — Imprimir siempre pasa por el PDF:** no existen dos caminos de impresión. El botón "Imprimir" y el botón "Exportar PDF" comparten el **mismo pipeline** (§5.2): ambos generan primero el `Uint8Array` del PDF vía `pdf-lib`. La diferencia es el paso final —"Exportar" lo guarda a disco vía `dialog.showSaveDialog`, mientras que "Imprimir" escribe ese mismo buffer a un archivo temporal (`app.getPath('temp')`) y lo carga en un `BrowserWindow` oculto vía `loadURL('file://...')` (evita duplicar el buffer en base64 y los límites de longitud de `data:` URL), ejecutando `webContents.print()` (o `print({ silent: true, deviceName })` para impresión silenciosa) sobre ese visor; el archivo temporal se borra al terminar. Esto garantiza que lo impreso sea *siempre* bit-a-bit lo mismo que el PDF exportado, eliminando cualquier posibilidad de divergencia entre "lo que ves" y "lo que se imprime".
 

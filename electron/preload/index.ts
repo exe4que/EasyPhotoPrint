@@ -12,6 +12,15 @@ const eppAPI = {
     openProject: () => ipcRenderer.invoke('fs:open-project'),
     saveProject: (project: unknown) => ipcRenderer.invoke('fs:save-project', project),
   },
+  menu: {
+    onNewProject: (callback: () => void) => {
+      const listener = () => callback();
+      ipcRenderer.on('menu:new-project', listener);
+      return () => {
+        ipcRenderer.removeListener('menu:new-project', listener);
+      };
+    },
+  },
   pdf: {
     export: (project: unknown) => ipcRenderer.invoke('pdf:export', project) as Promise<Uint8Array>,
   },

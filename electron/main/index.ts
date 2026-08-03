@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { registerIpcHandlers } from './ipc/index.js';
+import { buildApplicationMenu } from './menu.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const isDevelopment = Boolean(process.env.ELECTRON_RENDERER_URL);
@@ -40,6 +41,7 @@ function createMainWindow(): BrowserWindow {
 
 app.whenReady().then(() => {
   registerIpcHandlers();
+  buildApplicationMenu();
   createMainWindow();
 
   app.on('activate', () => {

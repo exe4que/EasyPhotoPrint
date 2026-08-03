@@ -14,6 +14,7 @@
 |---|---|---|---|
 | §2.2 | Arquitectura de procesos Electron, reglas de seguridad, contextBridge | `electron/main/index.ts`, `electron/preload/index.ts` | Completo |
 | §2.2 | Impresión siempre vía PDF (temp file + `webContents.print`) | `electron/main/ipc/print.handlers.ts` | No implementado |
+| §2.2 | Menú de aplicación recortado (sin `View`/`Window`) + `File > New` vía IPC Main→Renderer y `ConfirmDialog` | `electron/main/menu.ts`, `electron/main/index.ts`, `electron/preload/index.ts`, `src/lib/ipc-client.ts`, `src/App.tsx`, `src/store/index.ts` (`startNewProject`), `src/store/documentSlice.ts` (`createInitialDocumentState`), `src/store/uiSlice.ts` (`createInitialUiState`) | Completo |
 | §2.3 | Store Zustand + `zundo`, slices `document`/`ui`/`imagePool` | `src/store/documentSlice.ts`, `src/store/uiSlice.ts`, `src/store/imagePoolSlice.ts`, `src/store/index.ts` | Parcial |
 | §2.3 | `pageConfig` por página (no global) | `src/store/documentSlice.ts` | Completo |
 | §2.3 | Swap vs. reemplazo al asignar imagen a un slot | `src/store/documentSlice.ts` (`assignImageToSlot`) | Completo |

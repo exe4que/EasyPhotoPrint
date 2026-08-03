@@ -14,6 +14,10 @@ export interface EppAPI {
     openProject: () => Promise<EPPProject>;
     saveProject: (project: EPPProject) => Promise<void>;
   };
+  menu: {
+    /** Subscribes to the native "File > New" menu click; returns an unsubscribe function. */
+    onNewProject: (callback: () => void) => () => void;
+  };
   pdf: {
     export: (project: EPPProject) => Promise<Uint8Array>;
   };

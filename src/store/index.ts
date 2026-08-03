@@ -1,11 +1,11 @@
-// @spec OPENSPEC.md §2.3, §2.4 — combined Zustand store with zundo tracking over document state
+// @spec OPENSPEC.md §2.2, §2.3, §2.4 — combined Zustand store with zundo tracking over document state; startNewProject backs File > New
 import { create } from 'zustand';
 import { temporal } from 'zundo';
 
-import { createDocumentSlice, type DocumentSlice } from './documentSlice.js';
+import { createDocumentSlice, createInitialDocumentState, type DocumentSlice } from './documentSlice.js';
 import { createImagePoolSlice, type ImagePoolSlice } from './imagePoolSlice.js';
 import { createSettingsSlice, type SettingsSlice } from './settingsSlice.js';
-import { createUiSlice, type UiSlice } from './uiSlice.js';
+import { createInitialUiState, createUiSlice, type UiSlice } from './uiSlice.js';
 
 export type EPPStore = DocumentSlice &
   UiSlice &
@@ -13,6 +13,8 @@ export type EPPStore = DocumentSlice &
   SettingsSlice & {
     pauseHistory: () => void;
     resumeHistory: () => void;
+    /** Discards the current document, image pool, and undo/redo history — resets to the same state as a fresh app launch (File > New). */
+    startNewProject: () => void;
   };
 
 export const useEPPStore = create<EPPStore>()(
@@ -27,6 +29,14 @@ export const useEPPStore = create<EPPStore>()(
       },
       resumeHistory: () => {
         useEPPStore.temporal.getState().resume();
+      },
+      startNewProject: () => {
+        set({
+          document: createInitialDocumentState(),
+          ui: createInitialUiState(),
+          imagePool: [],
+        });
+        useEPPStore.temporal.getState().clear();
       },
     }),
     {

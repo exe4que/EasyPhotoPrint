@@ -45,11 +45,7 @@ function collectFlexContainerNodes(node: LayoutNode): LayoutNode[] {
   return nodes;
 }
 
-interface PageStageProps {
-  selectedImageAssetId: string | null;
-}
-
-export function PageStage({ selectedImageAssetId }: PageStageProps) {
+export function PageStage() {
   const { page, pageBox, layout } = useLayoutResolution();
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const suppressNextClickRef = useRef(false);
@@ -138,7 +134,7 @@ export function PageStage({ selectedImageAssetId }: PageStageProps) {
         <div>
           <h2 className="text-sm font-semibold text-white">Page preview</h2>
           <p className="mt-1 text-xs text-slate-400">
-            Click a slot to select it. Drag or click a library image, then assign it into the current layout.
+            Click a slot to select it. Drag a library image onto a slot to assign it.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -257,9 +253,6 @@ export function PageStage({ selectedImageAssetId }: PageStageProps) {
                   }
 
                   setSelectedElementIds([id]);
-                  if (selectedImageAssetId) {
-                    assignImageToSlot(page.id, id, selectedImageAssetId);
-                  }
                 }}
                 onKeyDown={(event) => {
                   if (event.key !== 'Enter' && event.key !== ' ') {
@@ -273,9 +266,6 @@ export function PageStage({ selectedImageAssetId }: PageStageProps) {
                   }
 
                   setSelectedElementIds([id]);
-                  if (selectedImageAssetId) {
-                    assignImageToSlot(page.id, id, selectedImageAssetId);
-                  }
                 }}
                 {...createSlotDropProps((imageAssetId) => {
                   setSelectedElementIds([id]);
@@ -413,7 +403,7 @@ export function PageStage({ selectedImageAssetId }: PageStageProps) {
 
                 {!page.assignments[id] ? (
                   <div className="absolute inset-0 flex items-center justify-center px-2 text-center text-[11px] font-medium text-slate-500">
-                    {selectedImageAssetId ? 'Click to assign selected image' : 'Drag an image here'}
+                    Drag an image here
                   </div>
                 ) : null}
               </div>

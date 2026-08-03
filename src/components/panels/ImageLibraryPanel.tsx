@@ -92,7 +92,7 @@ export function ImageLibraryPanel({ selectedImageAssetId, onSelectImageAssetId }
   return (
     <CollapsiblePanel
       title="Image library"
-      description="Load images from the native dialog, then click or drag them into the grid slots."
+      description="Load images from the native dialog, then drag them into the grid slots. Click an image to view its details in the Selection panel."
       defaultCollapsed={false}
       headerAction={
         <button

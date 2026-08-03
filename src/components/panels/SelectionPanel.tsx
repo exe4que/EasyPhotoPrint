@@ -41,7 +41,7 @@ export function SelectionPanel({ selectedImageAssetId, onClearSelectedImage }: S
           <div className="text-xs uppercase tracking-wide text-slate-500">Selected library image</div>
           <div className="mt-1 font-medium text-white">{selectedAsset?.fileName ?? 'None'}</div>
           <div className="mt-1 text-xs text-slate-400">
-            {selectedAsset ? `${selectedAsset.widthPx}×${selectedAsset.heightPx}` : 'Click a thumbnail or drag it to a slot.'}
+            {selectedAsset ? `${selectedAsset.widthPx}×${selectedAsset.heightPx}` : 'Click a thumbnail to see its details, or drag it to a slot to assign it.'}
           </div>
         </div>
       </div>

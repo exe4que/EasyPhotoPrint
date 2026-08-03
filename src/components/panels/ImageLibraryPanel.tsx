@@ -36,7 +36,7 @@ function ImageCard({
     <button
       type="button"
       onClick={onSelect}
-      className={`group relative overflow-hidden rounded-xl border text-left transition ${
+      className={`group relative w-36 flex-none overflow-hidden rounded-xl border text-left transition ${
         isSelected
           ? 'border-cyan-500 ring-2 ring-cyan-500/30'
           : 'border-slate-800 hover:border-slate-600'
@@ -47,9 +47,9 @@ function ImageCard({
         <img src={asset.thumbnailDataUrl} alt={asset.fileName} className="h-full w-full object-contain" />
       </div>
 
-      <div className="space-y-1 bg-slate-900/90 p-3">
-        <div className="truncate text-sm font-medium text-white">{asset.fileName}</div>
-        <div className="flex items-center justify-between text-xs text-slate-400">
+      <div className="space-y-1 bg-slate-900/90 p-2">
+        <div className="truncate text-xs font-medium text-white">{asset.fileName}</div>
+        <div className="flex items-center justify-between text-[11px] text-slate-400">
           <span>{`${asset.widthPx}×${asset.heightPx}`}</span>
           <span>{assignmentsOnPage > 0 ? `${assignmentsOnPage} used` : 'unused'}</span>
         </div>
@@ -94,16 +94,14 @@ export function ImageLibraryPanel({ selectedImageAssetId, onSelectImageAssetId }
       title="Image library"
       description="Load images from the native dialog, then click or drag them into the grid slots."
       defaultCollapsed={false}
-      actions={
-        <div>
-          <button
-            type="button"
-            onClick={() => void handleOpenImages()}
-            className="rounded-lg border border-cyan-500/60 bg-cyan-500/10 px-3 py-2 text-sm font-medium text-cyan-200 hover:bg-cyan-500/20"
-          >
-            Load images
-          </button>
-        </div>
+      headerAction={
+        <button
+          type="button"
+          onClick={() => void handleOpenImages()}
+          className="whitespace-nowrap rounded-lg border border-cyan-500/60 bg-cyan-500/10 px-3 py-2 text-sm font-medium text-cyan-200 hover:bg-cyan-500/20"
+        >
+          Load images
+        </button>
       }
     >
 
@@ -118,7 +116,7 @@ export function ImageLibraryPanel({ selectedImageAssetId, onSelectImageAssetId }
           No images loaded yet.
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="flex gap-3 overflow-x-auto overflow-y-hidden pb-1">
           {imagePool.map((asset) => {
             const isSelected = asset.id === selectedImageAssetId;
             return (

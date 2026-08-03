@@ -128,14 +128,20 @@ export function App() {
               </div>
             </CollapsiblePanel>
 
+            <PageSetupPanel />
             <SaveTemplateDialog onSaved={() => setTemplateRefreshKey((value) => value + 1)} />
             <TemplateGallery refreshKey={templateRefreshKey} />
             {layoutMode === 'nested' ? <LayoutTreePanel /> : null}
-            <PageSetupPanel />
           </aside>
 
-          <div className="min-h-0">
-            <PageStage selectedImageAssetId={selectedImageAssetId} />
+          <div className="flex h-full min-h-0 flex-col gap-4">
+            <div className="min-h-0 flex-1">
+              <PageStage selectedImageAssetId={selectedImageAssetId} />
+            </div>
+            <ImageLibraryPanel
+              selectedImageAssetId={selectedImageAssetId}
+              onSelectImageAssetId={setSelectedImageAssetId}
+            />
           </div>
 
           <aside className="min-h-0 space-y-4 overflow-y-auto pr-1">
@@ -144,10 +150,6 @@ export function App() {
               onClearSelectedImage={() => setSelectedImageAssetId(null)}
             />
             <PropertiesPanel />
-            <ImageLibraryPanel
-              selectedImageAssetId={selectedImageAssetId}
-              onSelectImageAssetId={setSelectedImageAssetId}
-            />
           </aside>
         </div>
       </div>

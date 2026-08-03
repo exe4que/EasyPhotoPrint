@@ -4,7 +4,7 @@ import type { LayoutNode } from '@epp/layout-engine';
 import { useEPPStore } from '../../store/index.js';
 import { CollapsiblePanel } from '../ui/CollapsiblePanel.js';
 
-type EditableNodeType = 'grid' | 'horizontal' | 'vertical' | 'imageSlot';
+type EditableNodeType = 'grid' | 'horizontal' | 'vertical' | 'imageSlot' | 'freeformCanvas';
 
 function LayoutTreeNode({
   node,
@@ -59,6 +59,7 @@ function LayoutTreeNode({
             <option value="horizontal">horizontal</option>
             <option value="vertical">vertical</option>
             <option value="imageSlot">imageSlot</option>
+            <option value="freeformCanvas">freeformCanvas</option>
           </select>
         </div>
 
@@ -120,7 +121,7 @@ export function LayoutTreePanel() {
   return (
     <CollapsiblePanel
       title="Layout tree"
-      description="Edit the nested node hierarchy and switch between grid, horizontal, vertical, and slot nodes."
+      description="Edit the nested node hierarchy and switch between grid, horizontal, vertical, slot, and freeform-canvas nodes."
       defaultCollapsed={false}
     >
       <LayoutTreeNode node={activePage.rootNode} depth={0} selectedNodeId={selectedNodeId} activePageId={activePageId} />

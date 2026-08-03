@@ -6,7 +6,7 @@
 | **Estado** | Draft / Proposed |
 | **Autor** | Software Architecture Team |
 | **Fecha** | 2026-08-02 |
-| **Versión** | 0.3.0 |
+| **Versión** | 0.4.0 |
 
 ---
 
@@ -212,7 +212,7 @@ function parseLength(input: string, unitSystem: 'metric' | 'imperial'): number {
 }
 ```
 
-`formatLength`/`parseLength` son los únicos puntos de conversión de toda la UI: `PropertiesPanel` (alto/ancho fijo, gap, padding), `PageSetupPanel` (tamaño de hoja custom), `DimensionOverlay` (cotas en vivo del modo Freeform, §4.2) y el diálogo de confirmación de impresión (§2.2) los usan todos, en vez de formatear números "a mano" cada uno por su lado.
+`formatLength`/`parseLength` son los únicos puntos de conversión de toda la UI: `PropertiesPanel` (alto/ancho fijo, gap, padding), `PageSetupPanel` (tamaño de hoja custom), `DimensionOverlay` (etiquetas de dimensión por hover sobre cualquier `imageSlot`, §4.1) y el diálogo de confirmación de impresión (§2.2) los usan todos, en vez de formatear números "a mano" cada uno por su lado.
 
 **Qué NO se ve afectado por el toggle:**
 - El **DPI** (`page.dpi`, §3.2/§3.3) es un concepto de resolución de imagen (puntos por pulgada) universal en toda la industria de impresión, independiente del sistema de unidades elegido para longitudes — se muestra siempre como "DPI", nunca se convierte.
@@ -500,6 +500,15 @@ flowchart TD
     D --> I
 ```
 
+> **Decisión de diseño — `freeformCanvas` es un tipo de nodo más, anidable en cualquier profundidad.** El árbol de layout no distingue `freeformCanvas` de `grid`/`horizontal`/`vertical`/`imageSlot` a la hora de anidar: puede aparecer como hijo directo de un `horizontal`/`vertical`/`grid`, a cualquier profundidad, exactamente igual que los demás tipos — el flowchart de `resolveLayout` de arriba ya lo trata como una rama más, asignándole el `box` que le toque como a cualquier otro nodo (§4.2 documenta qué hace ese nodo puertas adentro con ese `box`: delega el posicionamiento de sus `freeformElements` en vez de distribuir `children`). En la UI, el modo `nested` (`LayoutTreePanel`, inspector de tipo de nodo) debe permitir agregar o retipar cualquier nodo a `freeformCanvas` igual que a los otros tres tipos — la única restricción de anidado sigue siendo la del modo `Simple` (§2.3: dos niveles, sin contenedores anidados de ningún tipo), que aplica por diseño a los cuatro tipos de contenedor/slot por igual, no específicamente a `freeformCanvas`.
+
+> **Requisito funcional — Etiquetas de dimensión por hover (reemplaza el overlay de cotas en vivo de versiones anteriores de este documento).** Todo `imageSlot`, sin importar el tipo de contenedor que lo aloje (`grid`, `horizontal`, `vertical` o `freeformCanvas`), muestra sus dimensiones físicas al pasar el mouse por encima — no hay overlay de cotas permanente ni actualizado en vivo durante un drag, es pura interacción de hover, independiente de que el nodo esté siendo arrastrado o sea un `FreeformElement`:
+> - **Hover sobre el slot**: aparece un texto gris en la esquina superior derecha del slot con `formatLength(box.w) × formatLength(box.h)` (§2.4 — respeta la unidad activa), usando el `BoxMm` que le asignó `resolveLayout` a ese nodo.
+> - **Hover sobre la imagen asignada dentro del slot**: la etiqueta del slot (gris, arriba a la derecha) persiste, y además aparece una segunda etiqueta en amarillo en la esquina inferior izquierda del slot con las dimensiones reales de la imagen dentro de ese slot — que no siempre coinciden con las del slot: en `fitInParent` es el tamaño resultante de `computeFitInParent` (puede ser menor por el letterboxing); en `envelopeParent` y `stretch` coincide exactamente con el tamaño del slot, porque ambos modos llenan el slot por completo.
+> - No se muestran coordenadas (`xMm`/`yMm`) ni ángulo de rotación en esta etiqueta.
+>
+> Esto reemplaza el ítem "Overlay de cotas" que antes describía §4.2 (`DimensionOverlay`): ese componente pasa a implementar esta interacción de hover en vez de un overlay en vivo durante drag. El resto de §4.2 (transform en mm, snapping, bloqueo de aspect ratio, recorte al área imprimible) sigue aplicando sin cambios, específicamente para `freeformCanvas`.
+
 **Aplicación de `paddingMm`** (común a `grid`, `horizontal` y `vertical`): antes de distribuir a los hijos, todo contenedor reduce su `box` disponible restando el padding de cada lado. Esto se resuelve en una única función reutilizada por ambos algoritmos:
 
 ```ts
@@ -692,7 +701,7 @@ function resizeSiblingsByDrag(
 }
 ```
 
-En la UI, `NestedNodeRenderer.tsx` renderiza un componente `NodeDivider.tsx` entre cada par de hijos adyacentes de un `horizontal`/`vertical` (cursor `col-resize`/`row-resize` según dirección). Cuando `isDividerLocked` es `true`, el divisor se renderiza en estado deshabilitado (sin cursor de resize, con un pequeño ícono de candado en hover) para comunicar visualmente por qué no se puede mover. `onDragStart` llama a `store.pauseHistory()` (wrapper de `store.temporal.getState().pause()`, §2.3); durante `onDragMove` se llama a `resizeSiblingsByDrag` con el `deltaMm` acumulado y se actualiza el store en vivo sin que `zundo` registre cada frame (mismo patrón de feedback inmediato que el `DimensionOverlay` de freeform, §4.2); en `onDragEnd` se llama a `store.resumeHistory()`, con lo que el gesto completo de arrastre queda como **un solo** paso de undo/redo, no cientos.
+En la UI, `NestedNodeRenderer.tsx` renderiza un componente `NodeDivider.tsx` entre cada par de hijos adyacentes de un `horizontal`/`vertical` (cursor `col-resize`/`row-resize` según dirección). Cuando `isDividerLocked` es `true`, el divisor se renderiza en estado deshabilitado (sin cursor de resize, con un pequeño ícono de candado en hover) para comunicar visualmente por qué no se puede mover. `onDragStart` llama a `store.pauseHistory()` (wrapper de `store.temporal.getState().pause()`, §2.3); durante `onDragMove` se llama a `resizeSiblingsByDrag` con el `deltaMm` acumulado y se actualiza el store en vivo sin que `zundo` registre cada frame; en `onDragEnd` se llama a `store.resumeHistory()`, con lo que el gesto completo de arrastre queda como **un solo** paso de undo/redo, no cientos.
 
 **Pseudocódigo — `computeGridCells` (aplica padding del contenedor + gap por eje entre celdas):**
 
@@ -773,9 +782,9 @@ function validateLayoutFeasibility(node: LayoutNode, assignedBox: BoxMm, resultM
 - **En edición** (renderer, tras cada cambio de `fixedSizeMm` o de estructura): no bloquea nada — el contenedor y los hijos afectados se resaltan con un borde rojo punteado en el canvas y un ícono de advertencia en el `LayoutTreePanel`, mismo lenguaje visual que el warning de DPI bajo (§5.3).
 - **Al exportar/imprimir** (§5.2): si `validateLayoutFeasibility` devuelve algún warning, la exportación **se bloquea** con un mensaje que lista los nodos problemáticos — a diferencia del warning de DPI (que es solo informativo), un layout infactible produce cajas con tamaño 0 o solapadas, no un PDF "de baja calidad" sino uno objetivamente incorrecto, así que no tiene sentido dejar exportar.
 
-### 4.2 Estrategia de Cotas y Gizmos en Modo Libre
+### 4.2 Transform Libre y Recorte al Área Imprimible en Modo `freeformCanvas`
 
-En modo `freeformCanvas`, cada `FreeformElement` se renderiza como un `Konva.Group` con un `Konva.Transformer` adjunto al seleccionarlo. La estrategia de cotas en tiempo real:
+En un nodo `freeformCanvas`, cada `FreeformElement` se renderiza como un `Konva.Group` con un `Konva.Transformer` adjunto al seleccionarlo. Reglas de posicionamiento e interacción (las etiquetas de dimensión al hacer hover, incluida la de `FreeformElement`s, están definidas de forma general en el requisito funcional de §4.1 — acá solo lo específico de este tipo de nodo):
 
 > **Decisión de diseño — Posicionamiento libre con recorte al área imprimible:** el `paddingMm` del nodo `freeformCanvas` (§3.2 unificación margen/padding) define el **área imprimible** de esa página. Las reglas de posicionamiento son:
 > - El usuario puede mover/escalar/rotar una imagen libremente **sin restricción de límites** — incluso puede quedar parcialmente (o totalmente) fuera de los bordes físicos de la hoja.
@@ -784,18 +793,13 @@ En modo `freeformCanvas`, cada `FreeformElement` se renderiza como un `Konva.Gro
 > - El borde del área imprimible se dibuja en el editor como una guía discontinua (no imprimible) para que el usuario entienda visualmente qué porción de cada imagen se va a recortar antes de exportar.
 
 1. **Fuente de verdad en mm**: el store guarda `transform.{xMm, yMm, widthMm, heightMm, rotationDeg}`. Konva trabaja en píxeles de pantalla; existe una capa de conversión `mmToPx(valueMm, zoomLevel, screenDpi)` aplicada solo en el punto de renderizado, nunca persistida.
-2. **Overlay de cotas** (`DimensionOverlay` component): un layer de Konva separado, renderizado *encima* del elemento seleccionado, que dibuja (todas las etiquetas de longitud vía `formatLength`, §2.4 — cambian de mm a pulgadas en vivo si el usuario alterna el `UnitToggle` en medio de un arrastre):
-   - Línea + etiqueta de ancho (arriba del bounding box) y alto (a la izquierda), actualizadas en el evento `onDragMove`/`onTransform` (no solo en `onDragEnd`, para feedback en vivo).
-   - Badge de rotación (°) cerca del handle de rotación del `Transformer`, mostrando `rotationDeg` normalizado a `[0, 360)` — los grados no son una unidad de longitud, no los afecta el toggle métrico/imperial.
-   - Badge de posición `X, Y` (esquina superior izquierda del elemento, relativa al origen de la página) mientras se arrastra.
-3. **Snapping opcional**: durante `onDragMove`, se calculan deltas contra: bordes de página, centro de página, y bordes/centros de otros elementos, con tolerancia de ~3px en pantalla → se ajusta el `xMm/yMm` y se muestra una guía magenta (patrón estándar tipo Figma/Sketch).
-4. **Bloqueo de aspect ratio**: si `lockAspectRatio: true`, el handler de `onTransform` del `Konva.Transformer` restringe `widthMm`/`heightMm` recalculando el segundo valor a partir del primero y el aspect ratio original de la imagen, en vez de dejar que Konva aplique escalado libre.
+2. **Snapping opcional**: durante `onDragMove`, se calculan deltas contra: bordes de página, centro de página, y bordes/centros de otros elementos, con tolerancia de ~3px en pantalla → se ajusta el `xMm/yMm` y se muestra una guía magenta (patrón estándar tipo Figma/Sketch).
+3. **Bloqueo de aspect ratio**: si `lockAspectRatio: true`, el handler de `onTransform` del `Konva.Transformer` restringe `widthMm`/`heightMm` recalculando el segundo valor a partir del primero y el aspect ratio original de la imagen, en vez de dejar que Konva aplique escalado libre.
 
 ```mermaid
 sequenceDiagram
     participant User
     participant Konva as Konva.Transformer
-    participant Overlay as DimensionOverlay
     participant Store as Zustand Store
 
     User->>Konva: mousedown (onDragStart/onTransformStart)
@@ -803,8 +807,6 @@ sequenceDiagram
     User->>Konva: drag / resize / rotate handle
     Konva->>Store: onTransform(evt) → deltas en px
     Store->>Store: pxToMm(deltas, zoom) → patch {xMm,yMm,widthMm,heightMm,rotationDeg}
-    Store->>Overlay: nuevo transform (reactivo, sin registrar en historial)
-    Overlay->>User: Redibuja cotas en vivo (mm, °)
     User->>Konva: mouseup (onTransformEnd)
     Konva->>Store: resumeHistory() [zundo.temporal().resume()] → 1 solo checkpoint para todo el gesto
 ```
@@ -1097,7 +1099,7 @@ gantt
 
     section Fase 3 — Modo Freeform
     Transform (move/scale/rotate) con Konva  :f3a, after f1d, 10d
-    DimensionOverlay (cotas en vivo)         :f3b, after f3a, 8d
+    DimensionOverlay (etiquetas por hover)   :f3b, after f3a, 8d
     Z-index / capas                          :f3c, after f3a, 5d
     Snapping guides                          :f3d, after f3b, 6d
     Clip al área imprimible (§4.2/§5.5)      :f3e, after f3d, 5d

@@ -1,11 +1,12 @@
 // @spec OPENSPEC.md §1.3, §2.3, §4.1, §6.1 — page preview shell backed by the shared layout engine
-import type { LayoutNode, ScalingRule } from '@epp/layout-engine';
+import { computeFitInParent, type BoxMm, type ImageAsset, type LayoutNode, type ScalingRule } from '@epp/layout-engine';
 import { useEffect, useRef, useState } from 'react';
 
 import { useDragAndDrop } from '../../hooks/useDragAndDrop.js';
-import { mmToPx } from '../../lib/units.js';
+import { formatLength, mmToPx } from '../../lib/units.js';
 import { useLayoutResolution } from '../../hooks/useLayoutResolution.js';
 import { useEPPStore } from '../../store/index.js';
+import { DimensionOverlay } from './DimensionOverlay.js';
 
 const PREVIEW_ZOOM_FALLBACK = 0.38;
 const PREVIEW_INNER_PADDING_PX = 48;
@@ -29,6 +30,17 @@ function scalingRuleToObjectFit(scalingRule: ScalingRule | undefined): 'contain'
   }
 }
 
+function computeImageDisplaySizeMm(
+  asset: ImageAsset,
+  slotBox: BoxMm,
+  scalingRule: ScalingRule | undefined,
+): { widthMm: number; heightMm: number } {
+  if (scalingRule === 'fitInParent' || scalingRule == null) {
+    return computeFitInParent(asset, slotBox);
+  }
+  return { widthMm: slotBox.w, heightMm: slotBox.h };
+}
+
 interface PageStageProps {
   selectedImageAssetId: string | null;
 }
@@ -37,8 +49,11 @@ export function PageStage({ selectedImageAssetId }: PageStageProps) {
   const { page, pageBox, layout } = useLayoutResolution();
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const [previewZoom, setPreviewZoom] = useState(PREVIEW_ZOOM_FALLBACK);
+  const [hoveredSlotId, setHoveredSlotId] = useState<string | null>(null);
+  const [hoveredImageSlotId, setHoveredImageSlotId] = useState<string | null>(null);
   const imagePool = useEPPStore((state) => state.imagePool);
   const layoutMode = useEPPStore((state) => state.ui.layoutMode);
+  const unitSystem = useEPPStore((state) => state.settings.unitSystem);
   const selectedSlotId = useEPPStore((state) => state.ui.selectedElementIds[0] ?? null);
   const setSelectedElementIds = useEPPStore((state) => state.setSelectedElementIds);
   const assignImageToSlot = useEPPStore((state) => state.assignImageToSlot);
@@ -185,6 +200,11 @@ export function PageStage({ selectedImageAssetId }: PageStageProps) {
                   setSelectedElementIds([id]);
                   assignImageToSlot(page.id, id, imageAssetId);
                 })}
+                onMouseEnter={() => setHoveredSlotId(id)}
+                onMouseLeave={() => {
+                  setHoveredSlotId((current) => (current === id ? null : current));
+                  setHoveredImageSlotId((current) => (current === id ? null : current));
+                }}
               >
                 {page.assignments[id] && imageAssetMap.get(page.assignments[id]) ? (
                   <img
@@ -194,6 +214,8 @@ export function PageStage({ selectedImageAssetId }: PageStageProps) {
                     style={{
                       objectFit: scalingRuleToObjectFit(imageSlotMap.get(id)?.imageSlotConfig?.scalingRule),
                     }}
+                    onMouseEnter={() => setHoveredImageSlotId(id)}
+                    onMouseLeave={() => setHoveredImageSlotId((current) => (current === id ? null : current))}
                   />
                 ) : null}
 
@@ -201,7 +223,7 @@ export function PageStage({ selectedImageAssetId }: PageStageProps) {
                   <button
                     type="button"
                     aria-label={`Remove image from ${id}`}
-                    className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-white/70 bg-slate-950/80 text-sm font-semibold text-white opacity-0 shadow transition group-hover:opacity-100 hover:bg-rose-600"
+                    className="absolute left-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-white/70 bg-slate-950/80 text-sm font-semibold text-white opacity-0 shadow transition group-hover:opacity-100 hover:bg-rose-600"
                     onClick={(event) => {
                       event.preventDefault();
                       event.stopPropagation();
@@ -215,16 +237,38 @@ export function PageStage({ selectedImageAssetId }: PageStageProps) {
                   </button>
                 ) : null}
 
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-slate-950/0 to-slate-950/10" />
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950/70 via-slate-950/0 to-slate-950/10" />
 
                 <div className="absolute inset-x-0 bottom-0 flex items-center justify-between p-2">
-                  <span className="rounded-full bg-slate-950/85 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
-                    {id === page.rootNode.id ? 'root' : id}
-                  </span>
+                  {hoveredImageSlotId === id ? (
+                    <span />
+                  ) : (
+                    <span className="rounded-full bg-slate-950/85 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
+                      {id === page.rootNode.id ? 'root' : id}
+                    </span>
+                  )}
                   <span className="rounded-full bg-white/85 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-700">
                     {page.assignments[id] ? 'assigned' : 'drop image'}
                   </span>
                 </div>
+
+                <DimensionOverlay
+                  showSlotLabel={hoveredSlotId === id}
+                  slotLabel={`${formatLength(box.w, unitSystem)} × ${formatLength(box.h, unitSystem)}`}
+                  showImageLabel={hoveredImageSlotId === id}
+                  imageLabel={(() => {
+                    const asset = imageAssetMap.get(page.assignments[id] ?? '');
+                    if (!asset) {
+                      return undefined;
+                    }
+                    const { widthMm, heightMm } = computeImageDisplaySizeMm(
+                      asset,
+                      box,
+                      imageSlotMap.get(id)?.imageSlotConfig?.scalingRule,
+                    );
+                    return `${formatLength(widthMm, unitSystem)} × ${formatLength(heightMm, unitSystem)}`;
+                  })()}
+                />
 
                 {!page.assignments[id] ? (
                   <div className="absolute inset-0 flex items-center justify-center px-2 text-center text-[11px] font-medium text-slate-500">

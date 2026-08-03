@@ -1,4 +1,4 @@
-// @spec OPENSPEC.md §2.3 — document slice, pageConfig per page, assignImageToSlot swap logic
+// @spec OPENSPEC.md §2.3, §4.1 — document slice, pageConfig per page, assignImageToSlot swap logic, freeformCanvas nesting
 import {
   applyPadding,
   reconcileTemplateUpdate,
@@ -493,7 +493,7 @@ function retypeNodeById(
 function addChildNodeById(
   node: LayoutNode,
   parentNodeId: string,
-  childType: Exclude<NestedNodeType, 'freeformCanvas'>,
+  childType: NestedNodeType,
   nextSlotId: () => string,
 ): LayoutNode {
   if (node.id === parentNodeId) {
@@ -659,7 +659,7 @@ export interface DocumentSlice {
   normalizePageForSimpleMode: (pageId: string) => void;
   setSimpleRootType: (pageId: string, nextType: 'grid' | 'horizontal' | 'vertical' | 'imageSlot') => void;
   retypeLayoutNode: (pageId: string, nodeId: string, nextType: NestedNodeType) => void;
-  addNestedChildNode: (pageId: string, parentNodeId: string, childType: 'imageSlot' | 'horizontal' | 'vertical' | 'grid') => void;
+  addNestedChildNode: (pageId: string, parentNodeId: string, childType: 'imageSlot' | 'horizontal' | 'vertical' | 'grid' | 'freeformCanvas') => void;
   removeLayoutNode: (pageId: string, nodeId: string) => void;
   assignImageToSlot: (pageId: string, nodeId: string, imageAssetId: string) => void;
   clearImageFromSlot: (pageId: string, nodeId: string) => void;

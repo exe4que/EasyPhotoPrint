@@ -168,7 +168,7 @@ export function PropertiesPanel() {
           onChange={(event) =>
             setSimpleRootType(
               activePage.id,
-              event.target.value as 'grid' | 'horizontal' | 'vertical' | 'imageSlot',
+              event.target.value as 'grid' | 'horizontal' | 'vertical' | 'imageSlot' | 'freeformCanvas',
             )
           }
         >
@@ -176,6 +176,7 @@ export function PropertiesPanel() {
           <option value="grid">grid</option>
           <option value="horizontal">horizontal</option>
           <option value="vertical">vertical</option>
+          <option value="freeformCanvas">freeformCanvas</option>
         </select>
       </div>
     ) : null;
@@ -334,18 +335,20 @@ export function PropertiesPanel() {
           <div className="mt-1 text-xs text-slate-400">{contextNode.type}</div>
         </div>
 
-        <div>
-          <FieldLabel>Gap</FieldLabel>
-          <CommitLengthInput
-            valueMm={contextNode.gapMm ?? 0}
-            unitSystem={unitSystem}
-            onCommit={(valueMm) =>
-              updateLayoutNode(activePage.id, contextNode.id, {
-                gapMm: valueMm,
-              })
-            }
-          />
-        </div>
+        {contextNode.type !== 'freeformCanvas' ? (
+          <div>
+            <FieldLabel>Gap</FieldLabel>
+            <CommitLengthInput
+              valueMm={contextNode.gapMm ?? 0}
+              unitSystem={unitSystem}
+              onCommit={(valueMm) =>
+                updateLayoutNode(activePage.id, contextNode.id, {
+                  gapMm: valueMm,
+                })
+              }
+            />
+          </div>
+        ) : null}
 
         {renderPaddingInputs({
           padding: contextNode.paddingMm ?? {},

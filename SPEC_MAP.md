@@ -41,7 +41,7 @@
 | §4.1.1 | UI de divisoria arrastrable | `src/components/canvas/NodeDivider.tsx` | No implementado |
 | §4.1.2 | `validateLayoutFeasibility` | `packages/layout-engine/src/feasibility.ts` | Completo |
 | §4.1 | Etiquetas de dimensión por hover (`DimensionOverlay`, slot + imagen) | `src/components/canvas/DimensionOverlay.tsx`, `src/components/canvas/PageStage.tsx` | Completo |
-| §4.1 | `freeformCanvas` anidable como cualquier otro tipo de nodo (retype/add en modo `nested`) | `src/store/documentSlice.ts`, `src/components/panels/LayoutTreePanel.tsx` | Completo |
+| §4.1 | `freeformCanvas` anidable como cualquier otro tipo de nodo (opción de tipo de nodo raíz en `Simple`, retype/add en `nested`; sin modo `Freeform` de nivel superior) | `src/store/documentSlice.ts`, `src/components/panels/LayoutTreePanel.tsx`, `src/components/panels/PropertiesPanel.tsx`, `src/App.tsx`, `src/store/uiSlice.ts` | Completo |
 | §4.2 | Transform freeform (drag/scale/rotate con Konva), snapping, clip al área imprimible | `src/components/canvas/FreeformElement.tsx` | No implementado |
 | §4.2 | `pauseHistory`/`resumeHistory` alrededor de gestos de drag | `src/hooks/useUndoRedo.ts` | Parcial |
 

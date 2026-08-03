@@ -175,6 +175,24 @@ describe('document slice helpers', () => {
     expect(state.document.pages[0].assignments).toEqual({});
   });
 
+  it('switches the Simple root type to freeformCanvas and clears slot assignments', () => {
+    type StoreState = ReturnType<typeof createDocumentSlice>;
+    let state = createDocumentSlice((updater) => {
+      state = { ...state, ...updater(state) };
+    }, () => state) as StoreState;
+
+    state.assignImageToSlot('page-1', 'root-grid', 'image-a');
+    state.setSimpleRootType('page-1', 'freeformCanvas');
+
+    const page = state.document.pages[0];
+    expect(page.rootNode.type).toBe('freeformCanvas');
+    expect(page.rootNode.freeformElements).toEqual([]);
+    expect(page.assignments).toEqual({});
+
+    state.setSimpleRootType('page-1', 'imageSlot');
+    expect(state.document.pages[0].rootNode.type).toBe('imageSlot');
+  });
+
   it('starts new pages in simple mode as a root image slot', () => {
     const page = createDefaultPage('page-1');
     expect(page.rootNode.type).toBe('imageSlot');

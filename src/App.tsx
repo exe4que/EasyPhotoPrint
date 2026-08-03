@@ -105,8 +105,8 @@ export function App() {
                 </div>
               </dl>
 
-              <div className="mt-4 grid grid-cols-3 gap-2">
-                {(['simple', 'nested', 'freeform'] as const).map((mode) => (
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                {(['simple', 'nested'] as const).map((mode) => (
                   <button
                     key={mode}
                     type="button"

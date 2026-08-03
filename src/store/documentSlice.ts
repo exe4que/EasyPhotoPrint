@@ -182,6 +182,17 @@ function normalizeRootForSimpleMode(rootNode: LayoutNode, nextSlotId: () => stri
     };
   }
 
+  if (rootNode.type === 'freeformCanvas') {
+    return {
+      ...rootNode,
+      paddingMm: rootNode.paddingMm ?? { top: 5, right: 5, bottom: 5, left: 5 },
+      freeformElements: rootNode.freeformElements ?? [],
+      children: undefined,
+      gridConfig: undefined,
+      imageSlotConfig: undefined,
+    };
+  }
+
   return {
     ...createImageSlot(rootNode.id),
     paddingMm: { top: 5, right: 5, bottom: 5, left: 5 },
@@ -204,7 +215,7 @@ function firstAssignedImageAssetId(page: EPPProjectPage): string | undefined {
 
 function setSimpleRootTypeForPage(
   page: EPPProjectPage,
-  nextType: Extract<NestedNodeType, 'grid' | 'horizontal' | 'vertical' | 'imageSlot'>,
+  nextType: Extract<NestedNodeType, 'grid' | 'horizontal' | 'vertical' | 'imageSlot' | 'freeformCanvas'>,
 ): { rootNode: LayoutNode; assignments: Record<string, string> } {
   const nextSlotId = createSlotIdGenerator(page.rootNode);
   const currentRoot = normalizeRootForSimpleMode(page.rootNode, nextSlotId);
@@ -221,6 +232,18 @@ function setSimpleRootTypeForPage(
             : { scalingRule: 'fitInParent' },
       },
       assignments: assignedImageAssetId ? { [currentRoot.id]: assignedImageAssetId } : {},
+    };
+  }
+
+  if (nextType === 'freeformCanvas') {
+    return {
+      rootNode: {
+        id: currentRoot.id,
+        type: 'freeformCanvas',
+        paddingMm: currentRoot.paddingMm ?? { top: 5, right: 5, bottom: 5, left: 5 },
+        freeformElements: currentRoot.type === 'freeformCanvas' ? currentRoot.freeformElements ?? [] : [],
+      },
+      assignments: {},
     };
   }
 
@@ -657,7 +680,7 @@ export interface DocumentSlice {
     },
   ) => void;
   normalizePageForSimpleMode: (pageId: string) => void;
-  setSimpleRootType: (pageId: string, nextType: 'grid' | 'horizontal' | 'vertical' | 'imageSlot') => void;
+  setSimpleRootType: (pageId: string, nextType: 'grid' | 'horizontal' | 'vertical' | 'imageSlot' | 'freeformCanvas') => void;
   retypeLayoutNode: (pageId: string, nodeId: string, nextType: NestedNodeType) => void;
   addNestedChildNode: (pageId: string, parentNodeId: string, childType: 'imageSlot' | 'horizontal' | 'vertical' | 'grid' | 'freeformCanvas') => void;
   removeLayoutNode: (pageId: string, nodeId: string) => void;

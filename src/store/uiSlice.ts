@@ -3,7 +3,7 @@ export interface UiState {
   activePageId: string;
   selectedElementIds: string[];
   activeTool: 'select' | 'pan' | 'crop';
-  layoutMode: 'simple' | 'nested' | 'freeform';
+  layoutMode: 'simple' | 'nested';
 }
 
 export interface UiSlice {

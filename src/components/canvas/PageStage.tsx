@@ -30,15 +30,15 @@ function scalingRuleToObjectFit(scalingRule: ScalingRule | undefined): 'contain'
   }
 }
 
-function computeImageDisplaySizeMm(
+function computeImageDisplayRectMm(
   asset: ImageAsset,
   slotBox: BoxMm,
   scalingRule: ScalingRule | undefined,
-): { widthMm: number; heightMm: number } {
+): { offsetXMm: number; offsetYMm: number; widthMm: number; heightMm: number } {
   if (scalingRule === 'fitInParent' || scalingRule == null) {
     return computeFitInParent(asset, slotBox);
   }
-  return { widthMm: slotBox.w, heightMm: slotBox.h };
+  return { offsetXMm: 0, offsetYMm: 0, widthMm: slotBox.w, heightMm: slotBox.h };
 }
 
 interface PageStageProps {
@@ -201,6 +201,34 @@ export function PageStage({ selectedImageAssetId }: PageStageProps) {
                   assignImageToSlot(page.id, id, imageAssetId);
                 })}
                 onMouseEnter={() => setHoveredSlotId(id)}
+                onMouseMove={(event) => {
+                  const asset = imageAssetMap.get(page.assignments[id] ?? '');
+                  if (!asset) {
+                    setHoveredImageSlotId((current) => (current === id ? null : current));
+                    return;
+                  }
+
+                  const rect = event.currentTarget.getBoundingClientRect();
+                  const localX = event.clientX - rect.left;
+                  const localY = event.clientY - rect.top;
+                  const displayRect = computeImageDisplayRectMm(
+                    asset,
+                    box,
+                    imageSlotMap.get(id)?.imageSlotConfig?.scalingRule,
+                  );
+                  const insideImage =
+                    localX >= mmToPx(displayRect.offsetXMm, previewZoom) &&
+                    localX <= mmToPx(displayRect.offsetXMm + displayRect.widthMm, previewZoom) &&
+                    localY >= mmToPx(displayRect.offsetYMm, previewZoom) &&
+                    localY <= mmToPx(displayRect.offsetYMm + displayRect.heightMm, previewZoom);
+
+                  setHoveredImageSlotId((current) => {
+                    if (insideImage) {
+                      return id;
+                    }
+                    return current === id ? null : current;
+                  });
+                }}
                 onMouseLeave={() => {
                   setHoveredSlotId((current) => (current === id ? null : current));
                   setHoveredImageSlotId((current) => (current === id ? null : current));
@@ -210,12 +238,10 @@ export function PageStage({ selectedImageAssetId }: PageStageProps) {
                   <img
                     src={imageAssetMap.get(page.assignments[id])?.thumbnailDataUrl}
                     alt={imageAssetMap.get(page.assignments[id])?.fileName}
-                    className="absolute inset-0 h-full w-full"
+                    className="pointer-events-none absolute inset-0 h-full w-full"
                     style={{
                       objectFit: scalingRuleToObjectFit(imageSlotMap.get(id)?.imageSlotConfig?.scalingRule),
                     }}
-                    onMouseEnter={() => setHoveredImageSlotId(id)}
-                    onMouseLeave={() => setHoveredImageSlotId((current) => (current === id ? null : current))}
                   />
                 ) : null}
 
@@ -261,7 +287,7 @@ export function PageStage({ selectedImageAssetId }: PageStageProps) {
                     if (!asset) {
                       return undefined;
                     }
-                    const { widthMm, heightMm } = computeImageDisplaySizeMm(
+                    const { widthMm, heightMm } = computeImageDisplayRectMm(
                       asset,
                       box,
                       imageSlotMap.get(id)?.imageSlotConfig?.scalingRule,

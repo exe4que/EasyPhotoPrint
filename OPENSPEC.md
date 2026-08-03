@@ -6,7 +6,7 @@
 | **Estado** | Draft / Proposed |
 | **Autor** | Software Architecture Team |
 | **Fecha** | 2026-08-02 |
-| **Versión** | 0.4.0 |
+| **Versión** | 0.5.0 |
 
 ---
 
@@ -42,7 +42,7 @@ La impresión doméstica de fotografías enfrenta tres fricciones recurrentes qu
 > 3. Selecciona el modo **Simple**, cambia el tipo del nodo raíz a `grid`, y configura 2 columnas x 3 filas con gap de 3mm.
 > 4. Arrastra 6 fotos desde la biblioteca a las celdas de la grilla; por defecto cada una se ajusta con `fitInParent` (sin recortar, respetando su aspect ratio) — María cambia una de ellas a `envelopeParent` para que llene la celda por completo recortando el sobrante.
 > 5. Guarda esta estructura como template `"Grid 2x3 Vacaciones"` (sin las imágenes, solo la estructura).
-> 6. Crea una segunda página, cambia a modo **Freeform**, arrastra 4 fotos libremente, las rota y escala usando los gizmos interactivos que muestran cotas en tiempo real (mm y grados).
+> 6. Crea una segunda página, en modo **Simple** cambia el tipo del nodo raíz a `freeformCanvas`, arrastra 4 fotos libremente, las rota y escala usando los gizmos interactivos.
 > 7. Exporta el documento completo a PDF a 300 DPI y lo envía a la impresora nativa del sistema.
 
 ### 1.4 No-Goals (Fuera de Alcance v1)
@@ -132,7 +132,7 @@ interface EPPStore {
     activePageId: string;
     selectedElementIds: string[];
     activeTool: 'select' | 'pan' | 'crop';
-    layoutMode: 'simple' | 'nested' | 'freeform';
+    layoutMode: 'simple' | 'nested';
   };
 
   // --- Biblioteca de imágenes cargadas (pool) ---
@@ -153,7 +153,7 @@ interface EPPStore {
 
 > **Decisión de diseño — `pageConfig` (tamaño, orientación, DPI) es por página, no global.** Antes `pageSize`/`orientation`/`dpi` vivían en `document` como un único valor para todo el proyecto — pero eso no permite mezclar, por ejemplo, una hoja A4 con una 4x6 en el mismo `.eppproj` (algo perfectamente normal: portada + fotos sueltas). Cada `Page` ahora trae su propio `pageConfig` (mismo shape que `EPPTemplate.page`, ver §3.3), y `applyTemplate(pageId, template)` solo modifica el `pageConfig` de la página indicada, nunca del documento completo. Una página nueva copia el `pageConfig` de la página activa como punto de partida, pero queda desde ese momento completamente independiente.
 
-> **Decisión de diseño — El modo `Simple` reemplaza al modo `Grid` como entrada por defecto y es un subconjunto restringido del editor nested.** El selector de modos de la UI pasa a ser `simple | nested | freeform`. `Simple` admite **solo dos niveles**: el nodo raíz de la página y, si el nodo raíz es un contenedor (`grid`, `horizontal` o `vertical`), únicamente `imageSlot`s como hijos directos — nunca contenedores anidados ni `freeformCanvas`. El panel `LayoutTree` no se muestra en `Simple`, y el usuario cambia el tipo del nodo raíz desde el inspector contextual. El tipo inicial de una página nueva es `imageSlot`, para cubrir el caso más simple de “una sola foto que ocupa toda la hoja respetando márgenes”; si el usuario cambia el tipo raíz a `grid`/`horizontal`/`vertical`, se crean o reutilizan `imageSlot`s directos sin introducir más profundidad en el árbol.
+> **Decisión de diseño — El modo `Simple` reemplaza al modo `Grid` como entrada por defecto y es un subconjunto restringido del editor nested.** El selector de modos de la UI es `simple | nested` — **no existe un modo `Freeform` como entrada de nivel superior**: `freeformCanvas` es únicamente un tipo de nodo más, seleccionable como tipo del nodo raíz en `Simple` (igual que `grid`/`horizontal`/`vertical`/`imageSlot`) o anidado en cualquier profundidad dentro de un `horizontal`/`vertical`/`grid` en modo `nested` (§4.1, decisión de diseño "`freeformCanvas` es un tipo de nodo más"). `Simple` admite **solo dos niveles**: el nodo raíz de la página y, si el nodo raíz es un contenedor (`grid`, `horizontal` o `vertical`), únicamente `imageSlot`s como hijos directos — nunca contenedores anidados. El panel `LayoutTree` no se muestra en `Simple`, y el usuario cambia el tipo del nodo raíz (incluyendo a `freeformCanvas`) desde el inspector contextual. El tipo inicial de una página nueva es `imageSlot`, para cubrir el caso más simple de “una sola foto que ocupa toda la hoja respetando márgenes”; si el usuario cambia el tipo raíz a `grid`/`horizontal`/`vertical`, se crean o reutilizan `imageSlot`s directos sin introducir más profundidad en el árbol; si lo cambia a `freeformCanvas`, la página entera pasa a ser un lienzo libre (el caso "collage" del user journey, §1.3).
 
 > **Decisión de diseño — Reemplazo vs. Swap al asignar imagen a un slot ocupado:** `assignImageToSlot` resuelve así:
 > - Si `imageAssetId` **no** está asignado a ningún otro slot de la página (viene "libre" del pool, o ya está usado en **otra** página) → **reemplaza** directamente la imagen del slot destino; la imagen reemplazada vuelve a quedar disponible (desasignada) en el `imagePool`. Las imágenes no son exclusivas: la misma foto puede estar asignada a varios slots a la vez, incluso en páginas distintas.
@@ -217,7 +217,7 @@ function parseLength(input: string, unitSystem: 'metric' | 'imperial'): number {
 **Qué NO se ve afectado por el toggle:**
 - El **DPI** (`page.dpi`, §3.2/§3.3) es un concepto de resolución de imagen (puntos por pulgada) universal en toda la industria de impresión, independiente del sistema de unidades elegido para longitudes — se muestra siempre como "DPI", nunca se convierte.
 - Los **presets de tamaño de hoja** (`sizePreset: 'A4' | 'Letter' | ...`) no cambian de valor ni de nombre con el toggle — solo su *label* mostrado en el selector incluye la equivalencia en la unidad activa (p. ej. `A4 (210 × 297 mm)` en métrico, `A4 (8.27 × 11.69")` en imperial), a partir del mismo `formatLength`.
-- La tolerancia de snapping en modo Freeform (§4.2, "~3px en pantalla") es espacio-pantalla, no una medida de diseño — no depende del sistema de unidades.
+- La tolerancia de snapping dentro de un nodo `freeformCanvas` (§4.2, "~3px en pantalla") es espacio-pantalla, no una medida de diseño — no depende del sistema de unidades.
 
 **UI:** un componente `UnitToggle.tsx` (switch "mm / in") visible en la barra de herramientas global, que llama a `setUnitSystem`. El cambio es instantáneo y solo re-renderiza labels/inputs — no dispara ningún recálculo del `layout-engine` (los mm internos no cambiaron).
 
@@ -451,7 +451,7 @@ interface EPPProject {
 
 > **Decisión de diseño — Un solo identificador estable (`LayoutNode.id`), sin `slotId` separado.** El schema tenía un `imageSlotConfig.slotId` distinto del `LayoutNode.id` del propio nodo, sin relación documentada entre ambos — se elimina `slotId` por redundante. Regla única: **`LayoutNode.id` es estable mientras el nodo exista lógicamente**; solo se genera un `id` nuevo cuando el usuario crea un nodo nuevo, nunca al mover, reordenar o envolver nodos existentes (tampoco durante la reconciliación de templates, ver más abajo). `assignments` y `FreeformElement` referencian directamente ese `id` (el campo `FreeformElement.slotId` se renombra a `imageNodeId`, §3.2).
 
-**Regla clave**: al "Aplicar" un template a una página, el `rootNode` del template se **clona** dentro de `page.rootNode`. Ediciones posteriores (agregar una fila, mover una imagen en modo libre) modifican la copia del proyecto, no el template original — a menos que el usuario ejecute explícitamente "Guardar cambios en template".
+**Regla clave**: al "Aplicar" un template a una página, el `rootNode` del template se **clona** dentro de `page.rootNode`. Ediciones posteriores (agregar una fila, mover una imagen dentro de un nodo `freeformCanvas`) modifican la copia del proyecto, no el template original — a menos que el usuario ejecute explícitamente "Guardar cambios en template".
 
 > **Decisión de diseño — Versionado tipo "símbolo compartido" (in-place, no inmutable):** "Guardar cambios en template" **sobrescribe** el `.epptemplate` original conservando su mismo `id` — no crea una copia versionada. Todo `page.rootNode` de cualquier proyecto cuyo `templateRef` apunte a ese `id` queda considerado **desincronizado** y se resuelve la próxima vez que ese proyecto se abre (o mediante una acción explícita "Actualizar desde template" en la UI, con badge de aviso en la página afectada — nunca de forma silenciosa mientras el usuario está trabajando). La reconciliación sigue estas reglas, por `LayoutNode.id`:
 >
@@ -500,11 +500,11 @@ flowchart TD
     D --> I
 ```
 
-> **Decisión de diseño — `freeformCanvas` es un tipo de nodo más, anidable en cualquier profundidad.** El árbol de layout no distingue `freeformCanvas` de `grid`/`horizontal`/`vertical`/`imageSlot` a la hora de anidar: puede aparecer como hijo directo de un `horizontal`/`vertical`/`grid`, a cualquier profundidad, exactamente igual que los demás tipos — el flowchart de `resolveLayout` de arriba ya lo trata como una rama más, asignándole el `box` que le toque como a cualquier otro nodo (§4.2 documenta qué hace ese nodo puertas adentro con ese `box`: delega el posicionamiento de sus `freeformElements` en vez de distribuir `children`). En la UI, el modo `nested` (`LayoutTreePanel`, inspector de tipo de nodo) debe permitir agregar o retipar cualquier nodo a `freeformCanvas` igual que a los otros tres tipos — la única restricción de anidado sigue siendo la del modo `Simple` (§2.3: dos niveles, sin contenedores anidados de ningún tipo), que aplica por diseño a los cuatro tipos de contenedor/slot por igual, no específicamente a `freeformCanvas`.
+> **Decisión de diseño — `freeformCanvas` es un tipo de nodo más, anidable en cualquier profundidad.** El árbol de layout no distingue `freeformCanvas` de `grid`/`horizontal`/`vertical`/`imageSlot` a la hora de anidar: puede aparecer como hijo directo de un `horizontal`/`vertical`/`grid`, a cualquier profundidad, exactamente igual que los demás tipos — el flowchart de `resolveLayout` de arriba ya lo trata como una rama más, asignándole el `box` que le toque como a cualquier otro nodo (§4.2 documenta qué hace ese nodo puertas adentro con ese `box`: delega el posicionamiento de sus `freeformElements` en vez de distribuir `children`). En la UI, el modo `nested` (`LayoutTreePanel`, inspector de tipo de nodo) debe permitir agregar o retipar cualquier nodo a `freeformCanvas` igual que a los otros tres tipos, y en modo `Simple` es una opción más del selector de tipo del nodo raíz (§2.3) — no existe un modo `Freeform` de nivel superior separado. La única restricción de anidado sigue siendo la de dos niveles de `Simple` (§2.3), que aplica por diseño a los cinco tipos de nodo por igual, no específicamente a `freeformCanvas`.
 
 > **Requisito funcional — Etiquetas de dimensión por hover (reemplaza el overlay de cotas en vivo de versiones anteriores de este documento).** Todo `imageSlot`, sin importar el tipo de contenedor que lo aloje (`grid`, `horizontal`, `vertical` o `freeformCanvas`), muestra sus dimensiones físicas al pasar el mouse por encima — no hay overlay de cotas permanente ni actualizado en vivo durante un drag, es pura interacción de hover, independiente de que el nodo esté siendo arrastrado o sea un `FreeformElement`:
 > - **Hover sobre el slot**: aparece un texto gris en la esquina superior derecha del slot con `formatLength(box.w) × formatLength(box.h)` (§2.4 — respeta la unidad activa), usando el `BoxMm` que le asignó `resolveLayout` a ese nodo.
-> - **Hover sobre la imagen asignada dentro del slot**: la etiqueta del slot (gris, arriba a la derecha) persiste, y además aparece una segunda etiqueta en amarillo en la esquina inferior izquierda del slot con las dimensiones reales de la imagen dentro de ese slot — que no siempre coinciden con las del slot: en `fitInParent` es el tamaño resultante de `computeFitInParent` (puede ser menor por el letterboxing); en `envelopeParent` y `stretch` coincide exactamente con el tamaño del slot, porque ambos modos llenan el slot por completo.
+> - **Hover sobre la imagen asignada dentro del slot**: la etiqueta del slot (gris, arriba a la derecha) persiste, y además aparece una segunda etiqueta en amarillo en la esquina inferior izquierda del slot con las dimensiones reales de la imagen dentro de ese slot — que no siempre coinciden con las del slot: en `fitInParent` es el tamaño resultante de `computeFitInParent` (puede ser menor por el letterboxing); en `envelopeParent` y `stretch` coincide exactamente con el tamaño del slot, porque ambos modos llenan el slot por completo. La detección de "está el mouse sobre la imagen" usa ese mismo rectángulo (`computeFitInParent` cuando aplica, el `slotBoxMm` completo en los otros dos modos) — **no** el bounding box completo del slot: en `fitInParent` con letterboxing, las franjas vacías del slot cuentan como "hover del slot" (etiqueta gris) pero no como "hover de la imagen" (etiqueta amarilla).
 > - No se muestran coordenadas (`xMm`/`yMm`) ni ángulo de rotación en esta etiqueta.
 >
 > Esto reemplaza el ítem "Overlay de cotas" que antes describía §4.2 (`DimensionOverlay`): ese componente pasa a implementar esta interacción de hover en vez de un overlay en vivo durante drag. El resto de §4.2 (transform en mm, snapping, bloqueo de aspect ratio, recorte al área imprimible) sigue aplicando sin cambios, específicamente para `freeformCanvas`.
@@ -955,9 +955,9 @@ function computeStretch(asset: ImageAsset, slotBoxMm: BoxMm): { widthMm: number;
 }
 ```
 
-Las tres funciones viven en el `layout-engine` compartido y se usan tanto para la vista previa (Konva `crop`/tamaño de `Konva.Image`, con `scaleX`/`scaleY` independientes en el caso de `stretch`) como para el recorte/escalado real vía `sharp` en la exportación — garantizando **paridad WYSIWYG** entre pantalla y PDF. Ni `computeFitInParent` ni `computeStretch` requieren clip adicional (ninguno de los dos excede el `slotBoxMm`), a diferencia del clip de márgenes en modo Freeform (§5.5), que sigue aplicando independientemente del `scalingRule` elegido.
+Las tres funciones viven en el `layout-engine` compartido y se usan tanto para la vista previa (Konva `crop`/tamaño de `Konva.Image`, con `scaleX`/`scaleY` independientes en el caso de `stretch`) como para el recorte/escalado real vía `sharp` en la exportación — garantizando **paridad WYSIWYG** entre pantalla y PDF. Ni `computeFitInParent` ni `computeStretch` requieren clip adicional (ninguno de los dos excede el `slotBoxMm`), a diferencia del clip de márgenes en un nodo `freeformCanvas` (§5.5), que sigue aplicando independientemente del `scalingRule` elegido.
 
-### 5.5 Clip al Área Imprimible (Modo Freeform)
+### 5.5 Clip al Área Imprimible (`freeformCanvas`)
 
 Como se define en §4.2, los `FreeformElement` pueden posicionarse fuera del área imprimible, pero nunca deben renderizarse dentro de la franja de margen ni fuera de la hoja. En `pdf-lib` esto se logra con un clip de contenido gráfico alrededor de cada `drawImage`:
 
@@ -1129,7 +1129,7 @@ gantt
 | **0 — Fundaciones** | App Electron arranca, IPC de prueba funcional, `layout-engine` con tests unitarios pasando |
 | **1 — Canvas Básico** | Usuario puede crear hoja A4, cargar fotos, armar grilla 2x3 y ver preview correcto |
 | **2 — Nested Layouts** | Usuario puede anidar contenedores H/V/Grid con alineación configurable, fijar tamaños en mm (con drag de divisorias respetándolos) y ver advertencia si el layout resultante es infactible, editando visualmente el árbol |
-| **3 — Freeform** | Usuario puede mover/rotar/escalar libremente con cotas en vivo, snapping, y recorte automático al área imprimible cuando una imagen se sale de la hoja |
+| **3 — Freeform** | Usuario puede mover/rotar/escalar libremente dentro de un nodo `freeformCanvas` (Simple o anidado), con etiquetas de dimensión por hover, snapping, y recorte automático al área imprimible cuando una imagen se sale de la hoja |
 | **4 — Templates** | CRUD completo de templates (uno por página), aplicables a nuevas páginas con imágenes distintas, con reconciliación automática al editar un template ya usado en otros proyectos |
 | **5 — Exportación** | PDF exportado mide exactamente lo configurado (verificado con regla en impresión física) a 300 DPI; la impresión nativa reproduce el mismo tamaño físico (verificado con `scaleFactor: 100` en Win/macOS/Linux) |
 | **6 — Release** | Instaladores firmados para Win/macOS/Linux, undo/redo estable (un solo checkpoint por gesto de arrastre) en toda la app |

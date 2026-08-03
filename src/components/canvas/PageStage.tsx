@@ -56,6 +56,7 @@ export function PageStage({ selectedImageAssetId }: PageStageProps) {
   const unitSystem = useEPPStore((state) => state.settings.unitSystem);
   const selectedSlotId = useEPPStore((state) => state.ui.selectedElementIds[0] ?? null);
   const setSelectedElementIds = useEPPStore((state) => state.setSelectedElementIds);
+  const clearSelection = useEPPStore((state) => state.clearSelection);
   const assignImageToSlot = useEPPStore((state) => state.assignImageToSlot);
   const clearImageFromSlot = useEPPStore((state) => state.clearImageFromSlot);
   const { createSlotDropProps } = useDragAndDrop();
@@ -171,7 +172,7 @@ export function PageStage({ selectedImageAssetId }: PageStageProps) {
                 }}
                 onClick={() => {
                   if (selectedSlotId === id) {
-                    setSelectedElementIds([]);
+                    clearSelection();
                     return;
                   }
 
@@ -187,7 +188,7 @@ export function PageStage({ selectedImageAssetId }: PageStageProps) {
 
                   event.preventDefault();
                   if (selectedSlotId === id) {
-                    setSelectedElementIds([]);
+                    clearSelection();
                     return;
                   }
 
@@ -255,7 +256,7 @@ export function PageStage({ selectedImageAssetId }: PageStageProps) {
                       event.stopPropagation();
                       clearImageFromSlot(page.id, id);
                       if (selectedSlotId === id) {
-                        setSelectedElementIds([]);
+                        clearSelection();
                       }
                     }}
                   >

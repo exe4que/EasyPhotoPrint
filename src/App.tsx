@@ -26,7 +26,7 @@ export function App() {
   const imageCount = useEPPStore((state) => state.imagePool.length);
   const pageCount = useEPPStore((state) => state.document.pages.length);
   const activePageId = useEPPStore((state) => state.ui.activePageId);
-  const setSelectedElementIds = useEPPStore((state) => state.setSelectedElementIds);
+  const clearSelection = useEPPStore((state) => state.clearSelection);
   const { pageBox, page } = useLayoutResolution();
   const { undo, redo } = useUndoRedo();
 
@@ -37,7 +37,7 @@ export function App() {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        setSelectedElementIds([]);
+        clearSelection();
       }
     };
 
@@ -45,7 +45,7 @@ export function App() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [setSelectedElementIds]);
+  }, [clearSelection]);
 
   return (
     <main className="flex h-screen flex-col overflow-hidden bg-slate-950 text-slate-100">

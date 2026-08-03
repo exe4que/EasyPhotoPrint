@@ -17,6 +17,7 @@
 | §2.3 | Store Zustand + `zundo`, slices `document`/`ui`/`imagePool` | `src/store/documentSlice.ts`, `src/store/uiSlice.ts`, `src/store/imagePoolSlice.ts`, `src/store/index.ts` | Parcial |
 | §2.3 | `pageConfig` por página (no global) | `src/store/documentSlice.ts` | Completo |
 | §2.3 | Swap vs. reemplazo al asignar imagen a un slot | `src/store/documentSlice.ts` (`assignImageToSlot`) | Completo |
+| §2.3 | Selección nunca vacía en `Simple` (cae al root, no a `[]`) | `src/store/uiSlice.ts` (`clearSelection`, `setLayoutMode`, `setActivePageId`), `src/App.tsx`, `src/components/canvas/PageStage.tsx` | Completo |
 | §2.4 | `AppSettings` (unitSystem, defaultPrinterName), persistencia | `electron/main/ipc/settings.handlers.ts`, `electron/main/ipc/settings.helpers.ts`, `src/store/settingsSlice.ts` | Completo |
 | §2.4 | Conversión/formateo de unidades (`formatLength`/`parseLength`/`mmToInches`) | `src/lib/units.ts` | Completo |
 | §2.4 | Toggle de unidades en la UI | `src/components/settings/UnitToggle.tsx` | Completo |

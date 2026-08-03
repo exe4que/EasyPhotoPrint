@@ -19,7 +19,7 @@ export const useEPPStore = create<EPPStore>()(
   temporal(
     (set, get) => ({
       ...createDocumentSlice(set as never, get as never),
-      ...createUiSlice(set as never),
+      ...createUiSlice(set as never, get as never),
       ...createImagePoolSlice(set as never),
       ...createSettingsSlice(set as never),
       pauseHistory: () => {

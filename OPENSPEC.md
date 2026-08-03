@@ -6,7 +6,7 @@
 | **Estado** | Draft / Proposed |
 | **Autor** | Software Architecture Team |
 | **Fecha** | 2026-08-02 |
-| **Versión** | 0.10.0 |
+| **Versión** | 0.11.0 |
 
 ---
 
@@ -363,14 +363,27 @@ classDiagram
           "properties": {
             "aspectRatio": { "type": "number", "description": "width/height deseado; null = libre" },
             "scalingRule": {
-              "enum": ["fitInParent", "envelopeParent", "stretch"],
+              "enum": ["fitInParent", "envelopeParent", "stretch", "specificSize"],
               "default": "fitInParent",
-              "description": "fitInParent: la imagen se escala completa dentro del slot sin recortar, preservando aspect ratio (puede dejar espacio vacío). envelopeParent: la imagen se escala para cubrir el slot por completo, preservando aspect ratio y recortando el sobrante. stretch: la imagen se deforma para ocupar exactamente el slot, ignorando su aspect ratio original (sin recorte y sin espacio vacío)."
+              "description": "fitInParent: la imagen se escala completa dentro del slot sin recortar, preservando aspect ratio (puede dejar espacio vacío). envelopeParent: la imagen se escala para cubrir el slot por completo, preservando aspect ratio y recortando el sobrante. stretch: la imagen se deforma para ocupar exactamente el slot, ignorando su aspect ratio original (sin recorte y sin espacio vacío). specificSize: la imagen se muestra a un tamaño físico exacto (`specificSizeMm`), independiente del tamaño que el layout le asignaría al slot — ver §4.1.1."
             },
             "focalPoint": {
               "type": "object",
               "properties": { "x": { "type": "number" }, "y": { "type": "number" } },
               "description": "0..1 normalizado, punto de anclaje del crop en modo 'envelopeParent'. No aplica en 'fitInParent' ni en 'stretch' (ninguno de los dos recorta)."
+            },
+            "specificSizeMm": {
+              "description": "Solo aplica (y solo se usa) si scalingRule === 'specificSize'. Ambos campos siempre están resueltos a un número concreto — nunca queda uno sin definir — para que el layout-engine (puro, sin acceso a ImageAsset) no tenga que calcular el eje derivado; ver §4.1.1.",
+              "type": "object",
+              "required": ["widthMm", "heightMm", "lockedAxis"],
+              "properties": {
+                "widthMm": { "type": "number", "exclusiveMinimum": 0 },
+                "heightMm": { "type": "number", "exclusiveMinimum": 0 },
+                "lockedAxis": {
+                  "enum": ["width", "height", "both"],
+                  "description": "Qué eje tipeó el usuario directamente. 'width'/'height': el otro eje se re-deriva del aspect ratio de la imagen asignada cada vez que esta cambia. 'both': el usuario fijó los dos ejes explícitamente — la imagen hace stretch para ocupar exactamente ese rectángulo."
+                }
+              }
             }
           }
         },
@@ -486,12 +499,13 @@ El motor de layout es un **algoritmo de layout de dos pasadas** (medir → posic
 >
 > Ambos valores ya están definidos en el schema (§3.2, campos `gapMm`/`paddingMm` de `LayoutNode`) y son obligatorios de implementar en el motor de resolución (no solo de persistir): el algoritmo siguiente muestra cómo se aplican.
 
-> **Requisito funcional — Modos de llenado de `imageSlot`:** toda imagen asignada a un `imageSlot` (en `grid`, `horizontal`, `vertical` o `freeformCanvas`) debe poder llenar su slot con uno de tres modos, controlados por `scalingRule` (§3.2):
+> **Requisito funcional — Modos de llenado de `imageSlot`:** toda imagen asignada a un `imageSlot` (en `grid`, `horizontal`, `vertical` o `freeformCanvas`) debe poder llenar su slot con uno de cuatro modos, controlados por `scalingRule` (§3.2):
 > - **`fitInParent`** *(modo por defecto)*: la imagen se escala completa dentro del slot manteniendo su aspect ratio original, sin recortar nada. Si el aspect ratio de la imagen no coincide con el del slot, queda espacio vacío (letterboxing) en los lados sobrantes — ese espacio se deja transparente, mostrando el fondo blanco de la página.
 > - **`envelopeParent`**: la imagen se escala para cubrir el slot por completo manteniendo su aspect ratio, recortando el sobrante según el `focalPoint` (mismo mecanismo que el anterior `cover`/`crop-to-fill`, ver §5.4).
 > - **`stretch`**: la imagen se deforma (escala X e Y de forma independiente) para ocupar exactamente el `slotBoxMm`, ignorando su aspect ratio original. No hay recorte ni espacio vacío, pero la imagen puede verse distorsionada si el aspect ratio del slot difiere mucho del original — el `PropertiesPanel` debe mostrar una advertencia no bloqueante cuando la distorsión resultante supera un umbral (p. ej. >15% de diferencia entre aspect ratios).
+> - **`specificSize`**: la imagen se muestra a un tamaño físico exacto en mm (`imageSlotConfig.specificSizeMm`), fijado por el usuario, en vez de al tamaño que el slot recibiría del layout. El usuario puede fijar solo el ancho, solo el alto, o ambos — ver el detalle completo (interacción con el drag de divisorias, recálculo automático, y aviso de layout infactible) en §4.1.1.
 >
-> Los tres modos se implementan como funciones puras en el `layout-engine` compartido (`computeFitInParent` / `computeEnvelopeCrop` / `computeStretch`, §5.4) para garantizar paridad WYSIWYG entre la vista previa (DOM) y la exportación (PDF).
+> Los cuatro modos se implementan como funciones puras en el `layout-engine` compartido (`computeFitInParent` / `computeEnvelopeCrop` / `computeStretch` / `computeSpecificSize`, §5.4) para garantizar paridad WYSIWYG entre la vista previa (DOM) y la exportación (PDF).
 
 ```mermaid
 flowchart TD
@@ -713,6 +727,25 @@ function resizeSiblingsByDrag(
 
 En la UI, `PageStage.tsx` (no existe un `NestedNodeRenderer.tsx` separado — ver nota sobre la estructura de carpetas real en §6.1) renderiza un `NodeDivider.tsx` entre cada par de hijos adyacentes de un `horizontal`/`vertical`, en cualquier profundidad del árbol y tanto en modo `Simple` como `nested` (cursor `col-resize`/`row-resize` según dirección). Cuando `isDividerLocked` es `true`, el divisor se renderiza en estado deshabilitado (sin cursor de resize, con un pequeño ícono de candado en hover) para comunicar visualmente por qué no se puede mover. `onDragStart` llama a `store.pauseHistory()` (wrapper de `store.temporal.getState().pause()`, §2.3); en cada `onDragMove` se llama a `resizeSiblingsByDrag` con el `deltaMm` **incremental desde el evento anterior** (no desde el inicio del gesto) — la acción del store recalcula el tamaño actual de cada hermano leyendo el árbol en vivo en cada llamada, así que pasarle un delta ya acumulado se sumaría por encima de eso una y otra vez, haciendo que la divisoria se despegue del cursor cada vez más rápido cuantos más eventos `mousemove` dispare el gesto (el bug real que motivó esta aclaración: la divisoria no seguía al cursor 1:1). Se actualiza el store en vivo sin que `zundo` registre cada frame; en `onDragEnd` se llama a `store.resumeHistory()`, con lo que el gesto completo de arrastre queda como **un solo** paso de undo/redo, no cientos.
 
+#### 4.1.1.1 Tamaño Específico (`specificSize`) — Clamping de Divisorias, no Bloqueo
+
+> **Requisito funcional — Tamaño real específico para una imagen (`specificSize`).** Desde el `PropertiesPanel`, con `scalingRule = 'specificSize'` (§3.2, §4.1), el usuario fija el tamaño físico exacto al que se muestra la imagen asignada a un `imageSlot`, independientemente del tamaño que el layout le asignaría al slot en ese punto del árbol:
+> - Si fija **solo el ancho** o **solo el alto**, el eje no fijado se deriva del aspect ratio original de la imagen asignada (`widthMm/heightMm` del `ImageAsset`) — `imageSlotConfig.specificSizeMm.lockedAxis` guarda cuál de los dos tipeó el usuario.
+> - Si fija **ambos ejes**, la imagen hace `stretch` para ocupar exactamente ese rectángulo (`lockedAxis: 'both'`), igual que el modo `stretch` (§4.1) pero a un tamaño impuesto en vez de al tamaño del slot.
+> - `specificSizeMm.widthMm`/`heightMm` **siempre están resueltos a un número concreto**, nunca queda un eje "sin definir" — el `layout-engine` es puro y no tiene acceso a `ImageAsset`/`imagePool` (§2.2), así que la resolución del eje derivado ocurre en la capa del store (`resolveSpecificSizeMm` en `documentSlice.ts`, con acceso a `imagePool`), no en el motor de layout. Si la imagen asignada al slot cambia (`assignImageToSlot`), el eje no fijado se re-deriva contra el aspect ratio de la nueva imagen, conservando el eje que el usuario sí tipeó.
+
+> **Decisión de diseño — El `specificSizeMm` es un piso de tamaño mínimo (clamping), no un `fixedSizeMm` (bloqueo total).** Ya existía un mecanismo de tamaño fijo en mm que bloquea por completo la divisoria adyacente (`fixedSizeMm` + `isDividerLocked`, arriba en esta sección). `specificSize` reutiliza deliberadamente uno de los dos únicos números que necesita (el mínimo requerido en mm por eje), **sin** activar `isDividerLocked`: la divisoria entre el slot con `specificSize` y su hermano sigue siendo arrastrable, pero el arrastre hace **clamping** — no puede reducir ese slot por debajo del tamaño específico pedido. Esto se logra extendiendo `computeMinRequiredMainSizeMm` (§4.1.1 arriba) para que, en un `imageSlot` con `scalingRule === 'specificSize'`, devuelva `Math.max(specificSizeMm[axis], fixedSizeMm?.[axis] ?? 0, MIN_SIZE_RATIO_MM)` en vez del piso plano — el clamp que ya existía dentro de `resizeSiblingsByDrag` (`clampedDeltaMm = clamp(deltaMm, minA - currentMainA, currentMainB - minB)`) respeta automáticamente ese nuevo mínimo, sin tocar el algoritmo de resize en sí.
+>
+> **Recálculo inmediato al fijar el tamaño (no solo al arrastrar):** al fijar o cambiar un `specificSizeMm` desde el `PropertiesPanel`, la acción `setSlotSpecificSize` del store, además de persistir el nuevo `imageSlotConfig`, llama a `growSlotToMinimum(page, slotNodeId)` — que compara el tamaño actualmente resuelto del slot (`resolveLayout`) contra su nuevo mínimo (`computeMinRequiredMainSizeMm`) y, si hay déficit, lo cubre pidiéndole prestado espacio a **un solo** hermano adyacente (el siguiente, o el anterior si el slot es el último hijo) reutilizando `resizeSiblingsByDrag` con un `deltaMm` sintético — el mismo camino de código que un arrastre manual, así que respeta el mismo clamp y actualiza la posición de la divisoria en el mismo gesto, sin esperar a que el usuario la mueva. Si ese único hermano tampoco tiene margen suficiente, el déficit remanente queda como layout infactible para ese slot (ver aviso de abajo) — deliberadamente no se cascadea el préstamo a través de múltiples hermanos.
+>
+> **Aviso visual cuando el tamaño específico no entra en el espacio disponible:** a diferencia de `validateLayoutFeasibility` (§4.1.2, que bloquea la exportación), un `specificSizeMm` insatisfecho es un caso previsible de uso normal (p. ej. el usuario pide una foto de `500mm` en una hoja A4) y se marca solo como advertencia no bloqueante, tanto en edición como en export/impresión — no tiene sentido impedir guardar o imprimir el resto del documento por un slot con un tamaño pedido a propósito más grande que su contenedor:
+> - La imagen (no el slot) recibe un **outline rojo** cuando `specificSizeMm.widthMm > slotBoxMm.w` o `specificSizeMm.heightMm > slotBoxMm.h` (con una tolerancia de 0.1mm) — comparación pura entre el tamaño pedido y el `BoxMm` que `resolveLayout()` efectivamente le asignó al slot, sin necesidad de re-ejecutar `validateLayoutFeasibility`.
+> - Al pasar el mouse sobre esa imagen, un `title` nativo del navegador explica la situación ("El tamaño específico no entra en el espacio disponible del slot").
+> - El `PropertiesPanel` del slot seleccionado muestra el mismo aviso en texto, para que sea visible sin necesidad de hacer hover sobre el canvas.
+> - La imagen se sigue renderizando centrada en el slot al tamaño pedido (`computeSpecificSize`, §5.4) — si excede el slot, el sobrante se recorta visualmente por el `overflow: hidden` del contenedor del slot, igual que cualquier otro elemento que se salga de su caja en el DOM.
+
+> **Decisión de diseño — La etiqueta de dimensiones de la imagen queda siempre visible (con candado) cuando hay `specificSize`.** La etiqueta amarilla de dimensiones de la imagen dentro de un slot (`DimensionOverlay`, abajo a la izquierda del slot) normalmente solo aparece al hacer hover sobre la imagen. Cuando el slot tiene `scalingRule === 'specificSize'` con un `specificSizeMm` resuelto, esa etiqueta **permanece visible siempre** (no depende del hover) y se le agrega un ícono de candado a la derecha del texto — comunicando que ese tamaño ya no se recalcula dinámicamente según la disposición del layout, a diferencia de los otros tres modos donde el tamaño mostrado siempre sigue al del slot. El mismo tratamiento (recálculo del divisor, clamping, outline rojo + tooltip, y etiqueta con candado) aplica tanto a un `imageSlot` dentro de `grid`/`horizontal`/`vertical` como a un `FreeformElement` en modo `freeformCanvas` (§4.2) — en este último caso, el "contenedor" contra el que se compara el tamaño específico es el propio rectángulo `transform.{widthMm,heightMm}` del elemento, y no hay divisorias que clampear porque el usuario ya controla ese rectángulo directamente con los gizmos de redimensionado.
+
 **Pseudocódigo — `computeGridCells` (aplica padding del contenedor + gap por eje entre celdas):**
 
 ```ts
@@ -908,7 +941,7 @@ function validateResolution(asset: ImageAsset, box: BoxMm, targetDpi: number): R
 
 Esta validación corre **antes** de la exportación (en el renderer, para feedback inmediato en la UI con un ícono de advertencia sobre el slot afectado) y se recalcula en el Main process como guardia final antes de generar el PDF.
 
-### 5.4 Modos de Llenado de Slot (`fitInParent` / `envelopeParent` / `stretch`)
+### 5.4 Modos de Llenado de Slot (`fitInParent` / `envelopeParent` / `stretch` / `specificSize`)
 
 **`envelopeParent`** (equivalente a `cover`/`crop-to-fill`): el recorte se calcula en el dominio de píxeles de la imagen original (no en mm), usando el `focalPoint` normalizado:
 
@@ -965,7 +998,20 @@ function computeStretch(asset: ImageAsset, slotBoxMm: BoxMm): { widthMm: number;
 }
 ```
 
-Las tres funciones viven en el `layout-engine` compartido y se usan tanto para la vista previa (estilos CSS `object-fit`/`transform` del `<img>` en pantalla, con `scaleX`/`scaleY` independientes en el caso de `stretch`) como para el recorte/escalado real vía `sharp` en la exportación — garantizando **paridad WYSIWYG** entre pantalla y PDF. Ni `computeFitInParent` ni `computeStretch` requieren clip adicional (ninguno de los dos excede el `slotBoxMm`), a diferencia del clip de márgenes en un nodo `freeformCanvas` (§5.5), que sigue aplicando independientemente del `scalingRule` elegido.
+**`specificSize`**: geometría pura — a diferencia de las otras tres, no necesita el `ImageAsset` (el ancho/alto del asset ya se usó para derivar el eje libre de `specificSizeMm` en la capa del store, §4.1.1.1; acá solo se centra el rectángulo ya resuelto dentro del slot). Si `specificSizeMm` excede al `slotBoxMm` en algún eje, el offset resultante da negativo (o el tamaño excede al slot) — eso es intencional, es lo que consume `isSpecificSizeUnsatisfied` (§4.1.1.1) para decidir si pintar el outline rojo, no algo que esta función deba clampear:
+
+```ts
+function computeSpecificSize(specificSizeMm: SpecificSizeMm, slotBoxMm: BoxMm): { offsetXMm: number; offsetYMm: number; widthMm: number; heightMm: number } {
+  return {
+    offsetXMm: (slotBoxMm.w - specificSizeMm.widthMm) / 2,
+    offsetYMm: (slotBoxMm.h - specificSizeMm.heightMm) / 2,
+    widthMm: specificSizeMm.widthMm,
+    heightMm: specificSizeMm.heightMm,
+  };
+}
+```
+
+Las cuatro funciones viven en el `layout-engine` compartido y se usan tanto para la vista previa (estilos CSS `object-fit`/`transform` del `<img>` en pantalla, con `scaleX`/`scaleY` independientes en el caso de `stretch`, u offset/tamaño explícito en el caso de `specificSize`) como para el recorte/escalado real vía `sharp` en la exportación — garantizando **paridad WYSIWYG** entre pantalla y PDF. Ni `computeFitInParent` ni `computeStretch` requieren clip adicional (ninguno de los dos excede el `slotBoxMm`); `computeSpecificSize` tampoco lo requiere en la exportación — cuando el tamaño pedido no entra en el slot, el PDF simplemente refleja lo mismo que la vista previa (imagen más grande que su caja) en vez de recortarla, dejando ese caso como una advertencia de layout infactible en vez de un recorte silencioso — a diferencia del clip de márgenes en un nodo `freeformCanvas` (§5.5), que sigue aplicando independientemente del `scalingRule` elegido.
 
 ### 5.5 Clip al Área Imprimible (`freeformCanvas`)
 

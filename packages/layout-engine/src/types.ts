@@ -29,7 +29,7 @@ export interface AlignmentConfig {
 }
 
 export type LayoutNodeType = 'grid' | 'horizontal' | 'vertical' | 'imageSlot' | 'freeformCanvas';
-export type ScalingRule = 'fitInParent' | 'envelopeParent' | 'stretch';
+export type ScalingRule = 'fitInParent' | 'envelopeParent' | 'stretch' | 'specificSize';
 export type PageSizePreset = 'A4' | 'Letter' | 'Legal' | '4x6' | '5x7' | 'A3' | 'Custom';
 
 export interface FixedSizeMm {
@@ -50,10 +50,19 @@ export interface FocalPoint {
   y: number;
 }
 
+export interface SpecificSizeMm {
+  widthMm: number;
+  heightMm: number;
+  /** Which axis the user typed in directly — the other is derived from it + the asset's aspect ratio. */
+  lockedAxis: 'width' | 'height' | 'both';
+}
+
 export interface ImageSlotConfig {
   aspectRatio?: number;
   scalingRule?: ScalingRule;
   focalPoint?: FocalPoint;
+  /** Only meaningful when scalingRule === 'specificSize'. Both fields are always resolved (never partial). */
+  specificSizeMm?: SpecificSizeMm;
 }
 
 export interface FreeformTransform {

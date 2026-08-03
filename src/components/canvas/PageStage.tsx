@@ -1,9 +1,9 @@
-// @spec OPENSPEC.md §1.3, §2.3, §4.1, §4.1.1, §6.1 — page preview shell backed by the shared layout engine
+// @spec OPENSPEC.md §1.3, §2.3, §4.1, §4.1.1, §4.1.1.1, §6.1 — page preview shell backed by the shared layout engine
 import { isDividerLocked, type LayoutNode } from '@epp/layout-engine';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useDragAndDrop } from '../../hooks/useDragAndDrop.js';
-import { computeImageDisplayRectMm, scalingRuleToObjectFit } from '../../lib/imageDisplay.js';
+import { computeImageDisplayRectMm, isSpecificSizeUnsatisfied, scalingRuleToObjectFit } from '../../lib/imageDisplay.js';
 import { formatLength, mmToPx, pxToMm } from '../../lib/units.js';
 import { useLayoutResolution } from '../../hooks/useLayoutResolution.js';
 import { useEPPStore } from '../../store/index.js';
@@ -296,6 +296,7 @@ export function PageStage({ selectedImageAssetId }: PageStageProps) {
                     asset,
                     box,
                     imageSlotMap.get(id)?.imageSlotConfig?.scalingRule,
+                    imageSlotMap.get(id)?.imageSlotConfig?.specificSizeMm,
                   );
                   const insideImage =
                     localX >= mmToPx(displayRect.offsetXMm, previewZoom) &&
@@ -315,16 +316,44 @@ export function PageStage({ selectedImageAssetId }: PageStageProps) {
                   setHoveredImageSlotId((current) => (current === id ? null : current));
                 }}
               >
-                {page.assignments[id] && imageAssetMap.get(page.assignments[id]) ? (
-                  <img
-                    src={imageAssetMap.get(page.assignments[id])?.thumbnailDataUrl}
-                    alt={imageAssetMap.get(page.assignments[id])?.fileName}
-                    className="pointer-events-none absolute inset-0 h-full w-full"
-                    style={{
-                      objectFit: scalingRuleToObjectFit(imageSlotMap.get(id)?.imageSlotConfig?.scalingRule),
-                    }}
-                  />
-                ) : null}
+                {page.assignments[id] && imageAssetMap.get(page.assignments[id])
+                  ? (() => {
+                      const asset = imageAssetMap.get(page.assignments[id])!;
+                      const imageSlotConfig = imageSlotMap.get(id)?.imageSlotConfig;
+                      const scalingRule = imageSlotConfig?.scalingRule;
+                      const specificSizeMm = imageSlotConfig?.specificSizeMm;
+                      const unsatisfied = scalingRule === 'specificSize' && isSpecificSizeUnsatisfied(specificSizeMm, box);
+
+                      if (scalingRule === 'specificSize' && specificSizeMm) {
+                        const rect = computeImageDisplayRectMm(asset, box, scalingRule, specificSizeMm);
+                        return (
+                          <img
+                            src={asset.thumbnailDataUrl}
+                            alt={asset.fileName}
+                            title={unsatisfied ? 'El tamaño específico no entra en el espacio disponible del slot' : undefined}
+                            className={`pointer-events-none absolute object-fill ${
+                              unsatisfied ? 'outline outline-2 outline-offset-[-2px] outline-rose-500' : ''
+                            }`}
+                            style={{
+                              left: mmToPx(rect.offsetXMm, previewZoom),
+                              top: mmToPx(rect.offsetYMm, previewZoom),
+                              width: mmToPx(rect.widthMm, previewZoom),
+                              height: mmToPx(rect.heightMm, previewZoom),
+                            }}
+                          />
+                        );
+                      }
+
+                      return (
+                        <img
+                          src={asset.thumbnailDataUrl}
+                          alt={asset.fileName}
+                          className="pointer-events-none absolute inset-0 h-full w-full"
+                          style={{ objectFit: scalingRuleToObjectFit(scalingRule) }}
+                        />
+                      );
+                    })()
+                  : null}
 
                 {page.assignments[id] ? (
                   <button
@@ -363,6 +392,10 @@ export function PageStage({ selectedImageAssetId }: PageStageProps) {
                   showSlotLabel={hoveredSlotId === id}
                   slotLabel={`${formatLength(box.w, unitSystem)} × ${formatLength(box.h, unitSystem)}`}
                   showImageLabel={hoveredImageSlotId === id}
+                  imageLabelLocked={
+                    imageSlotMap.get(id)?.imageSlotConfig?.scalingRule === 'specificSize' &&
+                    !!imageSlotMap.get(id)?.imageSlotConfig?.specificSizeMm
+                  }
                   imageLabel={(() => {
                     const asset = imageAssetMap.get(page.assignments[id] ?? '');
                     if (!asset) {
@@ -372,6 +405,7 @@ export function PageStage({ selectedImageAssetId }: PageStageProps) {
                       asset,
                       box,
                       imageSlotMap.get(id)?.imageSlotConfig?.scalingRule,
+                      imageSlotMap.get(id)?.imageSlotConfig?.specificSizeMm,
                     );
                     return `${formatLength(widthMm, unitSystem)} × ${formatLength(heightMm, unitSystem)}`;
                   })()}
@@ -451,6 +485,7 @@ export function PageStage({ selectedImageAssetId }: PageStageProps) {
                         offsetYMm={-(padding.top ?? 0)}
                         asset={imageAssetMap.get(page.assignments[element.imageNodeId] ?? '')}
                         scalingRule={imageSlotMap.get(element.imageNodeId)?.imageSlotConfig?.scalingRule}
+                        specificSizeMm={imageSlotMap.get(element.imageNodeId)?.imageSlotConfig?.specificSizeMm}
                         isSelected={selectedSlotId === element.imageNodeId}
                         previewZoom={previewZoom}
                         unitSystem={unitSystem}

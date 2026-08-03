@@ -1,5 +1,5 @@
-// @spec OPENSPEC.md §4.1, §5.4 — computeFitInParent, computeEnvelopeCrop, computeStretch
-import type { BoxMm, EnvelopeCrop, FitInParentBox, ImageAsset, StretchResult } from './types.js';
+// @spec OPENSPEC.md §4.1, §5.4, §4.1.1.1 — computeFitInParent, computeEnvelopeCrop, computeStretch, computeSpecificSize
+import type { BoxMm, EnvelopeCrop, FitInParentBox, ImageAsset, SpecificSizeMm, StretchResult } from './types.js';
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -50,6 +50,22 @@ export function computeFitInParent(asset: ImageAsset, slotBoxMm: BoxMm): FitInPa
     offsetYMm: (slotBoxMm.h - fittedSize.heightMm) / 2,
     widthMm: fittedSize.widthMm,
     heightMm: fittedSize.heightMm,
+  };
+}
+
+/**
+ * `specificSizeMm.widthMm`/`heightMm` are already fully resolved (never partial — see
+ * SpecificSizeMm) so this is pure geometry, unlike the other imageFit functions it doesn't
+ * need the ImageAsset at all. Centers the fixed-size image within the slot; if the slot is
+ * smaller than the requested size on either axis the result overflows the slot — the caller
+ * decides how to flag that (§4.1.1 red outline requirement).
+ */
+export function computeSpecificSize(specificSizeMm: SpecificSizeMm, slotBoxMm: BoxMm): FitInParentBox {
+  return {
+    offsetXMm: (slotBoxMm.w - specificSizeMm.widthMm) / 2,
+    offsetYMm: (slotBoxMm.h - specificSizeMm.heightMm) / 2,
+    widthMm: specificSizeMm.widthMm,
+    heightMm: specificSizeMm.heightMm,
   };
 }
 

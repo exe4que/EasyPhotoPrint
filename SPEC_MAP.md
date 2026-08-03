@@ -39,10 +39,13 @@
 | §4.1 | `resolveLayout` (algoritmo principal, dos pasadas) | `packages/layout-engine/src/resolveLayout.ts` | Completo |
 | §4.1 | `distributeChildren`, `resolveCrossAxis`, `applyPadding` | `packages/layout-engine/src/flexDistribution.ts` | Completo |
 | §4.1 | `computeGridCells`, `resolveDimensions` | `packages/layout-engine/src/grid.ts` | Completo |
-| §4.1.1 | `resizeSiblingsByDrag`, `isDividerLocked`, `computeMinRequiredMainSizeMm`, `fixedSizeMm` | `packages/layout-engine/src/flexDistribution.ts` | Completo |
+| §4.1.1 | `resizeSiblingsByDrag`, `isDividerLocked`, `computeMinRequiredMainSizeMm` (incl. piso de `specificSizeMm`), `fixedSizeMm` | `packages/layout-engine/src/flexDistribution.ts` | Completo |
 | §4.1.1 | UI de divisoria arrastrable | `src/components/canvas/NodeDivider.tsx`, `src/components/canvas/PageStage.tsx` | Completo |
+| §4.1.1.1 | `scalingRule: 'specificSize'` — resolución de eje derivado, `growSlotToMinimum`, `setSlotSpecificSize` | `src/store/documentSlice.ts` | Completo |
+| §4.1.1.1 | `computeSpecificSize`, `isSpecificSizeUnsatisfied` (offset/tamaño puro, sin acceso a `ImageAsset`) | `packages/layout-engine/src/imageFit.ts`, `src/lib/imageDisplay.ts` | Completo |
+| §4.1.1.1 | UI — outline rojo + tooltip en la imagen, inputs de ancho/alto en `PropertiesPanel` | `src/components/canvas/PageStage.tsx`, `src/components/canvas/FreeformElement.tsx`, `src/components/panels/PropertiesPanel.tsx` | Completo |
 | §4.1.2 | `validateLayoutFeasibility` | `packages/layout-engine/src/feasibility.ts` | Completo |
-| §4.1 | Etiquetas de dimensión por hover (`DimensionOverlay`, slot + imagen) | `src/components/canvas/DimensionOverlay.tsx`, `src/components/canvas/PageStage.tsx` | Completo |
+| §4.1, §4.1.1.1 | Etiquetas de dimensión por hover (`DimensionOverlay`, slot + imagen; siempre visible + candado cuando `specificSize`) | `src/components/canvas/DimensionOverlay.tsx`, `src/components/canvas/PageStage.tsx` | Completo |
 | §4.1 | `freeformCanvas` anidable como cualquier otro tipo de nodo (opción de tipo de nodo raíz en `Simple`, retype/add en `nested`; sin modo `Freeform` de nivel superior) | `src/store/documentSlice.ts`, `src/components/panels/LayoutTreePanel.tsx`, `src/components/panels/PropertiesPanel.tsx`, `src/App.tsx`, `src/store/uiSlice.ts` | Completo |
 | §4.2 | Transform freeform (mover/rotar/escalar con DOM + CSS), agregar/quitar elementos, clip al área imprimible | `src/components/canvas/FreeformElement.tsx`, `src/components/canvas/PageStage.tsx`, `src/store/documentSlice.ts` (`addFreeformElement`/`removeFreeformElement`/`updateFreeformElementTransform`) | Parcial (falta snapping) |
 | §4.2 | Contención — `clampFreeformPosition`/`computeRotatedAabbMm` (el elemento no puede salir por completo del área del nodo) | `packages/layout-engine/src/freeform.ts` | Completo |
@@ -55,7 +58,7 @@
 | §5.1 | Conversión de coordenadas mm↔px↔pt | `src/lib/units.ts`, `electron/main/services/pdf-builder.ts` | Parcial |
 | §5.2 | Pipeline de exportación (`pdf:export` IPC) | `electron/main/ipc/pdf.handlers.ts`, `electron/main/services/pdf-builder.ts` | No implementado |
 | §5.3 | Validación de resolución / DPI efectivo | `electron/main/services/image-processor.ts` | No implementado |
-| §5.4 | `computeFitInParent`, `computeEnvelopeCrop`, `computeStretch` | `packages/layout-engine/src/imageFit.ts` | Completo |
+| §5.4 | `computeFitInParent`, `computeEnvelopeCrop`, `computeStretch`, `computeSpecificSize` | `packages/layout-engine/src/imageFit.ts` | Completo |
 | §5.5 | Clip al área imprimible en PDF (`drawClippedImage`) | `electron/main/services/pdf-builder.ts` | No implementado |
 
 ## Componentes de UI sin sección numerada dedicada
@@ -66,7 +69,7 @@ Estos archivos implementan funcionalidad descrita en el spec (schema de `ImageAs
 |---|---|---|---|
 | Ingesta de imágenes (dialog + DnD + pool) | `src/components/panels/ImageLibraryPanel.tsx`, `src/hooks/useDragAndDrop.ts`, `electron/main/ipc/fs.handlers.ts`, `src/store/imagePoolSlice.ts` | §1.3, §3.3 (`ImageAsset`) | Parcial |
 | Panel de árbol de layout editable | `src/components/panels/LayoutTreePanel.tsx` | §4.1, §6.1 | Parcial |
-| Inspector contextual (alignment, gap, `fixedSizeMm`, cantidad de slots en `horizontal`/`vertical`) | `src/components/panels/PropertiesPanel.tsx`, `src/store/documentSlice.ts` (`setContainerChildCount`) | §4.1, §4.1.1, §2.4, §2.3 | Parcial |
+| Inspector contextual (alignment, gap, `fixedSizeMm`, `specificSizeMm`, cantidad de slots en `horizontal`/`vertical`) | `src/components/panels/PropertiesPanel.tsx`, `src/store/documentSlice.ts` (`setContainerChildCount`, `setSlotSpecificSize`) | §4.1, §4.1.1, §4.1.1.1, §2.4, §2.3 | Parcial |
 | Setup de página por página | `src/components/panels/PageSetupPanel.tsx` | §2.3, §2.4 | Completo |
 | Galería y miniaturas de templates (generadas dinámicamente) | `src/components/templates/TemplateGallery.tsx`, `src/components/templates/TemplateThumbnail.tsx` | §6.1 (decisión de diseño) | Completo |
 | CRUD de templates (list/save/delete) | `src/components/templates/SaveTemplateDialog.tsx`, `electron/main/ipc/templates.handlers.ts`, `electron/main/ipc/templates.helpers.ts` | §3.1, §3.3 | Completo |

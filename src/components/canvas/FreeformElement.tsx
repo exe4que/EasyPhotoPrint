@@ -1,8 +1,15 @@
-// @spec OPENSPEC.md §4.2 — move/rotate/scale gizmo for a single FreeformElement (DOM + CSS transforms)
-import { MIN_FREEFORM_SIZE_MM, type FreeformElement, type FreeformTransform, type ImageAsset, type ScalingRule } from '@epp/layout-engine';
+// @spec OPENSPEC.md §4.2, §4.1.1.1 — move/rotate/scale gizmo for a single FreeformElement (DOM + CSS transforms)
+import {
+  MIN_FREEFORM_SIZE_MM,
+  type FreeformElement,
+  type FreeformTransform,
+  type ImageAsset,
+  type ScalingRule,
+  type SpecificSizeMm,
+} from '@epp/layout-engine';
 import { useRef, useState } from 'react';
 
-import { computeImageDisplayRectMm, scalingRuleToObjectFit } from '../../lib/imageDisplay.js';
+import { computeImageDisplayRectMm, isSpecificSizeUnsatisfied, scalingRuleToObjectFit } from '../../lib/imageDisplay.js';
 import { formatLength, mmToPx, pxToMm, type UnitSystem } from '../../lib/units.js';
 import { DimensionOverlay } from './DimensionOverlay.js';
 
@@ -17,6 +24,7 @@ interface FreeformElementViewProps {
   offsetYMm: number;
   asset: ImageAsset | undefined;
   scalingRule: ScalingRule | undefined;
+  specificSizeMm?: SpecificSizeMm;
   isSelected: boolean;
   previewZoom: number;
   unitSystem: UnitSystem;
@@ -33,6 +41,7 @@ export function FreeformElementView({
   offsetYMm,
   asset,
   scalingRule,
+  specificSizeMm,
   isSelected,
   previewZoom,
   unitSystem,
@@ -126,7 +135,11 @@ export function FreeformElementView({
     window.addEventListener('mouseup', handleMouseUp);
   };
 
-  const displayRect = asset ? computeImageDisplayRectMm(asset, { x: 0, y: 0, w: widthMm, h: heightMm }, scalingRule) : null;
+  const displayRect = asset
+    ? computeImageDisplayRectMm(asset, { x: 0, y: 0, w: widthMm, h: heightMm }, scalingRule, specificSizeMm)
+    : null;
+  const isSpecificSize = scalingRule === 'specificSize' && !!specificSizeMm;
+  const specificSizeUnsatisfied = isSpecificSize && isSpecificSizeUnsatisfied(specificSizeMm, { x: 0, y: 0, w: widthMm, h: heightMm });
 
   return (
     <div
@@ -174,13 +187,30 @@ export function FreeformElementView({
           isSelected ? 'border-cyan-500 ring-2 ring-cyan-500/40' : 'border-white/50 hover:border-white'
         }`}
       >
-        {asset ? (
-          <img
-            src={asset.thumbnailDataUrl}
-            alt={asset.fileName}
-            className="pointer-events-none h-full w-full"
-            style={{ objectFit: scalingRuleToObjectFit(scalingRule) }}
-          />
+        {asset && displayRect ? (
+          isSpecificSize ? (
+            <img
+              src={asset.thumbnailDataUrl}
+              alt={asset.fileName}
+              title={specificSizeUnsatisfied ? 'El tamaño específico no entra en el espacio disponible del elemento' : undefined}
+              className={`pointer-events-none absolute object-fill ${
+                specificSizeUnsatisfied ? 'outline outline-2 outline-offset-[-2px] outline-rose-500' : ''
+              }`}
+              style={{
+                left: mmToPx(displayRect.offsetXMm, previewZoom),
+                top: mmToPx(displayRect.offsetYMm, previewZoom),
+                width: mmToPx(displayRect.widthMm, previewZoom),
+                height: mmToPx(displayRect.heightMm, previewZoom),
+              }}
+            />
+          ) : (
+            <img
+              src={asset.thumbnailDataUrl}
+              alt={asset.fileName}
+              className="pointer-events-none h-full w-full"
+              style={{ objectFit: scalingRuleToObjectFit(scalingRule) }}
+            />
+          )
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-slate-800/80 text-[10px] text-slate-400">Empty</div>
         )}
@@ -189,6 +219,7 @@ export function FreeformElementView({
           showSlotLabel={isHovered}
           slotLabel={`${formatLength(widthMm, unitSystem)} × ${formatLength(heightMm, unitSystem)}`}
           showImageLabel={isHoveredImage}
+          imageLabelLocked={isSpecificSize}
           imageLabel={
             displayRect ? `${formatLength(displayRect.widthMm, unitSystem)} × ${formatLength(displayRect.heightMm, unitSystem)}` : undefined
           }

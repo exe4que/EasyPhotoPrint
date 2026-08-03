@@ -1,7 +1,8 @@
-// @spec OPENSPEC.md §2.3, §4.1, §4.2 — document slice, pageConfig per page, assignImageToSlot swap logic, freeformCanvas nesting + transforms
+// @spec OPENSPEC.md §2.3, §4.1, §4.1.1, §4.2 — document slice, pageConfig per page, assignImageToSlot swap logic, specificSize resolution + grow-to-minimum, freeformCanvas nesting + transforms
 import {
   applyPadding,
   clampFreeformPosition,
+  computeMinRequiredMainSizeMm,
   MIN_FREEFORM_SIZE_MM,
   reconcileTemplateUpdate,
   resolveLayout,
@@ -11,9 +12,11 @@ import {
   type FreeformElement,
   type FreeformTransform,
   type GridConfig,
+  type ImageAsset,
   type LayoutNode,
   type PageConfig,
   type Sides,
+  type SpecificSizeMm,
 } from '@epp/layout-engine';
 
 import { getEppApi } from '../lib/ipc-client.js';
@@ -743,6 +746,114 @@ function computeAvailableMainSize(page: EPPProjectPage, parentNode: LayoutNode):
   };
 }
 
+function resolveAspectRatio(asset: ImageAsset | undefined): number {
+  return asset && asset.heightPx > 0 ? asset.widthPx / asset.heightPx : 1;
+}
+
+/**
+ * Computes the next SpecificSizeMm given a width/height edit (or clear, when valueMm is null).
+ * Only the axis the user explicitly typed into is authoritative — the other is derived from it
+ * plus the asset's aspect ratio, unless both axes are explicit (lockedAxis: 'both'), in which
+ * case the image stretches to fit both exactly. Both fields are always fully resolved (never
+ * partial) so the pure layout-engine can use them as a size floor without needing asset data.
+ */
+function resolveSpecificSizeMm(
+  current: SpecificSizeMm | undefined,
+  axis: 'width' | 'height',
+  valueMm: number | null,
+  aspectRatio: number,
+): SpecificSizeMm | undefined {
+  if (valueMm == null) {
+    if (!current) {
+      return undefined;
+    }
+    if (axis === 'width') {
+      if (current.lockedAxis === 'width') {
+        return undefined;
+      }
+      return { widthMm: current.heightMm * aspectRatio, heightMm: current.heightMm, lockedAxis: 'height' };
+    }
+    if (current.lockedAxis === 'height') {
+      return undefined;
+    }
+    return { widthMm: current.widthMm, heightMm: current.widthMm / aspectRatio, lockedAxis: 'width' };
+  }
+
+  const clampedValueMm = Math.max(0.1, valueMm);
+  if (axis === 'width') {
+    const otherExplicit = current?.lockedAxis === 'height' || current?.lockedAxis === 'both';
+    const heightMm = otherExplicit ? current!.heightMm : clampedValueMm / aspectRatio;
+    return { widthMm: clampedValueMm, heightMm, lockedAxis: otherExplicit ? 'both' : 'width' };
+  }
+
+  const otherExplicit = current?.lockedAxis === 'width' || current?.lockedAxis === 'both';
+  const widthMm = otherExplicit ? current!.widthMm : clampedValueMm * aspectRatio;
+  return { widthMm, heightMm: clampedValueMm, lockedAxis: otherExplicit ? 'both' : 'height' };
+}
+
+function findParentAndIndex(node: LayoutNode, targetId: string): { parent: LayoutNode; index: number } | null {
+  const children = node.children ?? [];
+  const index = children.findIndex((child) => child.id === targetId);
+  if (index !== -1) {
+    return { parent: node, index };
+  }
+
+  for (const child of children) {
+    const found = findParentAndIndex(child, targetId);
+    if (found) {
+      return found;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * §4.1.1 — when a slot's minimum required size grows (e.g. a specificSize is set), borrows
+ * space from the one adjacent sibling on the growing side so the divider between them lands
+ * exactly on the new minimum instead of leaving the slot under-sized. A no-op if the slot isn't
+ * inside a horizontal/vertical parent, is already big enough, or the divider is locked/maxed —
+ * any leftover deficit is left for the caller to flag (can't be satisfied by the template).
+ */
+function growSlotToMinimum(page: EPPProjectPage, slotNodeId: string): LayoutNode {
+  const parentInfo = findParentAndIndex(page.rootNode, slotNodeId);
+  if (!parentInfo) {
+    return page.rootNode;
+  }
+
+  const { parent, index } = parentInfo;
+  if (parent.type !== 'horizontal' && parent.type !== 'vertical') {
+    return page.rootNode;
+  }
+
+  const children = parent.children ?? [];
+  const slotNode = children[index];
+  if (!slotNode || children.length < 2) {
+    return page.rootNode;
+  }
+
+  const { availableMain, mainAxisKey, axis } = computeAvailableMainSize(page, parent);
+  const pageBox = createPageBoxMm(page.pageConfig);
+  const slotBox = resolveLayout(page.rootNode, pageBox).get(slotNodeId);
+  if (!slotBox) {
+    return page.rootNode;
+  }
+
+  const requiredMm = computeMinRequiredMainSizeMm(slotNode, axis);
+  const currentMm = axis === 'w' ? slotBox.w : slotBox.h;
+  const deficitMm = requiredMm - currentMm;
+  if (deficitMm <= 0.001) {
+    return page.rootNode;
+  }
+
+  const hasNextSibling = index < children.length - 1;
+  const siblingIndexA = hasNextSibling ? index : index - 1;
+  const deltaMm = hasNextSibling ? deficitMm : -deficitMm;
+  const resizedChildren = resizeAdjacentSiblings(children, siblingIndexA, deltaMm, availableMain, mainAxisKey, axis);
+
+  return updateChildrenForNode(page.rootNode, parent.id, () => resizedChildren);
+}
+
 export interface DocumentState {
   pages: EPPProjectPage[];
 }
@@ -767,6 +878,7 @@ export interface DocumentSlice {
   addNestedChildNode: (pageId: string, parentNodeId: string, childType: 'imageSlot' | 'horizontal' | 'vertical' | 'grid' | 'freeformCanvas') => void;
   removeLayoutNode: (pageId: string, nodeId: string) => void;
   assignImageToSlot: (pageId: string, nodeId: string, imageAssetId: string) => void;
+  setSlotSpecificSize: (pageId: string, nodeId: string, axis: 'width' | 'height', valueMm: number | null) => void;
   clearImageFromSlot: (pageId: string, nodeId: string) => void;
   resizeSiblingsByDrag: (pageId: string, parentNodeId: string, siblingIndexA: number, deltaMm: number) => void;
   addFreeformElement: (
@@ -790,6 +902,7 @@ export interface DocumentSlice {
 
 interface DocumentSliceDependencies {
   document: DocumentState;
+  imagePool: ImageAsset[];
 }
 
 export function createDocumentSlice(
@@ -979,16 +1092,41 @@ export function createDocumentSlice(
       }));
     },
     assignImageToSlot: (pageId, nodeId, imageAssetId) => {
+      const page = get().document.pages.find((entry) => entry.id === pageId);
+      const slotNode = page ? findNodeById(page.rootNode, nodeId) : undefined;
+      const specificSizeMm = slotNode?.imageSlotConfig?.specificSizeMm;
+
       set((state) => ({
         document: {
-          pages: state.document.pages.map((page) =>
-            page.id === pageId
-              ? {
-                  ...page,
-                  assignments: assignImageToPage(page, nodeId, imageAssetId),
-                }
-              : page,
-          ),
+          pages: state.document.pages.map((entry) => {
+            if (entry.id !== pageId) {
+              return entry;
+            }
+
+            // A specificSize slot whose non-locked axis was derived from the *previous* image's
+            // aspect ratio needs to be re-derived for the newly assigned one, so the image keeps
+            // fitting its explicitly-set axis instead of quietly carrying a stale dimension.
+            const rootNode =
+              specificSizeMm && specificSizeMm.lockedAxis !== 'both'
+                ? updateNodeById(entry.rootNode, nodeId, {
+                    imageSlotConfig: {
+                      ...slotNode!.imageSlotConfig,
+                      specificSizeMm: resolveSpecificSizeMm(
+                        specificSizeMm,
+                        specificSizeMm.lockedAxis,
+                        specificSizeMm.lockedAxis === 'width' ? specificSizeMm.widthMm : specificSizeMm.heightMm,
+                        resolveAspectRatio(get().imagePool.find((asset) => asset.id === imageAssetId)),
+                      ),
+                    },
+                  })
+                : entry.rootNode;
+
+            return {
+              ...entry,
+              rootNode,
+              assignments: assignImageToPage(entry, nodeId, imageAssetId),
+            };
+          }),
         },
       }));
     },
@@ -1005,6 +1143,59 @@ export function createDocumentSlice(
           ),
         },
       }));
+    },
+    setSlotSpecificSize: (pageId, nodeId, axis, valueMm) => {
+      const page = get().document.pages.find((entry) => entry.id === pageId);
+      if (!page) {
+        throw new Error(`Page ${pageId} does not exist.`);
+      }
+
+      const slotNode = findNodeById(page.rootNode, nodeId);
+      if (!slotNode || slotNode.type !== 'imageSlot') {
+        throw new Error(`Node ${nodeId} is not an imageSlot.`);
+      }
+
+      const asset = get().imagePool.find((entry) => entry.id === page.assignments[nodeId]);
+      const nextSpecificSizeMm = resolveSpecificSizeMm(
+        slotNode.imageSlotConfig?.specificSizeMm,
+        axis,
+        valueMm,
+        resolveAspectRatio(asset),
+      );
+
+      set((state) => ({
+        document: {
+          pages: state.document.pages.map((entry) =>
+            entry.id === pageId
+              ? {
+                  ...entry,
+                  rootNode: updateNodeById(entry.rootNode, nodeId, {
+                    imageSlotConfig: {
+                      ...slotNode.imageSlotConfig,
+                      scalingRule: 'specificSize',
+                      specificSizeMm: nextSpecificSizeMm,
+                    },
+                  }),
+                }
+              : entry,
+          ),
+        },
+      }));
+
+      // §4.1.1 — reposition the dividers around this slot right away so they reflect the new
+      // minimum, instead of waiting for the user to drag one manually.
+      const updatedPage = get().document.pages.find((entry) => entry.id === pageId);
+      if (!updatedPage) {
+        return;
+      }
+      const grownRootNode = growSlotToMinimum(updatedPage, nodeId);
+      if (grownRootNode !== updatedPage.rootNode) {
+        set((state) => ({
+          document: {
+            pages: state.document.pages.map((entry) => (entry.id === pageId ? { ...entry, rootNode: grownRootNode } : entry)),
+          },
+        }));
+      }
     },
     resizeSiblingsByDrag: (pageId, parentNodeId, siblingIndexA, deltaMm) => {
       const page = get().document.pages.find((entry) => entry.id === pageId);

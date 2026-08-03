@@ -67,5 +67,37 @@ describe('flex distribution', () => {
     expect(computeMinRequiredMainSizeMm(node, 'w')).toBe(73);
     expect(computeMinRequiredMainSizeMm(node, 'h')).toBe(25);
   });
+
+  it('treats a specificSize imageSlot as having a minimum equal to the resolved image size', () => {
+    const node: LayoutNode = {
+      id: 'slot',
+      type: 'imageSlot',
+      imageSlotConfig: {
+        scalingRule: 'specificSize',
+        specificSizeMm: { widthMm: 80, heightMm: 40, lockedAxis: 'width' },
+      },
+    };
+
+    expect(computeMinRequiredMainSizeMm(node, 'w')).toBe(80);
+    expect(computeMinRequiredMainSizeMm(node, 'h')).toBe(40);
+  });
+
+  it('clamps a divider drag so it cannot shrink a specificSize slot below its resolved size', () => {
+    const children: LayoutNode[] = [
+      {
+        id: 'a',
+        type: 'imageSlot',
+        sizeRatio: 1,
+        imageSlotConfig: { scalingRule: 'specificSize', specificSizeMm: { widthMm: 70, heightMm: 70, lockedAxis: 'both' } },
+      },
+      { id: 'b', type: 'imageSlot', sizeRatio: 1 },
+    ];
+
+    // Container is 200mm wide split 50/50 (100mm each) — try to shrink "a" by 60mm (down to 40mm),
+    // which is below its specific 70mm floor, so it should clamp at 70mm instead.
+    const resized = resizeSiblingsByDrag(children, 0, -60, 200, 'widthMm', 'w');
+    const resultingWidthA = (resized[0].sizeRatio! / (resized[0].sizeRatio! + resized[1].sizeRatio!)) * 200;
+    expect(resultingWidthA).toBeCloseTo(70, 5);
+  });
 });
 

@@ -62,6 +62,10 @@ export function isDividerLocked(children: LayoutNode[], index: number, mainAxisK
 export function computeMinRequiredMainSizeMm(node: LayoutNode, axis: Axis): number {
   const axisKey: MainAxisKey = axis === 'w' ? 'widthMm' : 'heightMm';
   if (node.type === 'imageSlot' || node.type === 'freeformCanvas') {
+    if (node.type === 'imageSlot' && node.imageSlotConfig?.scalingRule === 'specificSize' && node.imageSlotConfig.specificSizeMm) {
+      const specificValue = axis === 'w' ? node.imageSlotConfig.specificSizeMm.widthMm : node.imageSlotConfig.specificSizeMm.heightMm;
+      return Math.max(specificValue, node.fixedSizeMm?.[axisKey] ?? 0, MIN_SIZE_RATIO_MM);
+    }
     return node.fixedSizeMm?.[axisKey] ?? MIN_SIZE_RATIO_MM;
   }
 

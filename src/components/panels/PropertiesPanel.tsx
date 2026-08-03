@@ -1,8 +1,9 @@
-// @spec OPENSPEC.md §4.1, §4.1.1, §2.4 — contextual inspector for grid and imageSlot properties
+// @spec OPENSPEC.md §4.1, §4.1.1, §4.1.1.1, §2.4 — contextual inspector for grid and imageSlot properties
 import { computeStretch, type LayoutNode, type Sides } from '@epp/layout-engine';
 import { useEffect, useState, type KeyboardEvent, type ReactNode } from 'react';
 
 import { useLayoutResolution } from '../../hooks/useLayoutResolution.js';
+import { isSpecificSizeUnsatisfied } from '../../lib/imageDisplay.js';
 import { formatLength, inchesToMm, mmToInches } from '../../lib/units.js';
 import { useEPPStore } from '../../store/index.js';
 import { CollapsiblePanel } from '../ui/CollapsiblePanel.js';
@@ -85,6 +86,69 @@ function CommitLengthInput({
   );
 }
 
+function ClearableLengthInput({
+  valueMm,
+  unitSystem,
+  onCommit,
+}: {
+  valueMm: number | undefined;
+  unitSystem: 'metric' | 'imperial';
+  onCommit: (valueMm: number | null) => void;
+}) {
+  const unitLabel = unitSystem === 'imperial' ? 'in' : 'mm';
+  const toDisplayValue = (mm: number | undefined): string =>
+    mm == null ? '' : unitSystem === 'imperial' ? mmToInches(mm).toFixed(2) : mm.toFixed(1);
+  const fromDisplayValue = (value: number): number => (unitSystem === 'imperial' ? inchesToMm(value) : value);
+  const [draft, setDraft] = useState(() => toDisplayValue(valueMm));
+  const [isEditing, setIsEditing] = useState(false);
+
+  useEffect(() => {
+    if (isEditing) {
+      return;
+    }
+    setDraft(toDisplayValue(valueMm));
+  }, [isEditing, valueMm, unitSystem]);
+
+  const commit = () => {
+    if (draft.trim() === '') {
+      onCommit(null);
+      return;
+    }
+    const parsed = Number.parseFloat(draft);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      setDraft(toDisplayValue(valueMm));
+      return;
+    }
+    onCommit(fromDisplayValue(parsed));
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        type="number"
+        min={0}
+        step={0.1}
+        placeholder="auto"
+        className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
+        value={draft}
+        onFocus={() => setIsEditing(true)}
+        onChange={(event) => setDraft(event.target.value)}
+        onBlur={() => {
+          setIsEditing(false);
+          commit();
+        }}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            commit();
+            event.currentTarget.blur();
+          }
+        }}
+      />
+      <span className="min-w-8 text-xs font-medium uppercase tracking-wide text-slate-400">{unitLabel}</span>
+    </div>
+  );
+}
+
 function findNodeById(node: LayoutNode, nodeId: string): LayoutNode | null {
   if (node.id === nodeId) {
     return node;
@@ -141,6 +205,7 @@ export function PropertiesPanel() {
   );
   const updateGridNodeConfig = useEPPStore((state) => state.updateGridNodeConfig);
   const updateLayoutNode = useEPPStore((state) => state.updateLayoutNode);
+  const setSlotSpecificSize = useEPPStore((state) => state.setSlotSpecificSize);
   const setSimpleRootType = useEPPStore((state) => state.setSimpleRootType);
   const setContainerChildCount = useEPPStore((state) => state.setContainerChildCount);
   const imagePool = useEPPStore((state) => state.imagePool);
@@ -188,6 +253,9 @@ export function PropertiesPanel() {
       scalingRule === 'stretch' && selectedAsset && selectedBox
         ? computeStretch(selectedAsset, selectedBox).distortionWarning
         : false;
+    const specificSizeMm = slotPropertyNode.imageSlotConfig?.specificSizeMm;
+    const specificSizeUnsatisfied =
+      scalingRule === 'specificSize' && selectedBox ? isSpecificSizeUnsatisfied(specificSizeMm, selectedBox) : false;
 
     return (
       <CollapsiblePanel
@@ -205,7 +273,7 @@ export function PropertiesPanel() {
               onChange={(event) =>
                 updateLayoutNode(activePage.id, slotPropertyNode.id, {
                   imageSlotConfig: {
-                    scalingRule: event.target.value as 'fitInParent' | 'envelopeParent' | 'stretch',
+                    scalingRule: event.target.value as 'fitInParent' | 'envelopeParent' | 'stretch' | 'specificSize',
                   },
                 })
               }
@@ -213,8 +281,33 @@ export function PropertiesPanel() {
               <option value="fitInParent">fitInParent</option>
               <option value="envelopeParent">envelopeParent</option>
               <option value="stretch">stretch</option>
+              <option value="specificSize">specificSize</option>
             </select>
           </div>
+
+          {scalingRule === 'specificSize' ? (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <FieldLabel>Width</FieldLabel>
+                <ClearableLengthInput
+                  valueMm={specificSizeMm?.widthMm}
+                  unitSystem={unitSystem}
+                  onCommit={(valueMm) => setSlotSpecificSize(activePage.id, slotPropertyNode.id, 'width', valueMm)}
+                />
+              </div>
+              <div>
+                <FieldLabel>Height</FieldLabel>
+                <ClearableLengthInput
+                  valueMm={specificSizeMm?.heightMm}
+                  unitSystem={unitSystem}
+                  onCommit={(valueMm) => setSlotSpecificSize(activePage.id, slotPropertyNode.id, 'height', valueMm)}
+                />
+              </div>
+              <p className="col-span-2 text-xs text-slate-500">
+                Set only one side to derive the other from the image's aspect ratio, or both to stretch the image to that exact size.
+              </p>
+            </div>
+          ) : null}
 
           <div className="rounded-lg border border-slate-800 bg-slate-950/70 p-3 text-sm text-slate-300">
             <div className="text-xs uppercase tracking-wide text-slate-500">Assigned image</div>
@@ -229,6 +322,13 @@ export function PropertiesPanel() {
           {stretchWarning ? (
             <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
               This image will be visibly distorted in <code>stretch</code> mode because its aspect ratio differs from the slot by more than 15%.
+            </div>
+          ) : null}
+
+          {specificSizeUnsatisfied ? (
+            <div className="rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
+              The requested specific size doesn&apos;t fit in the space this template gives the slot — the image is shown with a red
+              outline in the preview.
             </div>
           ) : null}
         </div>

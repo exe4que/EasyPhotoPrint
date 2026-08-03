@@ -1,8 +1,46 @@
 import { describe, expect, it } from 'vitest';
 
-import type { EPPProjectPage, EPPTemplate } from '@epp/layout-engine';
+import type { EPPProjectPage, EPPTemplate, ImageAsset } from '@epp/layout-engine';
 
 import { assignImageToPage, clearImageFromPage, createDefaultPage, createDocumentSlice, reconcileGridChildren } from './documentSlice.js';
+
+type StoreState = ReturnType<typeof createDocumentSlice>;
+
+/**
+ * `createDocumentSlice`'s actions mutate a `state` variable captured by the `set`/`get`
+ * closures passed into it — reading `.document` off of whatever object this function *returns*
+ * would just see a stale snapshot from construction time. The Proxy re-reads every property
+ * (data and methods alike) from the live internal state on each access, so callers can keep
+ * doing `store.someAction(...)` followed by `store.document...` naturally, same as the original
+ * per-test `let state = createDocumentSlice(...)` pattern this replaces.
+ */
+function createTestStore(imagePool: ImageAsset[] = []): StoreState {
+  let internalState = createDocumentSlice(
+    (updater) => {
+      internalState = { ...internalState, ...updater(internalState as never) } as StoreState;
+    },
+    () => ({ document: internalState.document, imagePool }) as never,
+  ) as StoreState;
+
+  return new Proxy({} as StoreState, {
+    get(_target, prop) {
+      const value = (internalState as never)[prop as never];
+      return typeof value === 'function' ? (value as (...args: unknown[]) => unknown).bind(internalState) : value;
+    },
+  });
+}
+
+function createTestAsset(id: string, widthPx: number, heightPx: number): ImageAsset {
+  return {
+    id,
+    originalPath: `/tmp/${id}.jpg`,
+    storedPath: `/tmp/${id}.jpg`,
+    fileName: `${id}.jpg`,
+    widthPx,
+    heightPx,
+    thumbnailDataUrl: 'data:image/jpeg;base64,AA==',
+  };
+}
 
 describe('document slice helpers', () => {
   it('allows assigning the same library image to multiple slots on the same page', () => {
@@ -63,10 +101,7 @@ describe('document slice helpers', () => {
   });
 
   it('applies pageConfig per page when a template is applied', () => {
-    type StoreState = ReturnType<typeof createDocumentSlice>;
-    let state = createDocumentSlice((updater) => {
-      state = { ...state, ...updater(state) };
-    }, () => state) as StoreState;
+    const state = createTestStore();
 
     const template: EPPTemplate = {
       schemaVersion: '1.0.0',
@@ -89,10 +124,7 @@ describe('document slice helpers', () => {
   });
 
   it('links a page to a newly saved template so "Save" can overwrite it afterwards', () => {
-    type StoreState = ReturnType<typeof createDocumentSlice>;
-    let state = createDocumentSlice((updater) => {
-      state = { ...state, ...updater(state) };
-    }, () => state) as StoreState;
+    const state = createTestStore();
 
     expect(state.document.pages[0].templateRef).toBeUndefined();
     state.linkPageToTemplate('page-1', 'template-42');
@@ -124,10 +156,7 @@ describe('document slice helpers', () => {
   });
 
   it('drops assignments for removed grid slots when resizing the grid', () => {
-    type StoreState = ReturnType<typeof createDocumentSlice>;
-    let state = createDocumentSlice((updater) => {
-      state = { ...state, ...updater(state) };
-    }, () => state) as StoreState;
+    const state = createTestStore();
 
     state.retypeLayoutNode('page-1', 'root-grid', 'grid');
     state.updateGridNodeConfig('page-1', 'root-grid', {
@@ -146,10 +175,7 @@ describe('document slice helpers', () => {
   });
 
   it('retypes an image slot into a nested container with child slots', () => {
-    type StoreState = ReturnType<typeof createDocumentSlice>;
-    let state = createDocumentSlice((updater) => {
-      state = { ...state, ...updater(state) };
-    }, () => state) as StoreState;
+    const state = createTestStore();
 
     state.assignImageToSlot('page-1', 'root-grid', 'image-a');
     state.retypeLayoutNode('page-1', 'root-grid', 'horizontal');
@@ -161,10 +187,7 @@ describe('document slice helpers', () => {
   });
 
   it('adds a nested child node into a horizontal container', () => {
-    type StoreState = ReturnType<typeof createDocumentSlice>;
-    let state = createDocumentSlice((updater) => {
-      state = { ...state, ...updater(state) };
-    }, () => state) as StoreState;
+    const state = createTestStore();
 
     state.retypeLayoutNode('page-1', 'root-grid', 'horizontal');
     state.addNestedChildNode('page-1', 'root-grid', 'imageSlot');
@@ -173,10 +196,7 @@ describe('document slice helpers', () => {
   });
 
   it('sets the child slot count of a horizontal/vertical container, preserving existing assignments', () => {
-    type StoreState = ReturnType<typeof createDocumentSlice>;
-    let state = createDocumentSlice((updater) => {
-      state = { ...state, ...updater(state) };
-    }, () => state) as StoreState;
+    const state = createTestStore();
 
     state.retypeLayoutNode('page-1', 'root-grid', 'horizontal');
     state.assignImageToSlot('page-1', 'slot-1', 'image-a');
@@ -191,10 +211,7 @@ describe('document slice helpers', () => {
   });
 
   it('removes nested nodes and clears assignments for removed slot ids', () => {
-    type StoreState = ReturnType<typeof createDocumentSlice>;
-    let state = createDocumentSlice((updater) => {
-      state = { ...state, ...updater(state) };
-    }, () => state) as StoreState;
+    const state = createTestStore();
 
     state.retypeLayoutNode('page-1', 'root-grid', 'horizontal');
     state.assignImageToSlot('page-1', 'slot-2', 'image-a');
@@ -205,10 +222,7 @@ describe('document slice helpers', () => {
   });
 
   it('switches the Simple root type to freeformCanvas and clears slot assignments', () => {
-    type StoreState = ReturnType<typeof createDocumentSlice>;
-    let state = createDocumentSlice((updater) => {
-      state = { ...state, ...updater(state) };
-    }, () => state) as StoreState;
+    const state = createTestStore();
 
     state.assignImageToSlot('page-1', 'root-grid', 'image-a');
     state.setSimpleRootType('page-1', 'freeformCanvas');
@@ -229,10 +243,7 @@ describe('document slice helpers', () => {
   });
 
   it('adds a freeform element centered in the node, referencing a new imageSlot child', () => {
-    type StoreState = ReturnType<typeof createDocumentSlice>;
-    let state = createDocumentSlice((updater) => {
-      state = { ...state, ...updater(state) };
-    }, () => state) as StoreState;
+    const state = createTestStore();
 
     state.setSimpleRootType('page-1', 'freeformCanvas');
     state.addFreeformElement('page-1', 'root-grid', 'image-a');
@@ -250,10 +261,7 @@ describe('document slice helpers', () => {
   });
 
   it('removes a freeform element along with its imageSlot child and assignment', () => {
-    type StoreState = ReturnType<typeof createDocumentSlice>;
-    let state = createDocumentSlice((updater) => {
-      state = { ...state, ...updater(state) };
-    }, () => state) as StoreState;
+    const state = createTestStore();
 
     state.setSimpleRootType('page-1', 'freeformCanvas');
     state.addFreeformElement('page-1', 'root-grid', 'image-a');
@@ -268,10 +276,7 @@ describe('document slice helpers', () => {
   });
 
   it('clamps updateFreeformElementTransform so the element cannot be dragged fully outside the node', () => {
-    type StoreState = ReturnType<typeof createDocumentSlice>;
-    let state = createDocumentSlice((updater) => {
-      state = { ...state, ...updater(state) };
-    }, () => state) as StoreState;
+    const state = createTestStore();
 
     state.setSimpleRootType('page-1', 'freeformCanvas');
     state.addFreeformElement('page-1', 'root-grid', 'image-a');
@@ -284,5 +289,82 @@ describe('document slice helpers', () => {
     // node's edge, never left free to fly off completely (§4.2 containment requirement).
     expect(element.transform.xMm).toBeLessThan(300);
     expect(element.transform.yMm).toBeLessThan(400);
+  });
+
+  it('derives the height from the width and the assigned image aspect ratio when only width is set', () => {
+    const state = createTestStore([createTestAsset('image-a', 400, 200)]);
+    state.assignImageToSlot('page-1', 'root-grid', 'image-a');
+
+    state.setSlotSpecificSize('page-1', 'root-grid', 'width', 100);
+
+    const slot = state.document.pages[0].rootNode;
+    expect(slot.imageSlotConfig?.scalingRule).toBe('specificSize');
+    expect(slot.imageSlotConfig?.specificSizeMm).toEqual({ widthMm: 100, heightMm: 50, lockedAxis: 'width' });
+  });
+
+  it('derives the width from the height when only height is set', () => {
+    const state = createTestStore([createTestAsset('image-a', 400, 200)]);
+    state.assignImageToSlot('page-1', 'root-grid', 'image-a');
+
+    state.setSlotSpecificSize('page-1', 'root-grid', 'height', 60);
+
+    expect(state.document.pages[0].rootNode.imageSlotConfig?.specificSizeMm).toEqual({
+      widthMm: 120,
+      heightMm: 60,
+      lockedAxis: 'height',
+    });
+  });
+
+  it('locks both axes (stretch) once the user sets both explicitly', () => {
+    const state = createTestStore([createTestAsset('image-a', 400, 200)]);
+    state.assignImageToSlot('page-1', 'root-grid', 'image-a');
+
+    state.setSlotSpecificSize('page-1', 'root-grid', 'width', 100);
+    state.setSlotSpecificSize('page-1', 'root-grid', 'height', 90);
+
+    expect(state.document.pages[0].rootNode.imageSlotConfig?.specificSizeMm).toEqual({
+      widthMm: 100,
+      heightMm: 90,
+      lockedAxis: 'both',
+    });
+  });
+
+  it('clearing the only locked axis removes the specific size entirely', () => {
+    const state = createTestStore([createTestAsset('image-a', 400, 200)]);
+    state.assignImageToSlot('page-1', 'root-grid', 'image-a');
+    state.setSlotSpecificSize('page-1', 'root-grid', 'width', 100);
+
+    state.setSlotSpecificSize('page-1', 'root-grid', 'width', null);
+
+    expect(state.document.pages[0].rootNode.imageSlotConfig?.specificSizeMm).toBeUndefined();
+  });
+
+  it('re-derives the non-locked axis when the assigned image changes', () => {
+    const state = createTestStore([createTestAsset('image-a', 400, 200), createTestAsset('image-b', 100, 400)]);
+    state.assignImageToSlot('page-1', 'root-grid', 'image-a');
+    state.setSlotSpecificSize('page-1', 'root-grid', 'width', 100);
+    expect(state.document.pages[0].rootNode.imageSlotConfig?.specificSizeMm?.heightMm).toBe(50);
+
+    state.assignImageToSlot('page-1', 'root-grid', 'image-b');
+
+    const specificSizeMm = state.document.pages[0].rootNode.imageSlotConfig?.specificSizeMm;
+    expect(specificSizeMm?.widthMm).toBe(100);
+    expect(specificSizeMm?.heightMm).toBe(400);
+  });
+
+  it('grows a slot to its specific size by shrinking its adjacent sibling, right when the size is set', () => {
+    const state = createTestStore([createTestAsset('image-a', 100, 100)]);
+    state.retypeLayoutNode('page-1', 'root-grid', 'horizontal');
+    // Root A4 portrait is 210mm wide minus 10mm padding minus a 3mm gap -> ~197mm split 50/50 (~97mm each).
+    const [firstChildId] = state.document.pages[0].rootNode.children!.map((child) => child.id);
+    state.assignImageToSlot('page-1', firstChildId, 'image-a');
+
+    state.setSlotSpecificSize('page-1', firstChildId, 'width', 150);
+
+    const [firstChild, secondChild] = state.document.pages[0].rootNode.children!;
+    const totalRatio = (firstChild.sizeRatio ?? 1) + (secondChild.sizeRatio ?? 1);
+    const availableMain = 210 - 10 - 3; // page width - root padding (5+5) - gap
+    const firstChildWidthMm = ((firstChild.sizeRatio ?? 1) / totalRatio) * availableMain;
+    expect(firstChildWidthMm).toBeCloseTo(150, 1);
   });
 });

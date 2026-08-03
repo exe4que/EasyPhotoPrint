@@ -177,7 +177,7 @@ export function PageStage({ selectedImageAssetId }: PageStageProps) {
       </div>
 
       <div ref={viewportRef} className="min-h-0 flex-1 overflow-auto rounded-xl border border-slate-800 bg-slate-950/80 p-6">
-        <div className="flex min-h-full min-w-full items-center justify-center">
+        <div className="flex min-h-full w-max min-w-full items-center justify-center">
           <div
             className="relative shrink-0 bg-white shadow-2xl"
           style={{

@@ -1,12 +1,18 @@
 // @spec OPENSPEC.md §4.1, §4.1.1.1 — shared imageSlot rendering helpers (hover dimension labels, object-fit, specific size)
 import { computeFitInParent, computeSpecificSize, type BoxMm, type ImageAsset, type ScalingRule, type SpecificSizeMm } from '@epp/layout-engine';
 
+/**
+ * `specificSize` is intentionally absent here: whenever `specificSizeMm` is actually resolved,
+ * callers use the rect-based `computeImageDisplayRectMm` positioning instead of `object-fit`
+ * entirely. This function is only ever consulted for a `specificSize` slot in the brief window
+ * before the user has typed a width/height — falling through to `contain` there keeps the
+ * image at its natural aspect ratio instead of stretching it to fill the slot.
+ */
 export function scalingRuleToObjectFit(scalingRule: ScalingRule | undefined): 'contain' | 'cover' | 'fill' {
   switch (scalingRule) {
     case 'envelopeParent':
       return 'cover';
     case 'stretch':
-    case 'specificSize':
       return 'fill';
     default:
       return 'contain';

@@ -149,6 +149,17 @@ function ClearableLengthInput({
   );
 }
 
+const ASPECT_RATIO_TOLERANCE_MM = 0.05;
+
+/** True when both axes of a `specificSizeMm` are explicitly locked (stretch) and no longer match the asset's original aspect ratio. */
+function isAspectRatioBroken(specificSizeMm: { widthMm: number; heightMm: number; lockedAxis: string } | undefined, aspectRatio: number): boolean {
+  if (!specificSizeMm || specificSizeMm.lockedAxis !== 'both') {
+    return false;
+  }
+  const expectedHeightMm = specificSizeMm.widthMm / aspectRatio;
+  return Math.abs(expectedHeightMm - specificSizeMm.heightMm) > ASPECT_RATIO_TOLERANCE_MM;
+}
+
 function findNodeById(node: LayoutNode, nodeId: string): LayoutNode | null {
   if (node.id === nodeId) {
     return node;
@@ -256,6 +267,8 @@ export function PropertiesPanel() {
     const specificSizeMm = slotPropertyNode.imageSlotConfig?.specificSizeMm;
     const specificSizeUnsatisfied =
       scalingRule === 'specificSize' && selectedBox ? isSpecificSizeUnsatisfied(specificSizeMm, selectedBox) : false;
+    const assetAspectRatio = selectedAsset && selectedAsset.heightPx > 0 ? selectedAsset.widthPx / selectedAsset.heightPx : undefined;
+    const aspectRatioBroken = assetAspectRatio != null && isAspectRatioBroken(specificSizeMm, assetAspectRatio);
 
     return (
       <CollapsiblePanel
@@ -294,6 +307,22 @@ export function PropertiesPanel() {
                   unitSystem={unitSystem}
                   onCommit={(valueMm) => setSlotSpecificSize(activePage.id, slotPropertyNode.id, 'width', valueMm)}
                 />
+                {aspectRatioBroken ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSlotSpecificSize(
+                        activePage.id,
+                        slotPropertyNode.id,
+                        'width',
+                        specificSizeMm!.heightMm * assetAspectRatio!,
+                      )
+                    }
+                    className="mt-1 text-left text-[11px] font-medium text-amber-400 hover:text-amber-300"
+                  >
+                    Adjust to restore aspect ratio
+                  </button>
+                ) : null}
               </div>
               <div>
                 <FieldLabel>Height</FieldLabel>
@@ -302,6 +331,22 @@ export function PropertiesPanel() {
                   unitSystem={unitSystem}
                   onCommit={(valueMm) => setSlotSpecificSize(activePage.id, slotPropertyNode.id, 'height', valueMm)}
                 />
+                {aspectRatioBroken ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSlotSpecificSize(
+                        activePage.id,
+                        slotPropertyNode.id,
+                        'height',
+                        specificSizeMm!.widthMm / assetAspectRatio!,
+                      )
+                    }
+                    className="mt-1 text-left text-[11px] font-medium text-amber-400 hover:text-amber-300"
+                  >
+                    Adjust to restore aspect ratio
+                  </button>
+                ) : null}
               </div>
               <p className="col-span-2 text-xs text-slate-500">
                 Set only one side to derive the other from the image's aspect ratio, or both to stretch the image to that exact size.

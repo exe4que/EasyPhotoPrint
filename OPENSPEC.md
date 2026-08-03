@@ -6,7 +6,7 @@
 | **Estado** | Draft / Proposed |
 | **Autor** | Software Architecture Team |
 | **Fecha** | 2026-08-02 |
-| **Versión** | 0.8.0 |
+| **Versión** | 0.9.0 |
 
 ---
 
@@ -705,7 +705,7 @@ function resizeSiblingsByDrag(
 }
 ```
 
-En la UI, `NestedNodeRenderer.tsx` renderiza un componente `NodeDivider.tsx` entre cada par de hijos adyacentes de un `horizontal`/`vertical` (cursor `col-resize`/`row-resize` según dirección). Cuando `isDividerLocked` es `true`, el divisor se renderiza en estado deshabilitado (sin cursor de resize, con un pequeño ícono de candado en hover) para comunicar visualmente por qué no se puede mover. `onDragStart` llama a `store.pauseHistory()` (wrapper de `store.temporal.getState().pause()`, §2.3); durante `onDragMove` se llama a `resizeSiblingsByDrag` con el `deltaMm` acumulado y se actualiza el store en vivo sin que `zundo` registre cada frame; en `onDragEnd` se llama a `store.resumeHistory()`, con lo que el gesto completo de arrastre queda como **un solo** paso de undo/redo, no cientos.
+En la UI, `PageStage.tsx` (no existe un `NestedNodeRenderer.tsx` separado — ver nota sobre la estructura de carpetas real en §6.1) renderiza un `NodeDivider.tsx` entre cada par de hijos adyacentes de un `horizontal`/`vertical`, en cualquier profundidad del árbol y tanto en modo `Simple` como `nested` (cursor `col-resize`/`row-resize` según dirección). Cuando `isDividerLocked` es `true`, el divisor se renderiza en estado deshabilitado (sin cursor de resize, con un pequeño ícono de candado en hover) para comunicar visualmente por qué no se puede mover. `onDragStart` llama a `store.pauseHistory()` (wrapper de `store.temporal.getState().pause()`, §2.3); durante `onDragMove` se llama a `resizeSiblingsByDrag` con el `deltaMm` acumulado y se actualiza el store en vivo sin que `zundo` registre cada frame; en `onDragEnd` se llama a `store.resumeHistory()`, con lo que el gesto completo de arrastre queda como **un solo** paso de undo/redo, no cientos.
 
 **Pseudocódigo — `computeGridCells` (aplica padding del contenedor + gap por eje entre celdas):**
 
@@ -1029,9 +1029,9 @@ easy-photo-print/
 │   ├── App.tsx
 │   ├── components/
 │   │   ├── canvas/
-│   │   │   ├── PageStage.tsx        # DOM canvas wrapper (resolveLayout + CSS)
-│   │   │   ├── GridRenderer.tsx
-│   │   │   ├── NestedNodeRenderer.tsx
+│   │   │   ├── PageStage.tsx        # DOM canvas wrapper (resolveLayout + CSS) —
+│   │   │   │                       #   renderiza grid/nested/freeform directo, no hay
+│   │   │   │                       #   GridRenderer.tsx/NestedNodeRenderer.tsx separados
 │   │   │   ├── NodeDivider.tsx      # drag entre hermanos → resizeSiblingsByDrag (sizeRatio)
 │   │   │   ├── FreeformElement.tsx
 │   │   │   └── DimensionOverlay.tsx
@@ -1161,7 +1161,7 @@ Regla de dependencia que el diagrama codifica: las flechas siempre apuntan **hac
 graph TB
     subgraph UI["src/ — Renderer (React + DOM/CSS)"]
         COMP_CANVAS["components/canvas
-PageStage, GridRenderer, NestedNodeRenderer,
+PageStage (grid/nested/freeform),
 FreeformElement, DimensionOverlay, NodeDivider"]
         COMP_PANELS["components/panels
 ImageLibraryPanel, LayoutTreePanel,

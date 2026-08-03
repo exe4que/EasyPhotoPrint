@@ -39,13 +39,13 @@
 | §4.1 | `distributeChildren`, `resolveCrossAxis`, `applyPadding` | `packages/layout-engine/src/flexDistribution.ts` | Completo |
 | §4.1 | `computeGridCells`, `resolveDimensions` | `packages/layout-engine/src/grid.ts` | Completo |
 | §4.1.1 | `resizeSiblingsByDrag`, `isDividerLocked`, `computeMinRequiredMainSizeMm`, `fixedSizeMm` | `packages/layout-engine/src/flexDistribution.ts` | Completo |
-| §4.1.1 | UI de divisoria arrastrable | `src/components/canvas/NodeDivider.tsx` | No implementado |
+| §4.1.1 | UI de divisoria arrastrable | `src/components/canvas/NodeDivider.tsx`, `src/components/canvas/PageStage.tsx` | Completo |
 | §4.1.2 | `validateLayoutFeasibility` | `packages/layout-engine/src/feasibility.ts` | Completo |
 | §4.1 | Etiquetas de dimensión por hover (`DimensionOverlay`, slot + imagen) | `src/components/canvas/DimensionOverlay.tsx`, `src/components/canvas/PageStage.tsx` | Completo |
 | §4.1 | `freeformCanvas` anidable como cualquier otro tipo de nodo (opción de tipo de nodo raíz en `Simple`, retype/add en `nested`; sin modo `Freeform` de nivel superior) | `src/store/documentSlice.ts`, `src/components/panels/LayoutTreePanel.tsx`, `src/components/panels/PropertiesPanel.tsx`, `src/App.tsx`, `src/store/uiSlice.ts` | Completo |
 | §4.2 | Transform freeform (mover/rotar/escalar con DOM + CSS), agregar/quitar elementos, clip al área imprimible | `src/components/canvas/FreeformElement.tsx`, `src/components/canvas/PageStage.tsx`, `src/store/documentSlice.ts` (`addFreeformElement`/`removeFreeformElement`/`updateFreeformElementTransform`) | Parcial (falta snapping) |
 | §4.2 | Contención — `clampFreeformPosition`/`computeRotatedAabbMm` (el elemento no puede salir por completo del área del nodo) | `packages/layout-engine/src/freeform.ts` | Completo |
-| §4.2 | `pauseHistory`/`resumeHistory` alrededor de gestos de drag | `src/hooks/useUndoRedo.ts`, `src/components/canvas/PageStage.tsx`, `src/components/canvas/FreeformElement.tsx` | Parcial |
+| §4.1.1, §4.2 | `pauseHistory`/`resumeHistory` alrededor de gestos de drag (divisorias y freeform) | `src/hooks/useUndoRedo.ts`, `src/components/canvas/PageStage.tsx`, `src/components/canvas/FreeformElement.tsx`, `src/components/canvas/NodeDivider.tsx` | Completo |
 
 ## §5 PDF Generation Strategy
 

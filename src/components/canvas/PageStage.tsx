@@ -1,5 +1,5 @@
-// @spec OPENSPEC.md §1.3, §2.3, §4.1, §6.1 — page preview shell backed by the shared layout engine
-import type { LayoutNode } from '@epp/layout-engine';
+// @spec OPENSPEC.md §1.3, §2.3, §4.1, §4.1.1, §6.1 — page preview shell backed by the shared layout engine
+import { isDividerLocked, type LayoutNode } from '@epp/layout-engine';
 import { useEffect, useRef, useState } from 'react';
 
 import { useDragAndDrop } from '../../hooks/useDragAndDrop.js';
@@ -9,6 +9,7 @@ import { useLayoutResolution } from '../../hooks/useLayoutResolution.js';
 import { useEPPStore } from '../../store/index.js';
 import { DimensionOverlay } from './DimensionOverlay.js';
 import { FreeformElementView } from './FreeformElement.js';
+import { NodeDivider } from './NodeDivider.js';
 
 const PREVIEW_ZOOM_FALLBACK = 0.38;
 const PREVIEW_INNER_PADDING_PX = 48;
@@ -29,6 +30,14 @@ function collectFreeformCanvasNodes(node: LayoutNode): LayoutNode[] {
   return nodes;
 }
 
+function collectFlexContainerNodes(node: LayoutNode): LayoutNode[] {
+  const nodes = node.type === 'horizontal' || node.type === 'vertical' ? [node] : [];
+  for (const child of node.children ?? []) {
+    nodes.push(...collectFlexContainerNodes(child));
+  }
+  return nodes;
+}
+
 interface PageStageProps {
   selectedImageAssetId: string | null;
 }
@@ -36,7 +45,7 @@ interface PageStageProps {
 export function PageStage({ selectedImageAssetId }: PageStageProps) {
   const { page, pageBox, layout } = useLayoutResolution();
   const viewportRef = useRef<HTMLDivElement | null>(null);
-  const suppressCanvasClickRef = useRef(false);
+  const suppressNextClickRef = useRef(false);
   const [previewZoom, setPreviewZoom] = useState(PREVIEW_ZOOM_FALLBACK);
   const [hoveredSlotId, setHoveredSlotId] = useState<string | null>(null);
   const [hoveredImageSlotId, setHoveredImageSlotId] = useState<string | null>(null);
@@ -51,6 +60,7 @@ export function PageStage({ selectedImageAssetId }: PageStageProps) {
   const addFreeformElement = useEPPStore((state) => state.addFreeformElement);
   const removeFreeformElement = useEPPStore((state) => state.removeFreeformElement);
   const updateFreeformElementTransform = useEPPStore((state) => state.updateFreeformElementTransform);
+  const resizeSiblingsByDrag = useEPPStore((state) => state.resizeSiblingsByDrag);
   const pauseHistory = useEPPStore((state) => state.pauseHistory);
   const resumeHistory = useEPPStore((state) => state.resumeHistory);
   const { createSlotDropProps, createPositionalDropProps } = useDragAndDrop();
@@ -61,6 +71,7 @@ export function PageStage({ selectedImageAssetId }: PageStageProps) {
   const imageSlots = collectImageSlotNodes(page.rootNode);
   const imageSlotMap = new Map(imageSlots.map((node) => [node.id, node]));
   const freeformCanvasMap = new Map(collectFreeformCanvasNodes(page.rootNode).map((node) => [node.id, node]));
+  const flexContainers = collectFlexContainerNodes(page.rootNode);
   const imageAssetMap = new Map(imagePool.map((asset) => [asset.id, asset]));
 
   useEffect(() => {
@@ -166,6 +177,14 @@ export function PageStage({ selectedImageAssetId }: PageStageProps) {
                   height: mmToPx(box.h, previewZoom),
                 }}
                 onClick={() => {
+                  // A NodeDivider drag can end (mouseup) over a sibling slot rather than back
+                  // on the divider itself — ignore the resulting trailing native "click" so a
+                  // resize gesture never also reassigns/selects the slot under the cursor.
+                  if (suppressNextClickRef.current) {
+                    suppressNextClickRef.current = false;
+                    return;
+                  }
+
                   if (selectedSlotId === id) {
                     clearSelection();
                     return;
@@ -329,8 +348,8 @@ export function PageStage({ selectedImageAssetId }: PageStageProps) {
                     // its own small bounding box, over this background — the trailing native
                     // "click" then bubbles up here. Ignore it so a drag never also selects the
                     // canvas out from under an element the user was just transforming.
-                    if (suppressCanvasClickRef.current) {
-                      suppressCanvasClickRef.current = false;
+                    if (suppressNextClickRef.current) {
+                      suppressNextClickRef.current = false;
                       return;
                     }
 
@@ -373,13 +392,13 @@ export function PageStage({ selectedImageAssetId }: PageStageProps) {
                         onRemove={() => removeFreeformElement(page.id, id, element.id)}
                         onTransform={(patch) => updateFreeformElementTransform(page.id, id, element.id, patch)}
                         onDragStart={() => {
-                          suppressCanvasClickRef.current = true;
+                          suppressNextClickRef.current = true;
                           pauseHistory();
                         }}
                         onDragEnd={() => {
                           resumeHistory();
                           setTimeout(() => {
-                            suppressCanvasClickRef.current = false;
+                            suppressNextClickRef.current = false;
                           }, 0);
                         }}
                       />
@@ -394,6 +413,56 @@ export function PageStage({ selectedImageAssetId }: PageStageProps) {
                 </div>
               );
             })}
+
+          {flexContainers.flatMap((containerNode) => {
+            const children = containerNode.children ?? [];
+            const mainAxisKey = containerNode.type === 'horizontal' ? 'widthMm' : 'heightMm';
+            const containerBox = layout.get(containerNode.id);
+            if (!containerBox || children.length < 2) {
+              return [];
+            }
+
+            return children.slice(0, -1).map((_, siblingIndexA) => {
+              const boxA = layout.get(children[siblingIndexA].id);
+              const boxB = layout.get(children[siblingIndexA + 1].id);
+              if (!boxA || !boxB) {
+                return null;
+              }
+
+              const locked = isDividerLocked(children, siblingIndexA, mainAxisKey);
+              const centerMm =
+                containerNode.type === 'horizontal'
+                  ? (boxA.x + boxA.w + boxB.x) / 2
+                  : (boxA.y + boxA.h + boxB.y) / 2;
+
+              return (
+                <NodeDivider
+                  key={`divider-${containerNode.id}-${siblingIndexA}`}
+                  direction={containerNode.type as 'horizontal' | 'vertical'}
+                  locked={locked}
+                  centerPx={mmToPx(centerMm, previewZoom)}
+                  crossStartPx={
+                    containerNode.type === 'horizontal' ? mmToPx(containerBox.y, previewZoom) : mmToPx(containerBox.x, previewZoom)
+                  }
+                  crossLengthPx={
+                    containerNode.type === 'horizontal' ? mmToPx(containerBox.h, previewZoom) : mmToPx(containerBox.w, previewZoom)
+                  }
+                  previewZoom={previewZoom}
+                  onDragStart={() => {
+                    suppressNextClickRef.current = true;
+                    pauseHistory();
+                  }}
+                  onDragDeltaMm={(deltaMm) => resizeSiblingsByDrag(page.id, containerNode.id, siblingIndexA, deltaMm)}
+                  onDragEnd={() => {
+                    resumeHistory();
+                    setTimeout(() => {
+                      suppressNextClickRef.current = false;
+                    }, 0);
+                  }}
+                />
+              );
+            });
+          })}
           </div>
         </div>
       </div>

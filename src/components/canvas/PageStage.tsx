@@ -44,6 +44,20 @@ function collectFlexContainerNodes(node: LayoutNode): LayoutNode[] {
   return nodes;
 }
 
+/** Every LayoutNode type that gets the Nested-mode dashed outline + id badge treatment.
+ * Walking `children` (the real tree) means a FreeformElement's own id -- which lives in the
+ * sibling `freeformElements` array, never in `children` -- can never end up in this set. */
+function collectContainerNodes(node: LayoutNode): LayoutNode[] {
+  const nodes =
+    node.type === 'grid' || node.type === 'horizontal' || node.type === 'vertical' || node.type === 'freeformCanvas'
+      ? [node]
+      : [];
+  for (const child of node.children ?? []) {
+    nodes.push(...collectContainerNodes(child));
+  }
+  return nodes;
+}
+
 export function PageStage() {
   const { page, pageBox, layout } = useLayoutResolution();
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -75,6 +89,7 @@ export function PageStage() {
   const imageSlotMap = new Map(imageSlots.map((node) => [node.id, node]));
   const freeformCanvasMap = new Map(collectFreeformCanvasNodes(page.rootNode).map((node) => [node.id, node]));
   const flexContainers = collectFlexContainerNodes(page.rootNode);
+  const containerNodeIds = new Set(collectContainerNodes(page.rootNode).map((node) => node.id));
   const imageAssetMap = new Map(imagePool.map((asset) => [asset.id, asset]));
 
   const computeFitZoom = useCallback((): number | null => {
@@ -198,7 +213,7 @@ export function PageStage() {
 
           {layoutMode === 'nested'
             ? Array.from(layout.entries())
-                .filter(([id]) => id !== page.rootNode.id && !imageSlotMap.has(id) && !freeformCanvasMap.has(id))
+                .filter(([id]) => id !== page.rootNode.id && containerNodeIds.has(id))
                 .map(([id, box]) => (
                   <div
                     key={`container-${id}`}

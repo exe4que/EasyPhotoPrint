@@ -23,18 +23,27 @@ function ImageCard({
   isSelected,
   assignmentsOnPage,
   onSelect,
+  onRelink,
   dragProps,
 }: {
   asset: ImageAsset;
   isSelected: boolean;
   assignmentsOnPage: number;
   onSelect: () => void;
+  onRelink: () => void;
   dragProps: ReturnType<ReturnType<typeof useDragAndDrop>['createImageDragProps']>;
 }) {
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onSelect}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onSelect();
+        }
+      }}
       className={`group relative w-36 flex-none overflow-hidden rounded-xl border text-left transition ${
         isSelected
           ? 'border-cyan-500 ring-2 ring-cyan-500/30'
@@ -48,10 +57,26 @@ function ImageCard({
 
       <div className="space-y-1 bg-slate-900/90 p-2">
         <div className="truncate text-xs font-medium text-white">{asset.fileName}</div>
-        <div className="flex items-center justify-between text-[11px] text-slate-400">
-          <span>{`${asset.widthPx}×${asset.heightPx}`}</span>
-          <span>{assignmentsOnPage > 0 ? `${assignmentsOnPage} used` : 'unused'}</span>
-        </div>
+        {asset.missing ? (
+          <div className="flex items-center justify-between gap-2 text-[11px]">
+            <span className="font-semibold uppercase tracking-wide text-amber-400">Missing</span>
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onRelink();
+              }}
+              className="whitespace-nowrap rounded-full border border-cyan-500/60 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-medium text-cyan-200 hover:bg-cyan-500/20"
+            >
+              Locate...
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between text-[11px] text-slate-400">
+            <span>{`${asset.widthPx}×${asset.heightPx}`}</span>
+            <span>{assignmentsOnPage > 0 ? `${assignmentsOnPage} used` : 'unused'}</span>
+          </div>
+        )}
       </div>
 
       <div className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between p-2">
@@ -64,7 +89,7 @@ function ImageCard({
           </span>
         ) : null}
       </div>
-    </button>
+    </div>
   );
 }
 
@@ -76,6 +101,7 @@ export function ImageLibraryPanel({ selectedImageAssetId, onSelectImageAssetId }
     (state) => state.document.pages.find((page) => page.id === activePageId) ?? state.document.pages[0],
   );
   const openImagesFromDialog = useEPPStore((state) => state.openImagesFromDialog);
+  const relinkImage = useEPPStore((state) => state.relinkImage);
   const { createImageDragProps } = useDragAndDrop();
   const assignmentCounts = useMemo(() => countAssignments(activePage.assignments), [activePage.assignments]);
 
@@ -126,6 +152,7 @@ export function ImageLibraryPanel({ selectedImageAssetId, onSelectImageAssetId }
                 assignmentsOnPage={assignmentCounts.get(asset.id) ?? 0}
                 dragProps={createImageDragProps(asset.id)}
                 onSelect={() => onSelectImageAssetId(isSelected ? null : asset.id)}
+                onRelink={() => void relinkImage(asset.id)}
               />
             );
           })}

@@ -309,6 +309,17 @@ export function PageStage() {
                 {page.assignments[id] && imageAssetMap.get(page.assignments[id])
                   ? (() => {
                       const asset = imageAssetMap.get(page.assignments[id])!;
+
+                      if (asset.missing) {
+                        return (
+                          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1 border-2 border-dashed border-amber-500/50 bg-amber-950/30 px-2 text-center">
+                            <span className="text-lg font-semibold text-amber-400">!</span>
+                            <span className="text-[11px] font-medium text-amber-300">Image missing</span>
+                            <span className="truncate text-[10px] text-amber-200/70">{asset.fileName}</span>
+                          </div>
+                        );
+                      }
+
                       const imageSlotConfig = imageSlotMap.get(id)?.imageSlotConfig;
                       const scalingRule = imageSlotConfig?.scalingRule;
                       const specificSizeMm = imageSlotConfig?.specificSizeMm;

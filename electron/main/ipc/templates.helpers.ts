@@ -1,7 +1,7 @@
 import type { EPPTemplate } from '@epp/layout-engine';
 import { migrateTemplate } from '@epp/migrations';
 
-function assertPageConfig(value: Record<string, unknown>): EPPTemplate['page'] {
+export function assertPageConfig(value: Record<string, unknown>): EPPTemplate['page'] {
   const sizePreset = value.sizePreset;
   const orientation = value.orientation;
   const dpi = value.dpi;
@@ -38,7 +38,7 @@ function assertPageConfig(value: Record<string, unknown>): EPPTemplate['page'] {
   };
 }
 
-function assertLayoutNode(value: Record<string, unknown>): EPPTemplate['rootNode'] {
+export function assertLayoutNode(value: Record<string, unknown>): EPPTemplate['rootNode'] {
   const type = value.type;
   const id = value.id;
   if (

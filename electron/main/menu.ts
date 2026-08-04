@@ -1,6 +1,13 @@
 import { BrowserWindow, Menu, type MenuItemConstructorOptions } from 'electron';
 
 const NEW_PROJECT_CHANNEL = 'menu:new-project';
+const OPEN_PROJECT_CHANNEL = 'menu:open-project';
+const SAVE_PROJECT_CHANNEL = 'menu:save-project';
+const SAVE_PROJECT_AS_CHANNEL = 'menu:save-project-as';
+
+function sendToFocusedWindow(channel: string): void {
+  BrowserWindow.getFocusedWindow()?.webContents.send(channel);
+}
 
 export function buildApplicationMenu(): void {
   const isMac = process.platform === 'darwin';
@@ -13,9 +20,23 @@ export function buildApplicationMenu(): void {
         {
           label: 'New',
           accelerator: 'CmdOrCtrl+N',
-          click: () => {
-            BrowserWindow.getFocusedWindow()?.webContents.send(NEW_PROJECT_CHANNEL);
-          },
+          click: () => sendToFocusedWindow(NEW_PROJECT_CHANNEL),
+        },
+        {
+          label: 'Open...',
+          accelerator: 'CmdOrCtrl+O',
+          click: () => sendToFocusedWindow(OPEN_PROJECT_CHANNEL),
+        },
+        { type: 'separator' },
+        {
+          label: 'Save',
+          accelerator: 'CmdOrCtrl+S',
+          click: () => sendToFocusedWindow(SAVE_PROJECT_CHANNEL),
+        },
+        {
+          label: 'Save As...',
+          accelerator: 'CmdOrCtrl+Shift+S',
+          click: () => sendToFocusedWindow(SAVE_PROJECT_AS_CHANNEL),
         },
         { type: 'separator' },
         isMac ? { role: 'close' } : { role: 'quit' },

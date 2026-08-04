@@ -186,7 +186,12 @@ export function FreeformElementView({
           isSelected ? 'border-cyan-500 ring-2 ring-cyan-500/40' : 'border-white/50 hover:border-white'
         }`}
       >
-        {asset && displayRect ? (
+        {asset?.missing ? (
+          <div className="flex h-full w-full flex-col items-center justify-center gap-1 border-2 border-dashed border-amber-500/50 bg-amber-950/30 px-2 text-center">
+            <span className="text-sm font-semibold text-amber-400">!</span>
+            <span className="text-[10px] font-medium text-amber-300">Image missing</span>
+          </div>
+        ) : asset && displayRect ? (
           isSpecificSize ? (
             <img
               src={asset.thumbnailDataUrl}

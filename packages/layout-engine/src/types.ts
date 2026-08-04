@@ -103,6 +103,8 @@ export interface ImageAsset {
   heightPx: number;
   dpiOriginal?: number;
   thumbnailDataUrl: string;
+  /** Set when a project is opened and this asset's originalPath could not be read/decoded. */
+  missing?: boolean;
 }
 
 export interface PageConfig {

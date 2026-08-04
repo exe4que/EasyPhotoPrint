@@ -1,95 +1,10 @@
-# project-persistence Specification
+## REMOVED Requirements
 
-## Purpose
-The project-persistence capability covers how images are ingested into the in-memory image pool, how the `EPPProject`/`Page`/`ImageAsset` data model and its slot-assignment logic behave in the renderer store, and how a project is saved to and loaded from a lightweight `.eppproj` file on disk — including detecting and relinking images whose source file has moved, been renamed, or been deleted since the project was last saved.
-## Requirements
-### Requirement: Native Image Ingestion Dialog
-The system SHALL provide a native "open file" dialog (invoked via the `dialog:open-images` IPC channel) that lets the user select one or more image files, filtered to common raster formats (`png`, `jpg`, `jpeg`, `webp`, `gif`, `bmp`, `tiff`). For each selected file, the Main process SHALL read its pixel dimensions and generate a downscaled thumbnail whose longer edge does not exceed 240px, encoded as a data URL, and return one `ImageAsset` per selected file to the renderer, which SHALL append them to the in-memory `imagePool`.
+### Requirement: Disk Save and Load of Projects Are Not Implemented
+**Reason**: This change implements real disk save/load behind the `fs:open-project` and `fs:save-project` IPC channels, so the "always rejects" behavior these scenarios documented no longer holds.
+**Migration**: See the new "File > Save Writes To a Remembered Path", "File > Save As Always Prompts For a Path", and "File > Open Restores a Saved Project" requirements below.
 
-#### Scenario: Selecting images adds them to the pool
-- **WHEN** the user clicks "Load images" and selects one or more files in the native dialog
-- **THEN** each selected file SHALL produce a new `ImageAsset` (with a fresh `id`, decoded `widthPx`/`heightPx`, and a `thumbnailDataUrl`) appended to the store's `imagePool`, without removing any previously loaded assets
-
-#### Scenario: Canceling the dialog leaves the pool unchanged
-- **WHEN** the user opens the native "open file" dialog and cancels it without selecting any file
-- **THEN** the `imagePool` SHALL remain exactly as it was before the dialog was opened
-
-#### Scenario: Thumbnail is downscaled to a bounded edge
-- **WHEN** an image whose longer edge exceeds 240px is ingested
-- **THEN** the generated `thumbnailDataUrl` SHALL represent an image resized so its longer edge is at most 240px, preserving its original aspect ratio
-
-#### Scenario: Undecodable image is rejected
-- **WHEN** a selected file cannot be decoded (its reported width or height is zero or negative)
-- **THEN** the ingestion for that file SHALL fail with an error instead of producing a malformed `ImageAsset`
-
-### Requirement: ImageAsset Data Shape
-Every `ImageAsset` produced by ingestion SHALL include a UUID `id`, an `originalPath` and `storedPath` (both set to the source file's path today, since no per-project asset copy step exists yet), a `fileName`, integer `widthPx`/`heightPx`, and a `thumbnailDataUrl`.
-
-#### Scenario: Ingested asset has stable identity and file metadata
-- **WHEN** an image file is ingested through the native dialog
-- **THEN** the resulting `ImageAsset` SHALL have a unique `id`, `fileName` set to the file's base name, and `originalPath`/`storedPath` both set to the file's filesystem path
-
-### Requirement: In-Memory EPPProject Data Model
-The renderer's `document` state SHALL hold a `pages` array, where each page has its own `id`, `pageConfig`, an optional `templateRef`, a `rootNode` layout tree, and an `assignments` map from `LayoutNode.id` (of an `imageSlot`) to `ImageAsset.id`. The store SHALL additionally hold a single shared `imagePool` array of `ImageAsset`, independent of any individual page.
-
-#### Scenario: Initial document has one page with an empty assignment map
-- **WHEN** the application store initializes
-- **THEN** `document.pages` SHALL contain exactly one page with a default `pageConfig`, a default `rootNode` (a single `imageSlot`), and an empty `assignments` map
-
-#### Scenario: Assignments reference layout node ids, not a separate slot id
-- **WHEN** an image is assigned to an `imageSlot`
-- **THEN** the assignment SHALL be keyed by that node's own `LayoutNode.id`, with no separate `slotId` field involved
-
-### Requirement: PageConfig Is Independent Per Page
-Each page's `pageConfig` (`sizePreset`, optional `customSizeMm`, `orientation`, `dpi`) SHALL be stored and editable independently of every other page's `pageConfig`, so that pages in the same document can in principle carry different sizes, orientations, or DPI values.
-
-#### Scenario: Updating one page's pageConfig does not affect other pages
-- **WHEN** `updatePageConfig` is called for a given page id with a patch (e.g. a new `orientation`)
-- **THEN** only that page's `pageConfig` SHALL change; every other page's `pageConfig` in `document.pages` SHALL remain exactly as it was
-
-### Requirement: Assigning an Image Replaces the Slot's Occupant by Default
-The store's slot-assignment logic (`assignImageToPage`, exposed to the UI via the `assignImageToSlot` action, which the canvas wires up for drag-and-drop from the Image Library panel) SHALL, by default, replace the target slot's assignment with the given image, discarding any previous occupant of that slot from the assignments map (the previous image is not deleted from the pool — it simply stops being referenced by that slot).
-
-#### Scenario: Assigning a library image replaces the slot's current image
-- **WHEN** an image is dropped from the Image Library panel onto a slot that already has a different image assigned
-- **THEN** the target slot's assignment SHALL be updated to the dropped image's id, and the slot's previous image SHALL no longer appear in the assignments map for that slot
-
-#### Scenario: Assigning to an empty slot creates a new assignment
-- **WHEN** an image is dropped onto a slot with no current assignment
-- **THEN** the slot SHALL become assigned to that image with no other assignment on the page affected
-
-### Requirement: Assignment Logic Swaps When the Source Is Another Slot on the Same Page
-The store's slot-assignment logic (`assignImageToPage`, exposed to the UI via the `assignImageToSlot` action) SHALL accept a `source` of `'library'` (the default) or `'page'`. The canvas SHALL determine this source at drop time: a drag that originates from the Image Library panel SHALL use `source: 'library'`, and a drag that originates from an already-assigned `imageSlot` on the same page SHALL use `source: 'page'`. When called with `source: 'page'` for an image that is already assigned to a different slot on the same page, the assignment logic SHALL swap the two slots' assignments (each ends up with the other's previous image) instead of one slot's assignment simply clobbering the other's.
-
-#### Scenario: Dragging an assigned slot's image onto another slot swaps them
-- **WHEN** the user drags the image out of a slot that already has an image assigned and drops it onto a different slot on the same page that also has an image assigned
-- **THEN** the target slot SHALL receive the dragged image, and the source slot SHALL receive the image the target slot held before the drop
-
-#### Scenario: Dragging an assigned slot's image onto an empty slot moves it
-- **WHEN** the user drags the image out of a slot that has an image assigned and drops it onto an empty slot on the same page
-- **THEN** the target slot SHALL become assigned to that image, and the source slot SHALL become unassigned
-
-#### Scenario: Dragging from the Image Library panel never swaps
-- **WHEN** an image is dragged from the Image Library panel (not from another slot) and dropped onto a slot, regardless of whether that image is already assigned elsewhere on the page
-- **THEN** the target slot's assignment SHALL simply be replaced with the dropped image, and no other slot's assignment SHALL change as a side effect
-
-#### Scenario: Page-source swap does not affect unrelated slots
-- **WHEN** a page-source swap occurs between two slots
-- **THEN** every other slot's assignment on that page SHALL remain unchanged
-
-### Requirement: Images Are Not Exclusive
-The system SHALL allow the same `ImageAsset` id to appear as the assignment value for more than one slot at a time, including slots on the same page.
-
-#### Scenario: The same image is assigned to two slots on one page
-- **WHEN** an already-assigned image is dropped onto a second, different slot on the same page (arriving via the library source path)
-- **THEN** both slots' assignments SHALL reference that same `ImageAsset.id` simultaneously, and neither assignment SHALL be cleared as a side effect
-
-### Requirement: Clearing a Slot's Assignment
-The system SHALL provide a `clearImageFromSlot` action that removes a single slot's entry from the page's assignments map without altering any other slot's assignment.
-
-#### Scenario: Clearing one slot leaves other assignments intact
-- **WHEN** `clearImageFromSlot` is called for a slot that currently has an image assigned
-- **THEN** that slot's entry SHALL be removed from the page's `assignments` map, and every other slot's assignment on that page SHALL remain unchanged
+## ADDED Requirements
 
 ### Requirement: File > Save Writes To a Remembered Path
 The first time a project is saved (no path remembered yet for the current in-memory project), `File > Save` SHALL open the native save dialog so the user chooses a directory and filename. Every subsequent `File > Save` for that same project SHALL write to that same remembered path without opening any dialog or requiring confirmation, regardless of what has changed in the document since the last save.
@@ -185,4 +100,3 @@ A canvas `imageSlot` (or `FreeformElement`) whose assignment references a `missi
 #### Scenario: A slot assigned to a missing image is not shown as empty
 - **WHEN** a slot's assignment references an `ImageAsset` with `missing: true`
 - **THEN** the slot SHALL render a distinct "missing image" state rather than the ordinary empty-slot placeholder
-

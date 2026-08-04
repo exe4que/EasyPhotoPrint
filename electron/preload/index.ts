@@ -1,24 +1,31 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
-import type { EPPTemplate, ImageAsset } from '@epp/layout-engine';
+import type { EPPProject, EPPTemplate, ImageAsset } from '@epp/layout-engine';
 import type { AppSettings } from '../main/ipc/settings.handlers.js';
+
+function onMenuEvent(channel: string, callback: () => void) {
+  const listener = () => callback();
+  ipcRenderer.on(channel, listener);
+  return () => {
+    ipcRenderer.removeListener(channel, listener);
+  };
+}
 
 const eppAPI = {
   dialog: {
     openImages: () => ipcRenderer.invoke('dialog:open-images') as Promise<ImageAsset[]>,
+    relinkImage: () => ipcRenderer.invoke('dialog:relink-image') as Promise<Omit<ImageAsset, 'id'> | null>,
   },
   fs: {
-    openProject: () => ipcRenderer.invoke('fs:open-project'),
-    saveProject: (project: unknown) => ipcRenderer.invoke('fs:save-project', project),
+    openProject: () => ipcRenderer.invoke('fs:open-project') as Promise<{ project: EPPProject; filePath: string } | null>,
+    saveProject: (project: EPPProject, options: { existingPath: string | null; forceDialog: boolean }) =>
+      ipcRenderer.invoke('fs:save-project', project, options) as Promise<string | null>,
   },
   menu: {
-    onNewProject: (callback: () => void) => {
-      const listener = () => callback();
-      ipcRenderer.on('menu:new-project', listener);
-      return () => {
-        ipcRenderer.removeListener('menu:new-project', listener);
-      };
-    },
+    onNewProject: (callback: () => void) => onMenuEvent('menu:new-project', callback),
+    onOpenProject: (callback: () => void) => onMenuEvent('menu:open-project', callback),
+    onSaveProject: (callback: () => void) => onMenuEvent('menu:save-project', callback),
+    onSaveProjectAs: (callback: () => void) => onMenuEvent('menu:save-project-as', callback),
   },
   pdf: {
     export: (project: unknown) => ipcRenderer.invoke('pdf:export', project) as Promise<Uint8Array>,

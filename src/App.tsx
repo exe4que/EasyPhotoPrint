@@ -22,6 +22,8 @@ import { useEPPStore } from './store/index.js';
 export function App() {
   const [selectedImageAssetId, setSelectedImageAssetId] = useState<string | null>(null);
   const [isNewProjectConfirmOpen, setIsNewProjectConfirmOpen] = useState(false);
+  const [isOpenProjectConfirmOpen, setIsOpenProjectConfirmOpen] = useState(false);
+  const [isMissingImagesDialogOpen, setIsMissingImagesDialogOpen] = useState(false);
   const templateLibrary = useTemplateLibrary();
   const hydrateSettings = useEPPStore((state) => state.hydrateSettings);
   const unitSystem = useEPPStore((state) => state.settings.unitSystem);
@@ -29,7 +31,12 @@ export function App() {
   const setLayoutMode = useEPPStore((state) => state.setLayoutMode);
   const normalizePageForSimpleMode = useEPPStore((state) => state.normalizePageForSimpleMode);
   const startNewProject = useEPPStore((state) => state.startNewProject);
-  const imageCount = useEPPStore((state) => state.imagePool.length);
+  const openProject = useEPPStore((state) => state.openProject);
+  const saveProject = useEPPStore((state) => state.saveProject);
+  const relinkImage = useEPPStore((state) => state.relinkImage);
+  const imagePool = useEPPStore((state) => state.imagePool);
+  const imageCount = imagePool.length;
+  const missingImages = imagePool.filter((asset) => asset.missing);
   const pageCount = useEPPStore((state) => state.document.pages.length);
   const activePageId = useEPPStore((state) => state.ui.activePageId);
   const clearSelection = useEPPStore((state) => state.clearSelection);
@@ -46,6 +53,24 @@ export function App() {
       setIsNewProjectConfirmOpen(true);
     });
   }, []);
+
+  useEffect(() => {
+    return getEppApi().menu.onOpenProject(() => {
+      setIsOpenProjectConfirmOpen(true);
+    });
+  }, []);
+
+  useEffect(() => {
+    return getEppApi().menu.onSaveProject(() => {
+      void saveProject(false);
+    });
+  }, [saveProject]);
+
+  useEffect(() => {
+    return getEppApi().menu.onSaveProjectAs(() => {
+      void saveProject(true);
+    });
+  }, [saveProject]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -195,6 +220,54 @@ export function App() {
         }}
         onCancel={() => setIsNewProjectConfirmOpen(false)}
       />
+
+      <ConfirmDialog
+        open={isOpenProjectConfirmOpen}
+        title="Open a project?"
+        description="This discards every page, image, and undo/redo history in the current document. Choose a .eppproj file in the next dialog to replace it. This can't be undone."
+        confirmLabel="Choose file..."
+        destructive
+        onConfirm={() => {
+          setIsOpenProjectConfirmOpen(false);
+          void openProject().then((didLoad) => {
+            if (didLoad && useEPPStore.getState().imagePool.some((asset) => asset.missing)) {
+              setIsMissingImagesDialogOpen(true);
+            }
+          });
+        }}
+        onCancel={() => setIsOpenProjectConfirmOpen(false)}
+      />
+
+      <ConfirmDialog
+        open={isMissingImagesDialogOpen}
+        title={missingImages.length === 0 ? 'All reference problems resolved' : 'Some images could not be found'}
+        description={
+          missingImages.length === 0
+            ? 'Every missing image in this project has been relinked.'
+            : "These images' files have moved, been renamed, or been deleted since this project was last saved. The project loaded anyway — locate a replacement for each one now, or later from its card in the Image Library."
+        }
+        confirmLabel="Done"
+        onConfirm={() => setIsMissingImagesDialogOpen(false)}
+        onCancel={() => setIsMissingImagesDialogOpen(false)}
+      >
+        <ul className="space-y-2">
+          {missingImages.map((asset) => (
+            <li
+              key={asset.id}
+              className="flex items-center justify-between gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-sm"
+            >
+              <span className="truncate text-slate-200">{asset.fileName}</span>
+              <button
+                type="button"
+                onClick={() => void relinkImage(asset.id)}
+                className="whitespace-nowrap rounded-lg border border-cyan-500/60 bg-cyan-500/10 px-2 py-1 text-xs font-medium text-cyan-200 hover:bg-cyan-500/20"
+              >
+                Locate...
+              </button>
+            </li>
+          ))}
+        </ul>
+      </ConfirmDialog>
     </main>
   );
 }

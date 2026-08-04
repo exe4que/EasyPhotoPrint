@@ -882,7 +882,7 @@ export interface DocumentSlice {
   retypeLayoutNode: (pageId: string, nodeId: string, nextType: NestedNodeType) => void;
   addNestedChildNode: (pageId: string, parentNodeId: string, childType: 'imageSlot' | 'horizontal' | 'vertical' | 'grid' | 'freeformCanvas') => void;
   removeLayoutNode: (pageId: string, nodeId: string) => void;
-  assignImageToSlot: (pageId: string, nodeId: string, imageAssetId: string) => void;
+  assignImageToSlot: (pageId: string, nodeId: string, imageAssetId: string, source?: 'library' | 'page') => void;
   setSlotSpecificSize: (pageId: string, nodeId: string, axis: 'width' | 'height', valueMm: number | null) => void;
   clearImageFromSlot: (pageId: string, nodeId: string) => void;
   resizeSiblingsByDrag: (pageId: string, parentNodeId: string, siblingIndexA: number, deltaMm: number) => void;
@@ -1094,7 +1094,7 @@ export function createDocumentSlice(
         },
       }));
     },
-    assignImageToSlot: (pageId, nodeId, imageAssetId) => {
+    assignImageToSlot: (pageId, nodeId, imageAssetId, source = 'library') => {
       const page = get().document.pages.find((entry) => entry.id === pageId);
       const slotNode = page ? findNodeById(page.rootNode, nodeId) : undefined;
       const specificSizeMm = slotNode?.imageSlotConfig?.specificSizeMm;
@@ -1127,7 +1127,7 @@ export function createDocumentSlice(
             return {
               ...entry,
               rootNode,
-              assignments: assignImageToPage(entry, nodeId, imageAssetId),
+              assignments: assignImageToPage(entry, nodeId, imageAssetId, source),
             };
           }),
         },

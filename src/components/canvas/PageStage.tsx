@@ -66,7 +66,7 @@ export function PageStage() {
   const resizeSiblingsByDrag = useEPPStore((state) => state.resizeSiblingsByDrag);
   const pauseHistory = useEPPStore((state) => state.pauseHistory);
   const resumeHistory = useEPPStore((state) => state.resumeHistory);
-  const { createSlotDropProps, createPositionalDropProps } = useDragAndDrop();
+  const { createImageDragProps, createSlotDropProps, createPositionalDropProps } = useDragAndDrop();
   const pageWidthAtZoomOne = mmToPx(pageBox.w, 1);
   const pageHeightAtZoomOne = mmToPx(pageBox.h, 1);
   const previewWidthPx = mmToPx(pageBox.w, previewZoom);
@@ -266,9 +266,10 @@ export function PageStage() {
 
                   setSelectedElementIds([id]);
                 }}
-                {...createSlotDropProps((imageAssetId) => {
+                {...(page.assignments[id] ? createImageDragProps(page.assignments[id], 'page') : {})}
+                {...createSlotDropProps((imageAssetId, source) => {
                   setSelectedElementIds([id]);
-                  assignImageToSlot(page.id, id, imageAssetId);
+                  assignImageToSlot(page.id, id, imageAssetId, source);
                 })}
                 onMouseEnter={() => setHoveredSlotId(id)}
                 onMouseMove={(event) => {

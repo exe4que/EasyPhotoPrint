@@ -1,4 +1,3 @@
-// @spec OPENSPEC.md §4.1, §6.1 — editable layout tree for nested mode
 import type { LayoutNode } from '@epp/layout-engine';
 
 import { useEPPStore } from '../../store/index.js';

@@ -1,4 +1,3 @@
-// @spec OPENSPEC.md §4.1.1 — draggable divider between adjacent children of a horizontal/vertical node
 import { pxToMm } from '../../lib/units.js';
 
 const HIT_SIZE_PX = 14;

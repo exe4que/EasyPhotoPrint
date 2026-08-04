@@ -1,4 +1,3 @@
-// @spec OPENSPEC.md §2.2, §2.4, §6.1 — typed renderer access to preload IPC bridge
 import type { EPPProject, EPPTemplate, ImageAsset } from '@epp/layout-engine';
 
 export interface AppSettings {

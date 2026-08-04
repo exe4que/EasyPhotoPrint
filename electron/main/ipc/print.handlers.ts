@@ -1,4 +1,3 @@
-// @spec OPENSPEC.md §2.2, §5.2 — explicit print IPC channel
 import { ipcMain } from 'electron';
 
 const PRINT_DOCUMENT_CHANNEL = 'print:document';

@@ -1,4 +1,3 @@
-// @spec OPENSPEC.md §2.2, §2.3, §2.4 — combined Zustand store with zundo tracking over document state; startNewProject backs File > New
 import { create } from 'zustand';
 import { temporal } from 'zundo';
 

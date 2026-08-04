@@ -1,4 +1,3 @@
-// @spec OPENSPEC.md §3.2, §3.3 — migrateTemplate, migrateProject
 export const SUPPORTED_SCHEMA_VERSIONS = ['1.0.0'] as const;
 
 type SupportedSchemaVersion = (typeof SUPPORTED_SCHEMA_VERSIONS)[number];

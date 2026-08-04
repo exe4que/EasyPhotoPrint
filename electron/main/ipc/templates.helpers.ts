@@ -1,4 +1,3 @@
-// @spec OPENSPEC.md §3.1, §3.2, §3.3 — template persistence helpers
 import type { EPPTemplate } from '@epp/layout-engine';
 import { migrateTemplate } from '@epp/migrations';
 

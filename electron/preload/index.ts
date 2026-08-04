@@ -1,4 +1,3 @@
-// @spec OPENSPEC.md §2.2 — preload contextBridge with explicit API surface
 import { contextBridge, ipcRenderer } from 'electron';
 
 import type { EPPTemplate, ImageAsset } from '@epp/layout-engine';

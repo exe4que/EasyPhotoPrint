@@ -1,4 +1,3 @@
-// @spec OPENSPEC.md §2.4 — AppSettings persistence and IPC
 import { app, ipcMain } from 'electron';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';

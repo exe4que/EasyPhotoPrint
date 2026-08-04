@@ -1,4 +1,3 @@
-// @spec OPENSPEC.md §4.2 — freeform transform containment (clampFreeformPosition)
 import type { FreeformTransform } from './types.js';
 
 /** Minimum mm of a FreeformElement's rotated bounding box that must stay inside its freeformCanvas node. */

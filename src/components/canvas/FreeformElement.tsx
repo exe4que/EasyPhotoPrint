@@ -1,4 +1,3 @@
-// @spec OPENSPEC.md §4.2, §4.1.1.1 — move/rotate/scale gizmo for a single FreeformElement (DOM + CSS transforms)
 import {
   MIN_FREEFORM_SIZE_MM,
   type FreeformElement,

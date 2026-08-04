@@ -1,4 +1,3 @@
-// @spec OPENSPEC.md §2.3 — Simple mode two-level / imageSlot-leaf restriction
 import type { LayoutNode } from './types.js';
 
 /**

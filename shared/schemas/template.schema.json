@@ -1,7 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://easyphotoprint.app/schemas/template.v1.json",
-  "$comment": "@spec OPENSPEC.md §3.2 — EPPTemplate JSON Schema",
   "title": "EPPTemplate",
   "type": "object",
   "required": ["schemaVersion", "id", "name", "page", "rootNode"],

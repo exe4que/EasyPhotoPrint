@@ -1,4 +1,3 @@
-// @spec OPENSPEC.md §4.1.2 — validateLayoutFeasibility
 import { computeMinRequiredMainSizeMm } from './flexDistribution.js';
 import type { BoxMm, FeasibilityWarning, LayoutNode } from './types.js';
 

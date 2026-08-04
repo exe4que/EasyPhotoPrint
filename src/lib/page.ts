@@ -1,4 +1,3 @@
-// @spec OPENSPEC.md §2.3, §3.3, §5.2 — page size resolution from per-page PageConfig
 import type { BoxMm, PageConfig } from '@epp/layout-engine';
 
 const PAGE_PRESETS_MM = {

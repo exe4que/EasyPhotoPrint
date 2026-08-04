@@ -1,4 +1,3 @@
-// @spec OPENSPEC.md §2.2 — Electron main process, BrowserWindow security, contextBridge entrypoint
 import { app, BrowserWindow } from 'electron';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';

@@ -1,4 +1,3 @@
-// @spec OPENSPEC.md §5.2 — explicit PDF export IPC channel
 import { ipcMain } from 'electron';
 
 const EXPORT_PDF_CHANNEL = 'pdf:export';

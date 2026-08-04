@@ -1,4 +1,3 @@
-// @spec OPENSPEC.md §2.3, §3.1, §6.1 — template gallery with apply/delete flows, dynamic previews, and Simple-mode compatibility gating
 import { isSimpleModeCompatible, type EPPTemplate } from '@epp/layout-engine';
 import { useState } from 'react';
 

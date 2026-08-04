@@ -1,4 +1,3 @@
-// @spec OPENSPEC.md §3.1, §3.3, §6.1 — shared template list/reload used by SaveTemplateDialog and TemplateGallery
 import { useCallback, useEffect, useState } from 'react';
 
 import type { EPPTemplate } from '@epp/layout-engine';

@@ -1,4 +1,3 @@
-// @spec OPENSPEC.md §4.1, §4.1.1 — applyPadding, distributeChildren, resolveCrossAxis, resizeSiblingsByDrag
 import { resolveDimensions } from './grid.js';
 import type { AlignmentConfig, BoxMm, LayoutNode, Sides } from './types.js';
 

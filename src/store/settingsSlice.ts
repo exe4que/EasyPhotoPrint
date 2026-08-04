@@ -1,4 +1,3 @@
-// @spec OPENSPEC.md §2.4 — settings slice for unit system and persisted defaults
 import { getEppApi, type AppSettings } from '../lib/ipc-client.js';
 
 export interface SettingsSlice {

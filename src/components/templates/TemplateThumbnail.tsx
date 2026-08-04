@@ -1,4 +1,3 @@
-// @spec OPENSPEC.md §6.1 — dynamically generated template thumbnails from resolveLayout
 import { resolveLayout, type EPPTemplate } from '@epp/layout-engine';
 
 import { createPageBoxMm } from '../../lib/page.js';

@@ -1,4 +1,3 @@
-// @spec OPENSPEC.md §4.1, §4.1.1.1 — shared imageSlot rendering helpers (hover dimension labels, object-fit, specific size)
 import { computeFitInParent, computeSpecificSize, type BoxMm, type ImageAsset, type ScalingRule, type SpecificSizeMm } from '@epp/layout-engine';
 
 /**

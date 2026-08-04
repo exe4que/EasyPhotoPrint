@@ -1,29 +1,23 @@
 # Instrucciones para GitHub Copilot en este repositorio
 
-Este repo es **spec anchored**. Antes de generar o modificar código, leé `AGENTS.md` (raíz del repo) — son las reglas de operación completas, y aplican a vos exactamente igual que a Claude Code CLI: no hay un set de reglas distinto por herramienta. Este archivo es solo el punto de entrada que exige GitHub Copilot; el detalle vive en `AGENTS.md`.
+Este repo es **spec anchored** vía la CLI de **OpenSpec**. Antes de generar o modificar código, leé `AGENTS.md` (raíz del repo) — son las reglas de operación completas, y aplican a vos exactamente igual que a Claude Code CLI: no hay un set de reglas distinto por herramienta. Este archivo es solo el punto de entrada que exige GitHub Copilot; el detalle vive en `AGENTS.md`.
 
 ## Regla central (repetida acá porque es la más importante)
 
-`OPENSPEC.md` (raíz del repo) es la única fuente de verdad de arquitectura, schema de datos JSON, algoritmos del motor de layout y requisitos funcionales de Easy Photo Print.
+`openspec/specs/<capability>/spec.md` es la única fuente de verdad de requisitos funcionales de Easy Photo Print — no un documento único, sino una spec por capability (`layout-engine`, `template-schema`, `project-persistence`, `units-settings`, `electron-shell`, `undo-redo`, y las que se agreguen), gestionada solo a través de la CLI `openspec` o los skills `/opsx:*` (`opsx-propose`, `opsx-apply`, `opsx-archive`, etc. en `.github/skills/` y `.github/prompts/`).
 
-- Si cambiás código de forma que altere algo ya documentado en `OPENSPEC.md` (un campo de schema, un algoritmo, una decisión de diseño), **actualizá `OPENSPEC.md` en el mismo cambio** — no en un PR separado, no "después".
-- Si cambiás `OPENSPEC.md`, revisá `SPEC_MAP.md` para encontrar qué archivos de código implementan la sección que tocaste y actualizalos en el mismo cambio.
-- Nunca dejes el spec y el código en desacuerdo al terminar una tarea. Nunca dejes un comentario tipo `// TODO: el spec dice X pero el código hace Y` como estado permanente — o se corrige el código, o se reescribe el spec.
+- Si cambiás código de forma que altere un requisito ya documentado en una spec archivada, primero proponés un change (`openspec new change` / `/opsx:propose`) con una delta spec `MODIFIED Requirements`, lo implementás, y lo archivás (`openspec archive` / `/opsx:archive`) — recién ahí queda reflejado en `openspec/specs/`.
+- Si el comportamiento no existe todavía en ninguna spec, mismo flujo con `ADDED Requirements`.
+- Nunca dejes el código y una spec archivada en desacuerdo al terminar una tarea. Nunca dejes un comentario tipo `// TODO: la spec dice X pero el código hace Y` como estado permanente — o se corrige el código, o se propone un change que actualice la spec.
 
-## Tags `@spec`
+## Ya no hay tags `@spec` en el código
 
-El código que implementa una parte del spec lleva un comentario ancla cerca del inicio del archivo:
-
-```ts
-// @spec OPENSPEC.md §4.1.1 — resizeSiblingsByDrag, isDividerLocked, computeMinRequiredMainSizeMm
-```
-
-Mantené esos tags actualizados, y `SPEC_MAP.md` en sincro con ellos.
+La trazabilidad requisito↔código vive en la estructura de OpenSpec (nombre de capability ↔ carpeta `openspec/specs/<capability>/`), no en comentarios ancla dentro de los archivos fuente ni en un `SPEC_MAP.md`. No agregues ese tipo de tags en código nuevo.
 
 ## Antes de implementar algo
 
-Leé la sección correspondiente de `OPENSPEC.md` primero. Los nombres de campos del schema, la forma del JSON, los algoritmos de layout y las decisiones de diseño ya están definidos ahí — no se re-derivan desde cero en el código. No tomes decisiones de arquitectura nuevas (librerías, campos de schema, algoritmos) directamente en el código: primero se documentan en `OPENSPEC.md`.
+Leé la spec de la capability correspondiente en `openspec/specs/` primero. Los nombres de campos del schema, la forma del JSON, los algoritmos de layout y las decisiones de diseño ya están definidos ahí — no se re-derivan desde cero en el código. No tomes decisiones de arquitectura nuevas (librerías, campos de schema, algoritmos) directamente en el código: primero se proponen como change de OpenSpec.
 
-Si un pedido entra en conflicto con lo ya documentado en `OPENSPEC.md` y no se pidió explícitamente cambiar el spec, señalá el conflicto en vez de implementar en silencio algo distinto.
+Si un pedido entra en conflicto con lo ya documentado en una spec archivada y no se pidió explícitamente cambiarla, señalá el conflicto en vez de implementar en silencio algo distinto.
 
 Ver `AGENTS.md` para el checklist completo de qué revisar antes de cerrar una tarea.

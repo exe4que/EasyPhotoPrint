@@ -1,4 +1,3 @@
-// @spec OPENSPEC.md §3.1, §3.3 — save current page structure as a reusable template (overwrite in place or save as new)
 import { useState } from 'react';
 
 import type { EPPTemplate } from '@epp/layout-engine';

@@ -1,4 +1,3 @@
-// @spec OPENSPEC.md §2.4, §5.1 — unit conversion and formatting helpers
 export const MM_PER_INCH = 25.4;
 export const PT_PER_INCH = 72;
 

@@ -1,4 +1,3 @@
-// @spec OPENSPEC.md §4.1, §6.1 — memoized layout resolution for the active page
 import { resolveLayout } from '@epp/layout-engine';
 import { useMemo } from 'react';
 

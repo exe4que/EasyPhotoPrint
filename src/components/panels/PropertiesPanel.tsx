@@ -1,4 +1,3 @@
-// @spec OPENSPEC.md §4.1, §4.1.1, §4.1.1.1, §2.4 — contextual inspector for grid and imageSlot properties
 import { computeStretch, type LayoutNode, type Sides } from '@epp/layout-engine';
 import { useEffect, useState, type KeyboardEvent, type ReactNode } from 'react';
 

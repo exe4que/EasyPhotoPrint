@@ -1,12 +1,11 @@
 # CLAUDE.md
 
-Este repo es **spec anchored**: `OPENSPEC.md` es la fuente de verdad de arquitectura, schema y algoritmos, y el código debe mantenerse sincronizado con él en ambas direcciones.
+Este repo es **spec anchored** vía la CLI de **OpenSpec**: `openspec/specs/<capability>/spec.md` es la fuente de verdad de requisitos funcionales, gestionada exclusivamente a través de los comandos `openspec` (o los skills `/opsx:*`) — nunca editada a mano.
 
-**Antes de tocar código o el spec, leé:**
+**Antes de tocar código o proponer un change, leé:**
 
 @AGENTS.md
-@OPENSPEC.md
 
-`AGENTS.md` define las reglas de anclaje spec↔código (tags `@spec`, `SPEC_MAP.md`, checklist de cierre de tarea) que aplican igual acá que en GitHub Copilot CLI — no hay reglas "solo para Claude Code". Si en algún momento este archivo y `AGENTS.md` parecen decir cosas distintas, `AGENTS.md` gana.
+`AGENTS.md` define el flujo completo (proponer → implementar → archivar) y las reglas de anclaje spec↔código que aplican igual acá que en GitHub Copilot CLI — no hay reglas "solo para Claude Code". Es la fuente canónica; si en algún momento este archivo pareciera decir algo distinto, `AGENTS.md` gana.
 
-Regla corta para no perderla de vista en medio de una tarea: **si tocás código con un tag `@spec`, releé esa sección de `OPENSPEC.md` antes de dar la tarea por terminada; si tocás `OPENSPEC.md`, greppeá `@spec` para encontrar el código afectado.** El detalle completo está en `AGENTS.md` §2.
+Regla corta para no perderla de vista en medio de una tarea: **antes de implementar algo, leé la spec de la capability relevante en `openspec/specs/`; si tu cambio altera un requisito ya documentado, pasa primero por un change de OpenSpec (`/opsx:propose` → `/opsx:apply` → `/opsx:archive`), no por una edición directa de la spec archivada.** El detalle completo está en `AGENTS.md` §2.

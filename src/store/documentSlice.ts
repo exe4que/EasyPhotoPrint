@@ -1,4 +1,3 @@
-// @spec OPENSPEC.md §2.3, §4.1, §4.1.1, §4.2 — document slice, pageConfig per page, assignImageToSlot swap logic, specificSize resolution + grow-to-minimum, freeformCanvas nesting + transforms
 import {
   applyPadding,
   clampFreeformPosition,

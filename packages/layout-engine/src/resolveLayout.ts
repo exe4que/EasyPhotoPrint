@@ -1,4 +1,3 @@
-// @spec OPENSPEC.md §4.1, §4.2 — resolveLayout and freeform element box resolution
 import { applyPadding, distributeChildren } from './flexDistribution.js';
 import { computeGridCells } from './grid.js';
 import type { BoxMm, LayoutNode } from './types.js';

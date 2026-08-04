@@ -1,4 +1,3 @@
-// @spec OPENSPEC.md §3.1, §3.3 — explicit template IPC channels
 import { app, ipcMain } from 'electron';
 import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';

@@ -1,7 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://easyphotoprint.app/schemas/project.v1.json",
-  "$comment": "@spec OPENSPEC.md §3.3 — EPPProject JSON Schema",
   "title": "EPPProject",
   "type": "object",
   "required": ["schemaVersion", "id", "name", "pages", "imagePool"],

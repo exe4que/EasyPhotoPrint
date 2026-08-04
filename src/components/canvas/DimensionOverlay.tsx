@@ -1,4 +1,3 @@
-// @spec OPENSPEC.md §4.1, §4.1.1, §4.1.1.1 — hover-triggered dimension labels for imageSlot boxes (slot size + assigned image size)
 interface DimensionOverlayProps {
   showSlotLabel: boolean;
   slotLabel: string;

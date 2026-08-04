@@ -1,4 +1,3 @@
-// @spec OPENSPEC.md §2.2 — application menu trimmed to this project's needs; "File > New" round-trips through the renderer's confirmation popup
 import { BrowserWindow, Menu, type MenuItemConstructorOptions } from 'electron';
 
 const NEW_PROJECT_CHANNEL = 'menu:new-project';

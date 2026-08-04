@@ -1,4 +1,3 @@
-// @spec OPENSPEC.md §4.1, §5.4, §4.1.1.1 — computeFitInParent, computeEnvelopeCrop, computeStretch, computeSpecificSize
 import type { BoxMm, EnvelopeCrop, FitInParentBox, ImageAsset, SpecificSizeMm, StretchResult } from './types.js';
 
 function clamp(value: number, min: number, max: number): number {

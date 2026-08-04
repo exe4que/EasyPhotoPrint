@@ -1,4 +1,3 @@
-// @spec OPENSPEC.md §2.2, §3.3 — explicit IPC for file and dialog access
 import { dialog, ipcMain, nativeImage } from 'electron';
 import { basename } from 'node:path';
 

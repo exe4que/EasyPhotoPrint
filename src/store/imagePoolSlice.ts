@@ -1,4 +1,3 @@
-// @spec OPENSPEC.md §2.3, §3.3 — image pool slice and ingestion entrypoint
 import type { ImageAsset } from '@epp/layout-engine';
 
 import { getEppApi } from '../lib/ipc-client.js';

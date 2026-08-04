@@ -1,4 +1,3 @@
-// @spec OPENSPEC.md §2.3, §2.4 — per-page pageConfig inspector
 import type { ReactNode } from 'react';
 
 import { formatLength, parseLength } from '../../lib/units.js';

@@ -1,4 +1,3 @@
-// @spec OPENSPEC.md §2.3 — transient UI slice for selection and mode state
 import type { EPPProjectPage } from '@epp/layout-engine';
 
 export interface UiState {

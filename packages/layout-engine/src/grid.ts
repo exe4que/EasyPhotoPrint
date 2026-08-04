@@ -1,4 +1,3 @@
-// @spec OPENSPEC.md §4.1 — computeGridCells, resolveDimensions
 import type { BoxMm, GridConfig, Sides } from './types.js';
 
 function normalizePadding(padding?: Partial<Sides>): Sides {

@@ -1,4 +1,3 @@
-// @spec OPENSPEC.md §1.3, §2.3, §4.1, §4.1.1, §4.1.1.1, §6.1 — page preview shell backed by the shared layout engine
 import { isDividerLocked, type LayoutNode } from '@epp/layout-engine';
 import { useCallback, useEffect, useRef, useState } from 'react';
 

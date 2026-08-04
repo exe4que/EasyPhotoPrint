@@ -1,4 +1,3 @@
-// @spec OPENSPEC.md §2.4 — UI toggle for metric/imperial presentation
 import { useEPPStore } from '../../store/index.js';
 
 const OPTIONS = [

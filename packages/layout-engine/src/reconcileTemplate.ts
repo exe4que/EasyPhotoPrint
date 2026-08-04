@@ -1,4 +1,3 @@
-// @spec OPENSPEC.md §3.3 — reconcileTemplateUpdate
 import type { LayoutNode, TemplateReconciliationResult } from './types.js';
 
 function cloneLayoutNode(node: LayoutNode): LayoutNode {

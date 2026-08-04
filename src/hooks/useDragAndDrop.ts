@@ -1,4 +1,3 @@
-// @spec OPENSPEC.md §1.3, §6.1 — drag-and-drop helpers for assigning library images to slots
 import { useCallback } from 'react';
 import type { DragEvent } from 'react';
 

@@ -1,4 +1,3 @@
-// @spec OPENSPEC.md §1.3, §2.3, §3.3 — image library, ingestion, and assignment source
 import type { ImageAsset } from '@epp/layout-engine';
 import { useMemo, useState } from 'react';
 

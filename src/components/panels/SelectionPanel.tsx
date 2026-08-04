@@ -1,4 +1,3 @@
-// @spec OPENSPEC.md §1.3, §2.3 — current slot/image selection feedback for basic grid assignment
 import { useMemo } from 'react';
 
 import { useEPPStore } from '../../store/index.js';

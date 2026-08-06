@@ -42,13 +42,25 @@ No existe ya el mecanismo de tags `@spec OPENSPEC.md §X` en comentarios ni el a
 - **No tomes decisiones de arquitectura nuevas directamente en el código.** Elegir una librería nueva, agregar un campo de schema, cambiar un algoritmo — eso son decisiones que primero se proponen como change de OpenSpec (con su `design.md` si la decisión lo amerita) y después se implementan. El código no es el lugar para arquitectura no documentada en `openspec/`.
 - **Si un pedido del usuario entra en conflicto con una spec archivada** y el usuario no pidió explícitamente cambiar esa spec, señalá el conflicto en vez de implementar en silencio algo distinto a lo documentado. Puede que el usuario quiera proponer un change que la modifique, o puede que no supiera que ya había una decisión tomada al respecto.
 - **No dupliques este archivo.** `CLAUDE.md` y `.github/copilot-instructions.md` son puntos de entrada cortos que remiten acá — si necesitás agregar una regla de comportamiento nueva, se agrega en `AGENTS.md`, no en los archivos específicos de herramienta.
-- **Al terminar un cambio independiente (una tarea, un fix, una feature — no cada mensaje suelto de la conversación), hacé commit y push vos mismo, sin esperar a que el usuario lo pida.** Esta es una autorización permanente y aplica a cualquier agente que trabaje en este repo (Claude Code, GitHub Copilot CLI, u otro): no hace falta confirmación puntual para el `git push` cada vez, ese es justamente el propósito de dejarlo escrito acá. Concretamente:
+- **El trabajo de un change vive en su propia rama de feature — nunca se commitea directo a `main`.** `/opsx:apply` es responsable de crear (si no existe) y pararse sobre una rama con el nombre del change antes de tocar código. Dentro de esa rama, seguís teniendo autorización permanente para commitear y pushear vos mismo al terminar un cambio independiente (una tarea, un fix, una feature — no cada mensaje suelto de la conversación), sin esperar a que el usuario lo pida. Esto aplica a cualquier agente que trabaje en este repo (Claude Code, GitHub Copilot CLI, u otro): no hace falta confirmación puntual para el `git push` cada vez, ese es justamente el propósito de dejarlo escrito acá. Concretamente:
   1. Revisá `git status`/`git diff` antes de stagear — si aparece algo que no reconocés (archivos de credenciales, `.env`, claves) no lo commitees sin preguntar, aunque el resto sí se suba.
   2. `git add -A` (salvo que haya algo a excluir por el punto anterior).
   3. Redactá vos el mensaje de commit en base al diff real — qué cambió y por qué, en el estilo del historial existente (`git log`). Nada de mensajes genéricos tipo timestamp o "auto-commit": si no podés justificar en una línea qué hace el cambio, no está listo para commitear.
-  4. `git push` a la rama activa contra `origin`.
+  4. `git push` a la rama de feature activa contra `origin` — nunca a `main` directamente.
   - Si el cambio deja el repo en un estado roto o a mitad de camino (tests rotos, build roto, tarea incompleta a pedido explícito de pausar), no commitees todavía — dejalo para cuando cierre en un estado coherente.
   - Esto no reemplaza el checklist de spec-anchoring de §2.1 — ambos corren al cerrar una tarea: primero sincronizás spec↔código (incluido archivar el change si corresponde), después commiteás el resultado ya sincronizado.
+  - `main` solo recibe código a través del merge automático descripto en §3.1 — nunca por un push directo de un agente.
+
+### 3.1 Ciclo de vida de un change: rama de feature → PR → adversarial review → merge
+
+1. **`/opsx:apply`** — antes de implementar la primera tarea de `tasks.md`, asegurate de estar parado en una rama con el mismo nombre que el change (`git checkout -b <nombre-del-change>` desde un `main` local actualizado con `origin/main`, si esa rama no existe todavía). A partir de ahí, todo commit/push de esa sesión de trabajo va a esa rama, siguiendo la autorización permanente del punto anterior.
+2. **`/opsx:archive`** — además de lo que ya hace (sincronizar las specs delta a `openspec/specs/` y mover el change a `openspec/changes/archive/`), al cerrar:
+   1. Committeá y pusheá el resultado del archive (specs sincronizadas + change movido) en esa misma rama de feature.
+   2. Abrí un pull request de esa rama hacia `main` con `gh pr create` — autorización permanente, no hace falta confirmar cada vez, mismo espíritu que el commit/push automático.
+   3. Corré un adversarial code review sobre el PR usando los subagentes del plugin `pr-review-toolkit` (`code-reviewer`, `silent-failure-hunter`, `type-design-analyzer`, `pr-test-analyzer`, `comment-analyzer`), en paralelo. Puntuá cada hallazgo 0–100 de confianza, con el mismo rubric que usa el skill `/code-review` (0 = falso positivo evidente, 100 = certeza absoluta de que es un problema real y frecuente).
+   4. Si queda algún hallazgo con confianza ≥80: arreglalo, committeá, pusheá, y volvé a correr el review una vez más sobre el diff actualizado.
+   5. Cuando no quede ningún hallazgo ≥80: mergeá el PR a `main` vos mismo (`gh pr merge`) — sin gate de CI adicional, sin pedir confirmación puntual para el merge en sí. Esta es la única vía por la que código llega a `main`.
+   - `/opsx:archive` no se considera terminado hasta que el merge esté hecho (o hasta que quede documentado por qué no se pudo mergear — p. ej. hallazgos del review sin resolver que requieren una decisión del usuario).
 
 ## 4. Mapa de archivos de este repo
 

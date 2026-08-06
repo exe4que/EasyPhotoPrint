@@ -30,3 +30,13 @@ schema: spec-driven
 #     archive:
 #       guidance:
 #         - Summarize the archive outcome before finishing
+
+operations:
+  apply:
+    guidance:
+      - "Before implementing the first task, ensure you're on a git branch named after this change (create it from an up-to-date main via `git checkout -b <change-name>` if it doesn't exist yet). Commit and push to this feature branch as you complete tasks -- never push directly to main. See AGENTS.md §3.1."
+  archive:
+    guidance:
+      - "After archiving (syncing delta specs, moving the change to archive/), commit and push that result on the same feature branch, then open a pull request into main with `gh pr create` -- standing authorization, no need to ask."
+      - "Run an adversarial code review on the PR using the pr-review-toolkit subagents (code-reviewer, silent-failure-hunter, type-design-analyzer, pr-test-analyzer, comment-analyzer) in parallel, scoring each finding 0-100 confidence like the /code-review skill does."
+      - "Fix any finding scored >=80 confidence, commit, push, and re-review once. Once nothing >=80 remains, merge the PR into main yourself (`gh pr merge`) -- no CI gate, no separate confirmation for the merge. See AGENTS.md §3.1 for the full rubric and rationale."

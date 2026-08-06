@@ -268,7 +268,13 @@ export function PropertiesPanel() {
     const specificSizeMm = slotPropertyNode.imageSlotConfig?.specificSizeMm;
     const specificSizeUnsatisfied =
       scalingRule === 'specificSize' && selectedBox ? isSpecificSizeUnsatisfied(specificSizeMm, selectedBox) : false;
-    const assetAspectRatio = selectedAsset && selectedAsset.heightPx > 0 ? selectedAsset.widthPx / selectedAsset.heightPx : undefined;
+    const rawAssetAspectRatio = selectedAsset && selectedAsset.heightPx > 0 ? selectedAsset.widthPx / selectedAsset.heightPx : undefined;
+    // specificSizeMm is always the on-screen size, so the aspect ratio used to derive/restore it
+    // must be the image's effective (post-rotation) aspect, not its raw pixel aspect.
+    const assetAspectRatio =
+      rawAssetAspectRatio != null && (imageRotationDeg === 90 || imageRotationDeg === 270)
+        ? 1 / rawAssetAspectRatio
+        : rawAssetAspectRatio;
     const aspectRatioBroken = assetAspectRatio != null && isAspectRatioBroken(specificSizeMm, assetAspectRatio);
 
     return (

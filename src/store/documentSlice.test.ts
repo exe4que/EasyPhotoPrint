@@ -459,6 +459,37 @@ describe('document slice helpers', () => {
     expect(imageSlotConfig?.specificSizeMm).toEqual({ widthMm: 100, heightMm: 50, lockedAxis: 'width' });
   });
 
+  it('derives the non-locked specificSize axis using the rotated (effective, inverted) aspect ratio, not the raw one', () => {
+    const state = createTestStore([createTestAsset('image-a', 400, 200)]); // raw aspect 2 (landscape)
+    state.assignImageToSlot('page-1', 'root-grid', 'image-a');
+    state.rotateSlotImage('page-1', 'root-grid'); // 90deg -> effective on-screen aspect is 1/2 = 0.5
+
+    state.setSlotSpecificSize('page-1', 'root-grid', 'width', 100);
+
+    // Using the raw (unrotated) aspect ratio would derive heightMm = 100 / 2 = 50 -- wrong, since
+    // specificSizeMm is always the on-screen size and the image now displays at aspect 0.5.
+    expect(state.document.pages[0].rootNode.imageSlotConfig?.specificSizeMm).toEqual({
+      widthMm: 100,
+      heightMm: 200,
+      lockedAxis: 'width',
+    });
+  });
+
+  it('re-derives the non-locked axis using the rotated aspect ratio when the assigned image changes on a rotated slot', () => {
+    const state = createTestStore([createTestAsset('image-a', 400, 200), createTestAsset('image-b', 100, 400)]);
+    state.assignImageToSlot('page-1', 'root-grid', 'image-a');
+    state.rotateSlotImage('page-1', 'root-grid');
+    state.setSlotSpecificSize('page-1', 'root-grid', 'width', 100);
+    expect(state.document.pages[0].rootNode.imageSlotConfig?.specificSizeMm?.heightMm).toBe(200);
+
+    // image-b: raw aspect 0.25 (portrait), effective (rotated) aspect 4.
+    state.assignImageToSlot('page-1', 'root-grid', 'image-b');
+
+    const specificSizeMm = state.document.pages[0].rootNode.imageSlotConfig?.specificSizeMm;
+    expect(specificSizeMm?.widthMm).toBe(100);
+    expect(specificSizeMm?.heightMm).toBe(25);
+  });
+
   it('grows a slot to its specific size by shrinking its adjacent sibling, right when the size is set', () => {
     const state = createTestStore([createTestAsset('image-a', 100, 100)]);
     state.retypeLayoutNode('page-1', 'root-grid', 'horizontal');

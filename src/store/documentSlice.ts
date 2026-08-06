@@ -737,8 +737,15 @@ function computeAvailableMainSize(page: EPPProjectPage, parentNode: LayoutNode):
   };
 }
 
-function resolveAspectRatio(asset: ImageAsset | undefined): number {
-  return asset && asset.heightPx > 0 ? asset.widthPx / asset.heightPx : 1;
+/**
+ * The asset's *effective* (on-screen) aspect ratio: raw pixel aspect, inverted when
+ * imageRotationDeg is 90/270 since rotating swaps which pixel axis reads as width on screen.
+ * specificSizeMm is always the on-screen size (see the "Image rotation orientation"
+ * requirement), so any derivation from/to it must use this, not the raw asset aspect.
+ */
+function resolveAspectRatio(asset: ImageAsset | undefined, imageRotationDeg?: ImageRotationDeg): number {
+  const rawAspect = asset && asset.heightPx > 0 ? asset.widthPx / asset.heightPx : 1;
+  return imageRotationDeg === 90 || imageRotationDeg === 270 ? 1 / rawAspect : rawAspect;
 }
 
 /**
@@ -1111,7 +1118,10 @@ export function createDocumentSlice(
                         specificSizeMm,
                         specificSizeMm.lockedAxis,
                         specificSizeMm.lockedAxis === 'width' ? specificSizeMm.widthMm : specificSizeMm.heightMm,
-                        resolveAspectRatio(get().imagePool.find((asset) => asset.id === imageAssetId)),
+                        resolveAspectRatio(
+                          get().imagePool.find((asset) => asset.id === imageAssetId),
+                          slotNode?.imageSlotConfig?.imageRotationDeg,
+                        ),
                       ),
                     },
                   })
@@ -1156,7 +1166,7 @@ export function createDocumentSlice(
         slotNode.imageSlotConfig?.specificSizeMm,
         axis,
         valueMm,
-        resolveAspectRatio(asset),
+        resolveAspectRatio(asset, slotNode.imageSlotConfig?.imageRotationDeg),
       );
 
       set((state) => ({

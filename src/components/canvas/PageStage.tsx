@@ -348,6 +348,10 @@ export function PageStage() {
                       const unsatisfied = scalingRule === 'specificSize' && isSpecificSizeUnsatisfied(specificSizeMm, box);
                       // Pre-rotation size, centered on the slot's own center then CSS-rotated --
                       // the rotated bounding box lands exactly on the slot with no offset math.
+                      // At 90/270, this is routinely wider than the slot itself (that's the point --
+                      // it's staged to become the slot's height once rotated), so the <img> below
+                      // must override the base stylesheet's `max-width: 100%`, or the browser clips
+                      // it to the slot's own width *before* rotating, corrupting the whole layout.
                       const renderRect = computeImageRenderRectMm(asset, box, scalingRule, specificSizeMm, imageRotationDeg);
                       const renderLeftMm = box.w / 2 - renderRect.widthMm / 2;
                       const renderTopMm = box.h / 2 - renderRect.heightMm / 2;
@@ -367,6 +371,8 @@ export function PageStage() {
                               top: mmToPx(renderTopMm, previewZoom),
                               width: mmToPx(renderRect.widthMm, previewZoom),
                               height: mmToPx(renderRect.heightMm, previewZoom),
+                              maxWidth: 'none',
+                              maxHeight: 'none',
                               transform: rotationTransform,
                               transformOrigin: 'center',
                             }}
@@ -384,6 +390,8 @@ export function PageStage() {
                             top: mmToPx(renderTopMm, previewZoom),
                             width: mmToPx(renderRect.widthMm, previewZoom),
                             height: mmToPx(renderRect.heightMm, previewZoom),
+                            maxWidth: 'none',
+                            maxHeight: 'none',
                             objectFit: scalingRuleToObjectFit(scalingRule),
                             transform: rotationTransform,
                             transformOrigin: 'center',

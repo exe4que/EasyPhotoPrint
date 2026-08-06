@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { computeEnvelopeCrop, computeFitInParent, computeSpecificSize, computeStretch } from './imageFit.js';
+import { computeEnvelopeCrop, computeFitInParent, computeSpecificSize, computeStretch, orientBoxMm } from './imageFit.js';
 import type { ImageAsset } from './types.js';
 
 const asset: ImageAsset = {
@@ -51,6 +51,64 @@ describe('imageFit', () => {
     const rect = computeSpecificSize({ widthMm: 120, heightMm: 40, lockedAxis: 'width' }, { x: 0, y: 0, w: 100, h: 100 });
     expect(rect.widthMm).toBe(120);
     expect(rect.offsetXMm).toBe(-10);
+  });
+});
+
+describe('orientBoxMm', () => {
+  const box = { x: 5, y: 5, w: 100, h: 50 };
+
+  it('swaps width/height at 90 and 270', () => {
+    expect(orientBoxMm(box, 90)).toEqual({ x: 5, y: 5, w: 50, h: 100 });
+    expect(orientBoxMm(box, 270)).toEqual({ x: 5, y: 5, w: 50, h: 100 });
+  });
+
+  it('leaves the box unchanged at 0, 180, and undefined', () => {
+    expect(orientBoxMm(box, 0)).toEqual(box);
+    expect(orientBoxMm(box, 180)).toEqual(box);
+    expect(orientBoxMm(box, undefined)).toEqual(box);
+  });
+});
+
+describe('computeEnvelopeCrop with a rotation-aware target aspect', () => {
+  // A rotation-aware caller derives targetAspect from the box orientBoxMm would produce for the
+  // slot's imageRotationDeg -- computeEnvelopeCrop itself has no rotation concept of its own.
+  it('a caller passing the 90/270-swapped target aspect gets a correspondingly different crop', () => {
+    const slotBox = { x: 0, y: 0, w: 200, h: 100 };
+
+    const unrotatedAspect = slotBox.w / slotBox.h;
+    expect(computeEnvelopeCrop(asset, unrotatedAspect, { x: 0.5, y: 0.5 })).toEqual({
+      left: 0,
+      top: 0,
+      width: 4000,
+      height: 2000,
+    });
+
+    const rotated90Box = orientBoxMm(slotBox, 90);
+    const rotated90Aspect = rotated90Box.w / rotated90Box.h;
+    expect(computeEnvelopeCrop(asset, rotated90Aspect, { x: 0.5, y: 0.5 })).toEqual({
+      left: 1500,
+      top: 0,
+      width: 1000,
+      height: 2000,
+    });
+
+    // 90 and 270 swap the same way -- the crop geometry is identical, only the caller's CSS
+    // rotation angle differs between them.
+    const rotated270Box = orientBoxMm(slotBox, 270);
+    expect(rotated270Box).toEqual(rotated90Box);
+  });
+
+  it("the focal point still addresses the source image's own unrotated pixel space at any rotation", () => {
+    const slotBox = { x: 0, y: 0, w: 200, h: 100 };
+    const rotatedAspect = orientBoxMm(slotBox, 90).w / orientBoxMm(slotBox, 90).h;
+
+    const topLeftFocus = computeEnvelopeCrop(asset, rotatedAspect, { x: 0, y: 0 });
+    expect(topLeftFocus.left).toBe(0);
+    expect(topLeftFocus.top).toBe(0);
+
+    const bottomRightFocus = computeEnvelopeCrop(asset, rotatedAspect, { x: 1, y: 1 });
+    expect(bottomRightFocus.left).toBe(asset.widthPx - bottomRightFocus.width);
+    expect(bottomRightFocus.top).toBe(asset.heightPx - bottomRightFocus.height);
   });
 });
 

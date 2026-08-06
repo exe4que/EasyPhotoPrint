@@ -13,6 +13,7 @@ import {
   type FreeformTransform,
   type GridConfig,
   type ImageAsset,
+  type ImageRotationDeg,
   type LayoutNode,
   type PageConfig,
   type Sides,
@@ -875,6 +876,7 @@ export interface DocumentSlice {
   removeLayoutNode: (pageId: string, nodeId: string) => void;
   assignImageToSlot: (pageId: string, nodeId: string, imageAssetId: string, source?: 'library' | 'page') => void;
   setSlotSpecificSize: (pageId: string, nodeId: string, axis: 'width' | 'height', valueMm: number | null) => void;
+  rotateSlotImage: (pageId: string, nodeId: string) => void;
   clearImageFromSlot: (pageId: string, nodeId: string) => void;
   resizeSiblingsByDrag: (pageId: string, parentNodeId: string, siblingIndexA: number, deltaMm: number) => void;
   addFreeformElement: (
@@ -1190,6 +1192,37 @@ export function createDocumentSlice(
           },
         }));
       }
+    },
+    rotateSlotImage: (pageId, nodeId) => {
+      const page = get().document.pages.find((entry) => entry.id === pageId);
+      if (!page) {
+        throw new Error(`Page ${pageId} does not exist.`);
+      }
+
+      const slotNode = findNodeById(page.rootNode, nodeId);
+      if (!slotNode || slotNode.type !== 'imageSlot') {
+        throw new Error(`Node ${nodeId} is not an imageSlot.`);
+      }
+
+      const nextRotationDeg = (((slotNode.imageSlotConfig?.imageRotationDeg ?? 0) + 90) % 360) as ImageRotationDeg;
+
+      set((state) => ({
+        document: {
+          pages: state.document.pages.map((entry) =>
+            entry.id === pageId
+              ? {
+                  ...entry,
+                  rootNode: updateNodeById(entry.rootNode, nodeId, {
+                    imageSlotConfig: {
+                      ...slotNode.imageSlotConfig,
+                      imageRotationDeg: nextRotationDeg,
+                    },
+                  }),
+                }
+              : entry,
+          ),
+        },
+      }));
     },
     resizeSiblingsByDrag: (pageId, parentNodeId, siblingIndexA, deltaMm) => {
       const page = get().document.pages.find((entry) => entry.id === pageId);

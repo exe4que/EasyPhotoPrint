@@ -1,7 +1,19 @@
-import type { BoxMm, EnvelopeCrop, FitInParentBox, ImageAsset, SpecificSizeMm, StretchResult } from './types.js';
+import type { BoxMm, EnvelopeCrop, FitInParentBox, ImageAsset, ImageRotationDeg, SpecificSizeMm, StretchResult } from './types.js';
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
+}
+
+/**
+ * Swaps a box's width/height when the rotation is 90 or 270 -- feeding this swapped box into the
+ * existing fit/crop/stretch/size math reorients their result without those functions needing any
+ * rotation-specific logic of their own. Callers are responsible for swapping the *result* back.
+ */
+export function orientBoxMm(box: BoxMm, rotationDeg: ImageRotationDeg | undefined): BoxMm {
+  if (rotationDeg === 90 || rotationDeg === 270) {
+    return { ...box, w: box.h, h: box.w };
+  }
+  return box;
 }
 
 export function computeEnvelopeCrop(

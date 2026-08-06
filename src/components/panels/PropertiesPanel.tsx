@@ -1,4 +1,4 @@
-import { computeStretch, type LayoutNode, type Sides } from '@epp/layout-engine';
+import { computeStretch, orientBoxMm, type LayoutNode, type Sides } from '@epp/layout-engine';
 import { useEffect, useState, type KeyboardEvent, type ReactNode } from 'react';
 
 import { useLayoutResolution } from '../../hooks/useLayoutResolution.js';
@@ -216,6 +216,7 @@ export function PropertiesPanel() {
   const updateGridNodeConfig = useEPPStore((state) => state.updateGridNodeConfig);
   const updateLayoutNode = useEPPStore((state) => state.updateLayoutNode);
   const setSlotSpecificSize = useEPPStore((state) => state.setSlotSpecificSize);
+  const rotateSlotImage = useEPPStore((state) => state.rotateSlotImage);
   const setSimpleRootType = useEPPStore((state) => state.setSimpleRootType);
   const setContainerChildCount = useEPPStore((state) => state.setContainerChildCount);
   const imagePool = useEPPStore((state) => state.imagePool);
@@ -259,9 +260,10 @@ export function PropertiesPanel() {
 
   if (slotPropertyNode) {
     const scalingRule = slotPropertyNode.imageSlotConfig?.scalingRule ?? 'fitInParent';
+    const imageRotationDeg = slotPropertyNode.imageSlotConfig?.imageRotationDeg;
     const stretchWarning =
       scalingRule === 'stretch' && selectedAsset && selectedBox
-        ? computeStretch(selectedAsset, selectedBox).distortionWarning
+        ? computeStretch(selectedAsset, orientBoxMm(selectedBox, imageRotationDeg)).distortionWarning
         : false;
     const specificSizeMm = slotPropertyNode.imageSlotConfig?.specificSizeMm;
     const specificSizeUnsatisfied =
@@ -295,6 +297,20 @@ export function PropertiesPanel() {
               <option value="stretch">stretch</option>
               <option value="specificSize">specificSize</option>
             </select>
+          </div>
+
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2">
+            <div>
+              <FieldLabel>Image rotation</FieldLabel>
+              <div className="text-sm text-slate-300">{imageRotationDeg ?? 0}°</div>
+            </div>
+            <button
+              type="button"
+              onClick={() => rotateSlotImage(activePage.id, slotPropertyNode.id)}
+              className="rounded-lg border border-slate-700 px-3 py-2 text-sm font-medium text-slate-200 hover:border-slate-600"
+            >
+              Rotate 90°
+            </button>
           </div>
 
           {scalingRule === 'specificSize' ? (

@@ -421,6 +421,44 @@ describe('document slice helpers', () => {
     expect(specificSizeMm?.heightMm).toBe(400);
   });
 
+  it('cycles imageRotationDeg through 0 -> 90 -> 180 -> 270 -> 0 without touching the slot box/shape', () => {
+    const state = createTestStore();
+    const rootBefore = state.document.pages[0].rootNode;
+
+    expect(rootBefore.imageSlotConfig?.imageRotationDeg).toBeUndefined();
+
+    state.rotateSlotImage('page-1', 'root-grid');
+    expect(state.document.pages[0].rootNode.imageSlotConfig?.imageRotationDeg).toBe(90);
+
+    state.rotateSlotImage('page-1', 'root-grid');
+    expect(state.document.pages[0].rootNode.imageSlotConfig?.imageRotationDeg).toBe(180);
+
+    state.rotateSlotImage('page-1', 'root-grid');
+    expect(state.document.pages[0].rootNode.imageSlotConfig?.imageRotationDeg).toBe(270);
+
+    state.rotateSlotImage('page-1', 'root-grid');
+    const rootAfter = state.document.pages[0].rootNode;
+    expect(rootAfter.imageSlotConfig?.imageRotationDeg).toBe(0);
+
+    // Rotation only touches imageSlotConfig -- the node's own shape/type/id is untouched.
+    expect(rootAfter.id).toBe(rootBefore.id);
+    expect(rootAfter.type).toBe(rootBefore.type);
+    expect(rootAfter.paddingMm).toEqual(rootBefore.paddingMm);
+  });
+
+  it('rotating an imageSlot preserves its other imageSlotConfig fields', () => {
+    const state = createTestStore([createTestAsset('image-a', 400, 200)]);
+    state.assignImageToSlot('page-1', 'root-grid', 'image-a');
+    state.setSlotSpecificSize('page-1', 'root-grid', 'width', 100);
+
+    state.rotateSlotImage('page-1', 'root-grid');
+
+    const imageSlotConfig = state.document.pages[0].rootNode.imageSlotConfig;
+    expect(imageSlotConfig?.imageRotationDeg).toBe(90);
+    expect(imageSlotConfig?.scalingRule).toBe('specificSize');
+    expect(imageSlotConfig?.specificSizeMm).toEqual({ widthMm: 100, heightMm: 50, lockedAxis: 'width' });
+  });
+
   it('grows a slot to its specific size by shrinking its adjacent sibling, right when the size is set', () => {
     const state = createTestStore([createTestAsset('image-a', 100, 100)]);
     state.retypeLayoutNode('page-1', 'root-grid', 'horizontal');

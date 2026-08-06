@@ -56,12 +56,16 @@ export interface SpecificSizeMm {
   lockedAxis: 'width' | 'height' | 'both';
 }
 
+export type ImageRotationDeg = 0 | 90 | 180 | 270;
+
 export interface ImageSlotConfig {
   aspectRatio?: number;
   scalingRule?: ScalingRule;
   focalPoint?: FocalPoint;
   /** Only meaningful when scalingRule === 'specificSize'. Both fields are always resolved (never partial). */
   specificSizeMm?: SpecificSizeMm;
+  /** Clockwise rotation applied to the assigned image before any scaling-rule fit/crop/stretch math, independent of the slot's own box shape. Defaults to 0. Not surfaced in the UI for the shadow imageSlot backing a FreeformElement. */
+  imageRotationDeg?: ImageRotationDeg;
 }
 
 export interface FreeformTransform {

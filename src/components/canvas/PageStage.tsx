@@ -2,7 +2,12 @@ import { isDividerLocked, type LayoutNode } from '@epp/layout-engine';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useDragAndDrop } from '../../hooks/useDragAndDrop.js';
-import { computeImageDisplayRectMm, isSpecificSizeUnsatisfied, scalingRuleToObjectFit } from '../../lib/imageDisplay.js';
+import {
+  computeImageDisplayRectMm,
+  computeImageRenderRectMm,
+  isSpecificSizeUnsatisfied,
+  scalingRuleToObjectFit,
+} from '../../lib/imageDisplay.js';
 import { formatLength, mmToPx, pxToMm } from '../../lib/units.js';
 import { useLayoutResolution } from '../../hooks/useLayoutResolution.js';
 import { useEPPStore } from '../../store/index.js';
@@ -302,6 +307,7 @@ export function PageStage() {
                     box,
                     imageSlotMap.get(id)?.imageSlotConfig?.scalingRule,
                     imageSlotMap.get(id)?.imageSlotConfig?.specificSizeMm,
+                    imageSlotMap.get(id)?.imageSlotConfig?.imageRotationDeg,
                   );
                   const insideImage =
                     localX >= mmToPx(displayRect.offsetXMm, previewZoom) &&
@@ -338,10 +344,16 @@ export function PageStage() {
                       const imageSlotConfig = imageSlotMap.get(id)?.imageSlotConfig;
                       const scalingRule = imageSlotConfig?.scalingRule;
                       const specificSizeMm = imageSlotConfig?.specificSizeMm;
+                      const imageRotationDeg = imageSlotConfig?.imageRotationDeg;
                       const unsatisfied = scalingRule === 'specificSize' && isSpecificSizeUnsatisfied(specificSizeMm, box);
+                      // Pre-rotation size, centered on the slot's own center then CSS-rotated --
+                      // the rotated bounding box lands exactly on the slot with no offset math.
+                      const renderRect = computeImageRenderRectMm(asset, box, scalingRule, specificSizeMm, imageRotationDeg);
+                      const renderLeftMm = box.w / 2 - renderRect.widthMm / 2;
+                      const renderTopMm = box.h / 2 - renderRect.heightMm / 2;
+                      const rotationTransform = imageRotationDeg ? `rotate(${imageRotationDeg}deg)` : undefined;
 
                       if (scalingRule === 'specificSize' && specificSizeMm) {
-                        const rect = computeImageDisplayRectMm(asset, box, scalingRule, specificSizeMm);
                         return (
                           <img
                             src={asset.thumbnailDataUrl}
@@ -351,10 +363,12 @@ export function PageStage() {
                               unsatisfied ? 'outline outline-2 outline-offset-[-2px] outline-rose-500' : ''
                             }`}
                             style={{
-                              left: mmToPx(rect.offsetXMm, previewZoom),
-                              top: mmToPx(rect.offsetYMm, previewZoom),
-                              width: mmToPx(rect.widthMm, previewZoom),
-                              height: mmToPx(rect.heightMm, previewZoom),
+                              left: mmToPx(renderLeftMm, previewZoom),
+                              top: mmToPx(renderTopMm, previewZoom),
+                              width: mmToPx(renderRect.widthMm, previewZoom),
+                              height: mmToPx(renderRect.heightMm, previewZoom),
+                              transform: rotationTransform,
+                              transformOrigin: 'center',
                             }}
                           />
                         );
@@ -364,8 +378,16 @@ export function PageStage() {
                         <img
                           src={asset.thumbnailDataUrl}
                           alt={asset.fileName}
-                          className="pointer-events-none absolute inset-0 h-full w-full"
-                          style={{ objectFit: scalingRuleToObjectFit(scalingRule) }}
+                          className="pointer-events-none absolute"
+                          style={{
+                            left: mmToPx(renderLeftMm, previewZoom),
+                            top: mmToPx(renderTopMm, previewZoom),
+                            width: mmToPx(renderRect.widthMm, previewZoom),
+                            height: mmToPx(renderRect.heightMm, previewZoom),
+                            objectFit: scalingRuleToObjectFit(scalingRule),
+                            transform: rotationTransform,
+                            transformOrigin: 'center',
+                          }}
                         />
                       );
                     })()
@@ -422,6 +444,7 @@ export function PageStage() {
                       box,
                       imageSlotMap.get(id)?.imageSlotConfig?.scalingRule,
                       imageSlotMap.get(id)?.imageSlotConfig?.specificSizeMm,
+                      imageSlotMap.get(id)?.imageSlotConfig?.imageRotationDeg,
                     );
                     return `${formatLength(widthMm, unitSystem)} × ${formatLength(heightMm, unitSystem)}`;
                   })()}

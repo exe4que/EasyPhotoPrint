@@ -73,7 +73,7 @@ Because the Main process has no access to the renderer's Zustand store, clicking
 - **AND** calling the value returned by each subscription function SHALL unsubscribe that listener
 
 ### Requirement: Edit > Undo and Redo Round-Trip Through the Renderer
-Because the Main process has no access to the renderer's Zustand/zundo store, clicking `Edit > Undo` or `Edit > Redo` (or using their accelerators) SHALL NOT invoke Chromium's built-in `webContents.undo()`/`redo()`. Each SHALL instead send a distinct, payload-free menu event (`menu:undo`, `menu:redo`) to the focused window's renderer, and the renderer SHALL be responsible for invoking the document undo/redo history itself. This mirrors the existing `menu:new-project`/`menu:save-project` pattern.
+Because the Main process has no access to the renderer's store, clicking `Edit > Undo` or `Edit > Redo` (or using their accelerators) SHALL NOT invoke Chromium's built-in `webContents.undo()`/`redo()`. Each SHALL instead send a distinct, payload-free menu event (`menu:undo`, `menu:redo`) to the focused window's renderer, and the renderer SHALL be responsible for invoking the document undo/redo history itself. This mirrors the existing `menu:new-project`/`menu:save-project` pattern.
 
 #### Scenario: Menu clicks notify the renderer instead of triggering browser-native undo
 - **WHEN** the user clicks `Edit > Undo` or `Edit > Redo` (or uses their `CmdOrCtrl+Z`/`CmdOrCtrl+Shift+Z` accelerators)
@@ -88,6 +88,6 @@ Because the Main process has no access to the renderer's Zustand/zundo store, cl
 
 #### Scenario: Receiving the event invokes the document undo/redo history
 - **WHEN** the renderer receives a `menu:undo` or `menu:redo` event
-- **THEN** it SHALL invoke `useEPPStore.temporal.getState().undo()` or `.redo()` respectively
-- **AND** if there is nothing to undo or redo, invoking it SHALL have no effect (the temporal store's own no-op behavior applies; the menu item itself is not disabled based on history state)
+- **THEN** it SHALL invoke the same document undo/redo controls described by the `undo-redo` capability's "Undo and Redo Controls" requirement
+- **AND** if there is nothing to undo or redo, invoking it SHALL have no effect (the underlying history's own no-op behavior applies; the menu item itself is not disabled based on history state)
 

@@ -19,7 +19,7 @@ The undo/redo temporal store SHALL track only the `document` slice of the applic
 - **THEN** a new entry is added to the undo/redo history, and invoking undo reverts that specific change
 
 ### Requirement: Undo and Redo Controls
-The application SHALL expose controls that invoke undo and redo against the temporal history of the `document` slice.
+The application SHALL expose controls that invoke undo and redo against the temporal history of the `document` slice, reachable exclusively through the application menu's `Edit > Undo` / `Edit > Redo` items and their keyboard accelerators (`CmdOrCtrl+Z` / `CmdOrCtrl+Shift+Z`). There SHALL NOT be a dedicated in-app toolbar button for undo or redo.
 
 #### Scenario: Undo reverts the most recent document change
 - **WHEN** the user activates the Undo control after making a document change
@@ -28,6 +28,11 @@ The application SHALL expose controls that invoke undo and redo against the temp
 #### Scenario: Redo re-applies an undone change
 - **WHEN** the user activates the Redo control immediately after an Undo
 - **THEN** the `document` slice returns to the state it had before the undo was performed
+
+#### Scenario: Undo and Redo are reachable only via the application menu
+- **WHEN** the user wants to undo or redo a document change
+- **THEN** they invoke it through `Edit > Undo` / `Edit > Redo` (menu click or `CmdOrCtrl+Z` / `CmdOrCtrl+Shift+Z`)
+- **AND** no standalone toolbar button exists for this purpose
 
 ### Requirement: Divider-Drag Gestures Batch Into a Single Undo Step
 Dragging the divider between two adjacent children of a `horizontal` or `vertical` container SHALL pause history recording when the drag starts, apply live sibling-resize updates to the store on every pointer-move event without recording each intermediate state, and resume history recording when the drag ends — so the entire drag gesture collapses into exactly one undo/redo step.

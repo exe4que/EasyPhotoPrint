@@ -73,6 +73,14 @@ export function App() {
   }, [saveProject]);
 
   useEffect(() => {
+    return getEppApi().menu.onUndo(undo);
+  }, [undo]);
+
+  useEffect(() => {
+    return getEppApi().menu.onRedo(redo);
+  }, [redo]);
+
+  useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         clearSelection();
@@ -98,20 +106,6 @@ export function App() {
 
           <div className="flex items-center gap-3">
             <UnitToggle />
-            <button
-              type="button"
-              onClick={undo}
-              className="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-200 hover:border-slate-600"
-            >
-              Undo
-            </button>
-            <button
-              type="button"
-              onClick={redo}
-              className="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-200 hover:border-slate-600"
-            >
-              Redo
-            </button>
           </div>
         </div>
       </div>

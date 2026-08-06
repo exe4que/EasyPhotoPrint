@@ -55,11 +55,22 @@ function createNextImageSlotId(children: LayoutNode[]): string {
   return `slot-${maxId + 1}`;
 }
 
+function collectAllNodeIds(node: LayoutNode, ids: Set<string>): void {
+  ids.add(node.id);
+  for (const child of node.children ?? []) {
+    collectAllNodeIds(child, ids);
+  }
+}
+
+/** Scans every node id in the tree, not just current imageSlot ids -- a node that used to be
+ * "slot-N" keeps that id when retyped to another type (e.g. freeformCanvas), so checking only
+ * imageSlot ids would let this generator reissue "slot-N" for a brand-new shadow slot, colliding
+ * with the retyped node's own id. */
 function createSlotIdGenerator(rootNode: LayoutNode): () => string {
-  const slotIds = new Set<string>();
-  collectImageSlotIds(rootNode, slotIds);
-  let currentMax = [...slotIds].reduce((max, slotId) => {
-    const parsed = parseSlotSequence(slotId);
+  const nodeIds = new Set<string>();
+  collectAllNodeIds(rootNode, nodeIds);
+  let currentMax = [...nodeIds].reduce((max, id) => {
+    const parsed = parseSlotSequence(id);
     return parsed == null ? max : Math.max(max, parsed);
   }, 0);
 

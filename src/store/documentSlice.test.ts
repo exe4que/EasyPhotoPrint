@@ -307,6 +307,28 @@ describe('document slice helpers', () => {
     expect(element.transform.rotationDeg).toBe(0);
   });
 
+  it('does not collide the shadow imageSlot id with the freeformCanvas node id when the retyped node held the highest slot number', () => {
+    const state = createTestStore();
+
+    // A 2x3 grid numbers its children slot-1..slot-6. Retyping the *last* one drops it out of
+    // the imageSlot id count, so a naive next-id generator would reissue "slot-6" for the new
+    // shadow slot -- colliding with the freeformCanvas node's own (unchanged) id.
+    state.retypeLayoutNode('page-1', 'root-grid', 'grid');
+    state.updateGridNodeConfig('page-1', 'root-grid', { gridConfig: { rows: 2, columns: 3 } });
+    const lastChildId = state.document.pages[0].rootNode.children![5].id;
+    expect(lastChildId).toBe('slot-6');
+
+    state.retypeLayoutNode('page-1', lastChildId, 'freeformCanvas');
+    state.addFreeformElement('page-1', lastChildId, 'image-a');
+
+    const freeformNode = state.document.pages[0].rootNode.children!.find((child) => child.id === lastChildId)!;
+    const shadowSlotId = freeformNode.children![0].id;
+
+    expect(shadowSlotId).not.toBe(lastChildId);
+    expect(state.document.pages[0].assignments[shadowSlotId]).toBe('image-a');
+    expect(state.document.pages[0].assignments[lastChildId]).toBeUndefined();
+  });
+
   it('removes a freeform element along with its imageSlot child and assignment', () => {
     const state = createTestStore();
 

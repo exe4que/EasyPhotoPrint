@@ -1,6 +1,7 @@
 import {
   applyPadding,
   clampFreeformPosition,
+  cloneLayoutNode,
   computeMinRequiredMainSizeMm,
   MIN_FREEFORM_SIZE_MM,
   reconcileTemplateUpdate,
@@ -347,27 +348,6 @@ function createNodeForType(type: NestedNodeType, nextSlotId: () => string, exist
     default:
       return createImageSlot(existingId ?? nextSlotId());
   }
-}
-
-function cloneLayoutNode(node: LayoutNode): LayoutNode {
-  return {
-    ...node,
-    fixedSizeMm: node.fixedSizeMm ? { ...node.fixedSizeMm } : undefined,
-    alignment: node.alignment ? { ...node.alignment } : undefined,
-    paddingMm: node.paddingMm ? { ...node.paddingMm } : undefined,
-    gridConfig: node.gridConfig ? { ...node.gridConfig } : undefined,
-    imageSlotConfig: node.imageSlotConfig
-      ? {
-          ...node.imageSlotConfig,
-          focalPoint: node.imageSlotConfig.focalPoint ? { ...node.imageSlotConfig.focalPoint } : undefined,
-        }
-      : undefined,
-    freeformElements: node.freeformElements?.map((element) => ({
-      ...element,
-      transform: { ...element.transform },
-    })),
-    children: node.children?.map(cloneLayoutNode),
-  };
 }
 
 function createDefaultRootNode(): LayoutNode {

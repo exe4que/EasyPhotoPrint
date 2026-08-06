@@ -1,6 +1,6 @@
 import type { LayoutNode, TemplateReconciliationResult } from './types.js';
 
-function cloneLayoutNode(node: LayoutNode): LayoutNode {
+export function cloneLayoutNode(node: LayoutNode): LayoutNode {
   return {
     ...node,
     fixedSizeMm: node.fixedSizeMm ? { ...node.fixedSizeMm } : undefined,

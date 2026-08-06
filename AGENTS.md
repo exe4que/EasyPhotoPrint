@@ -51,16 +51,23 @@ No existe ya el mecanismo de tags `@spec OPENSPEC.md §X` en comentarios ni el a
   - Esto no reemplaza el checklist de spec-anchoring de §2.1 — ambos corren al cerrar una tarea: primero sincronizás spec↔código (incluido archivar el change si corresponde), después commiteás el resultado ya sincronizado.
   - `main` solo recibe código a través del merge automático descripto en §3.1 — nunca por un push directo de un agente.
 
-### 3.1 Ciclo de vida de un change: rama de feature → PR → adversarial review → merge
+### 3.1 Ciclo de vida de un change: rama de feature → PR → merge
 
 1. **`/opsx:apply`** — antes de implementar la primera tarea de `tasks.md`, asegurate de estar parado en una rama con el mismo nombre que el change (`git checkout -b <nombre-del-change>` desde un `main` local actualizado con `origin/main`, si esa rama no existe todavía). A partir de ahí, todo commit/push de esa sesión de trabajo va a esa rama, siguiendo la autorización permanente del punto anterior.
 2. **`/opsx:archive`** — además de lo que ya hace (sincronizar las specs delta a `openspec/specs/` y mover el change a `openspec/changes/archive/`), al cerrar:
    1. Committeá y pusheá el resultado del archive (specs sincronizadas + change movido) en esa misma rama de feature.
    2. Abrí un pull request de esa rama hacia `main` con `gh pr create` — autorización permanente, no hace falta confirmar cada vez, mismo espíritu que el commit/push automático.
-   3. Corré un adversarial code review sobre el PR usando los subagentes del plugin `pr-review-toolkit` (`code-reviewer`, `silent-failure-hunter`, `type-design-analyzer`, `pr-test-analyzer`, `comment-analyzer`), en paralelo. Puntuá cada hallazgo 0–100 de confianza, con el mismo rubric que usa el skill `/code-review` (0 = falso positivo evidente, 100 = certeza absoluta de que es un problema real y frecuente).
-   4. Si queda algún hallazgo con confianza ≥80: arreglalo, committeá, pusheá, y volvé a correr el review una vez más sobre el diff actualizado.
-   5. Cuando no quede ningún hallazgo ≥80: mergeá el PR a `main` vos mismo (`gh pr merge`) — sin gate de CI adicional, sin pedir confirmación puntual para el merge en sí. Esta es la única vía por la que código llega a `main`.
-   - `/opsx:archive` no se considera terminado hasta que el merge esté hecho (o hasta que quede documentado por qué no se pudo mergear — p. ej. hallazgos del review sin resolver que requieren una decisión del usuario).
+   3. Mergeá el PR a `main` vos mismo (`gh pr merge`) — sin gate de CI adicional, sin pedir confirmación puntual para el merge en sí. Esta es la única vía por la que código llega a `main`.
+   - `/opsx:archive` no incluye el adversarial code review — ver §3.2. Es un paso desacoplado y opcional: si querés que corra, invocalo vos (o pedímelo) antes de archivar. `/opsx:archive` no espera a que corra ni lo dispara automáticamente.
+
+### 3.2 Adversarial code review — paso opcional, desacoplado de `/opsx:archive`
+
+El comando `/adversarial-review` (`.claude/commands/adversarial-review.md`) corre el mismo review de 5 agentes en paralelo que antes vivía adentro de `/opsx:archive`, pero como paso independiente que se invoca a mano — no corre automáticamente en ningún punto del flujo de OpenSpec (ni `/opsx:apply` ni `/opsx:archive` lo disparan por su cuenta).
+
+- **Cuándo correrlo:** el momento recomendado es sobre la rama de feature, antes de `/opsx:archive` — así lo que se sincroniza a specs y se abre como PR ya viene revisado, y `/opsx:archive` termina en un solo tramo limpio (sync → commit → push → PR → merge) sin tener que volver atrás a arreglar hallazgos post-PR. También podés correrlo más tarde, contra un PR ya abierto (pasándole el número), si preferís revisar ahí.
+- **Qué hace:** lanza en paralelo los mismos 5 roles (`code-reviewer`, `silent-failure-hunter`, `type-design-analyzer`, `pr-test-analyzer`, `comment-analyzer`) sobre el diff de la rama actual contra `main` (o contra el PR indicado), puntúa cada hallazgo 0–100 con el mismo rubric que `/code-review`, y solo reporta los que llegan a ≥80. Si el plugin `pr-review-toolkit` no está registrado como agent type invocable en el entorno, el comando cae automáticamente a agentes `general-purpose` cargando la persona real de cada rol — no hace falta que vos ni yo lo notemos ni lo resolvamos a mano cada vez.
+- **Qué hago con los hallazgos ≥80:** los arreglo cuando el fix es puramente técnico y de bajo riesgo (bug, tipo, comentario engañoso, etc.), committeo, pusheo, y vuelvo a correr un review dirigido sobre ese diff incremental. Si un hallazgo implica una decisión de producto/UX/arquitectura (ej.: un trade-off de comportamiento que nadie pidió explícitamente) no lo resuelvo en silencio — te lo presento con opciones concretas y espero tu decisión, igual que documentado en §3 (no tomar decisiones de arquitectura nuevas directamente en el código).
+- Correrlo es una recomendación, no una obligación: si un change es chico o de bajo riesgo, está bien saltarlo y archivar directo.
 
 ## 4. Mapa de archivos de este repo
 
@@ -74,5 +81,6 @@ No existe ya el mecanismo de tags `@spec OPENSPEC.md §X` en comentarios ni el a
 | `CLAUDE.md` | Punto de entrada para Claude Code CLI. |
 | `.github/copilot-instructions.md` | Punto de entrada para GitHub Copilot CLI/Chat. |
 | `.github/skills/`, `.github/prompts/` | Skills/prompts de OpenSpec para Copilot (equivalentes a los skills `/opsx:*` de Claude Code). |
+| `.claude/commands/adversarial-review.md` | Comando `/adversarial-review` — review de 5 agentes en paralelo, desacoplado de `/opsx:archive` (ver §3.2). No es parte del flujo generado por `openspec update`, así que no se pisa al actualizar la CLI. |
 
 La ubicación del código sigue la estructura de carpetas ya en uso (`electron/`, `packages/layout-engine/`, `packages/migrations/`, `src/`, `shared/`) — no hay un mapeo formal spec↔carpeta más allá del nombre de la capability; para encontrar qué código implementa una capability, `grep` es suficiente dado que los nombres de capability (`layout-engine`, `template-schema`, etc.) coinciden con los nombres de paquete/carpeta reales.

@@ -38,5 +38,5 @@ operations:
   archive:
     guidance:
       - "After archiving (syncing delta specs, moving the change to archive/), commit and push that result on the same feature branch, then open a pull request into main with `gh pr create` -- standing authorization, no need to ask."
-      - "Run an adversarial code review on the PR using the pr-review-toolkit subagents (code-reviewer, silent-failure-hunter, type-design-analyzer, pr-test-analyzer, comment-analyzer) in parallel, scoring each finding 0-100 confidence like the /code-review skill does."
-      - "Fix any finding scored >=80 confidence, commit, push, and re-review once. Once nothing >=80 remains, merge the PR into main yourself (`gh pr merge`) -- no CI gate, no separate confirmation for the merge. See AGENTS.md §3.1 for the full rubric and rationale."
+      - "Adversarial code review is a separate, optional step -- it is NOT run automatically as part of archiving. Run the `/adversarial-review` command yourself before archiving if you want it (recommended, but the user's call), or the user runs it directly. See AGENTS.md §3.1/§3.2."
+      - "Once the PR is open, merge it into main yourself (`gh pr merge`) -- no CI gate, no separate confirmation for the merge. Standing authorization, same as the commit/push/PR-create steps above. See AGENTS.md §3.1."

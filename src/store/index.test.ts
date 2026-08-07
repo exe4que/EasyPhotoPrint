@@ -98,6 +98,19 @@ describe('addPage', () => {
 
     expect(useEPPStore.getState().document.pages).toHaveLength(pageCountBefore);
   });
+
+  it('undoing through the store action re-anchors activePageId instead of leaving it dangling', () => {
+    const originalActiveId = useEPPStore.getState().ui.activePageId;
+
+    useEPPStore.getState().addPage();
+    expect(useEPPStore.getState().ui.activePageId).not.toBe(originalActiveId);
+
+    useEPPStore.getState().undo();
+
+    const state = useEPPStore.getState();
+    expect(state.document.pages.map((page) => page.id)).toContain(state.ui.activePageId);
+    expect(state.ui.activePageId).toBe(originalActiveId);
+  });
 });
 
 describe('removePage', () => {
@@ -154,6 +167,20 @@ describe('removePage', () => {
     useEPPStore.temporal.getState().undo();
 
     expect(useEPPStore.getState().document.pages.map((page) => page.id)).toEqual(pageIdsBefore);
+  });
+
+  it('undoing a removal through the store action leaves activePageId on a page that still exists', () => {
+    useEPPStore.getState().addPage();
+    useEPPStore.getState().addPage();
+    const activeId = useEPPStore.getState().ui.activePageId;
+
+    useEPPStore.getState().removePage(activeId);
+    expect(useEPPStore.getState().ui.activePageId).not.toBe(activeId);
+
+    useEPPStore.getState().undo();
+
+    const state = useEPPStore.getState();
+    expect(state.document.pages.map((page) => page.id)).toContain(state.ui.activePageId);
   });
 
   it('removing the active page when it is last activates the new last page', () => {

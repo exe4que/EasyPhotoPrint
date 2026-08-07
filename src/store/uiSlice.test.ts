@@ -84,4 +84,53 @@ describe('ui slice', () => {
     state.setActivePageId('page-2');
     expect(state.ui.selectedElementIds).toEqual(['root-of-page-2']);
   });
+
+  it("setActivePageId derives the layout mode from the newly active page's structure", () => {
+    const nestedPage: EPPProjectPage = {
+      id: 'nested-page',
+      pageConfig: { sizePreset: 'A4', orientation: 'portrait', dpi: 300 },
+      templateRef: undefined,
+      rootNode: {
+        id: 'nested-root',
+        type: 'horizontal',
+        children: [{ id: 'inner-container', type: 'vertical', children: [] }],
+      },
+      assignments: {},
+    };
+
+    let state: StoreState = {
+      ...createUiSlice(
+        (updater) => {
+          state = { ...state, ...updater(state) } as StoreState;
+        },
+        () => state,
+      ),
+      document: { pages: [createTestPage('page-1'), nestedPage] },
+    };
+
+    state.setActivePageId('nested-page');
+    expect(state.ui.layoutMode).toBe('nested');
+    expect(state.ui.selectedElementIds).toEqual([]);
+
+    state.setActivePageId('page-1');
+    expect(state.ui.layoutMode).toBe('simple');
+    expect(state.ui.selectedElementIds).toEqual(['root-of-page-1']);
+  });
+
+  it('setActivePageId keeps the current layout mode when the target id does not resolve to a page', () => {
+    let state: StoreState = {
+      ...createUiSlice(
+        (updater) => {
+          state = { ...state, ...updater(state) } as StoreState;
+        },
+        () => state,
+      ),
+      document: { pages: [createTestPage('page-1')] },
+    };
+
+    state.setLayoutMode('nested');
+    state.setActivePageId('missing-page');
+
+    expect(state.ui.layoutMode).toBe('nested');
+  });
 });

@@ -65,6 +65,111 @@ describe('startNewProject', () => {
   });
 });
 
+describe('addPage', () => {
+  afterEach(() => {
+    useEPPStore.getState().startNewProject();
+  });
+
+  it('appends a page using the app default config and a blank rootNode, and activates it', () => {
+    const before = useEPPStore.getState().document.pages;
+
+    useEPPStore.getState().addPage();
+
+    const state = useEPPStore.getState();
+    expect(state.document.pages).toHaveLength(before.length + 1);
+    expect(state.document.pages[0]).toEqual(before[0]);
+
+    const newPage = state.document.pages[1];
+    expect(newPage.pageConfig).toEqual({ sizePreset: 'A4', orientation: 'portrait', dpi: 300 });
+    expect(newPage.rootNode.type).toBe('imageSlot');
+    expect(newPage.assignments).toEqual({});
+    expect(state.ui.activePageId).toBe(newPage.id);
+  });
+
+  it('produces exactly one undo step, reverting the whole add in a single Undo', () => {
+    const pastBefore = useEPPStore.temporal.getState().pastStates.length;
+    const pageCountBefore = useEPPStore.getState().document.pages.length;
+
+    useEPPStore.getState().addPage();
+
+    expect(useEPPStore.temporal.getState().pastStates.length).toBe(pastBefore + 1);
+
+    useEPPStore.temporal.getState().undo();
+
+    expect(useEPPStore.getState().document.pages).toHaveLength(pageCountBefore);
+  });
+});
+
+describe('removePage', () => {
+  afterEach(() => {
+    useEPPStore.getState().startNewProject();
+  });
+
+  it('is a no-op when only one page remains', () => {
+    const onlyPageId = useEPPStore.getState().document.pages[0].id;
+
+    useEPPStore.getState().removePage(onlyPageId);
+
+    expect(useEPPStore.getState().document.pages).toHaveLength(1);
+    expect(useEPPStore.getState().document.pages[0].id).toBe(onlyPageId);
+  });
+
+  it('removes a non-active page without touching the active page or others', () => {
+    useEPPStore.getState().addPage();
+    useEPPStore.getState().addPage();
+    const [page1, page2, page3] = useEPPStore.getState().document.pages;
+    useEPPStore.getState().setActivePageId(page3.id);
+
+    useEPPStore.getState().removePage(page2.id);
+
+    const state = useEPPStore.getState();
+    expect(state.document.pages.map((page) => page.id)).toEqual([page1.id, page3.id]);
+    expect(state.ui.activePageId).toBe(page3.id);
+  });
+
+  it('removing the active (non-last) page activates the page that shifts into its old index', () => {
+    useEPPStore.getState().addPage();
+    useEPPStore.getState().addPage();
+    const [page1, page2, page3] = useEPPStore.getState().document.pages;
+    useEPPStore.getState().setActivePageId(page2.id);
+
+    useEPPStore.getState().removePage(page2.id);
+
+    const state = useEPPStore.getState();
+    expect(state.document.pages.map((page) => page.id)).toEqual([page1.id, page3.id]);
+    expect(state.ui.activePageId).toBe(page3.id);
+  });
+
+  it('removing the active page produces exactly one undo step, reverting the whole removal in a single Undo', () => {
+    useEPPStore.getState().addPage();
+    useEPPStore.getState().addPage();
+    const pageIdsBefore = useEPPStore.getState().document.pages.map((page) => page.id);
+    const activeId = useEPPStore.getState().ui.activePageId;
+    const pastBefore = useEPPStore.temporal.getState().pastStates.length;
+
+    useEPPStore.getState().removePage(activeId);
+
+    expect(useEPPStore.temporal.getState().pastStates.length).toBe(pastBefore + 1);
+
+    useEPPStore.temporal.getState().undo();
+
+    expect(useEPPStore.getState().document.pages.map((page) => page.id)).toEqual(pageIdsBefore);
+  });
+
+  it('removing the active page when it is last activates the new last page', () => {
+    useEPPStore.getState().addPage();
+    useEPPStore.getState().addPage();
+    const [page1, page2, page3] = useEPPStore.getState().document.pages;
+    expect(useEPPStore.getState().ui.activePageId).toBe(page3.id);
+
+    useEPPStore.getState().removePage(page3.id);
+
+    const state = useEPPStore.getState();
+    expect(state.document.pages.map((page) => page.id)).toEqual([page1.id, page2.id]);
+    expect(state.ui.activePageId).toBe(page2.id);
+  });
+});
+
 describe('saveProject', () => {
   afterEach(() => {
     delete (globalThis as { window?: unknown }).window;

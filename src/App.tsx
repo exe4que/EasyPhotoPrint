@@ -5,6 +5,7 @@ import { PageStage } from './components/canvas/PageStage.js';
 import { ImageLibraryPanel } from './components/panels/ImageLibraryPanel.js';
 import { LayoutTreePanel } from './components/panels/LayoutTreePanel.js';
 import { PageSetupPanel } from './components/panels/PageSetupPanel.js';
+import { PageSwitcher } from './components/panels/PageSwitcher.js';
 import { PropertiesPanel } from './components/panels/PropertiesPanel.js';
 import { SelectionPanel } from './components/panels/SelectionPanel.js';
 import { UnitToggle } from './components/settings/UnitToggle.js';
@@ -103,6 +104,8 @@ export function App() {
               Electron shell + shared layout engine + persisted unit settings.
             </p>
           </div>
+
+          <PageSwitcher />
 
           <div className="flex items-center gap-3">
             <UnitToggle />

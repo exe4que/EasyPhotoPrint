@@ -4,11 +4,11 @@ import { temporal } from 'zundo';
 import type { EPPProject } from '@epp/layout-engine';
 
 import { getEppApi } from '../lib/ipc-client.js';
-import { createDocumentSlice, createInitialDocumentState, type DocumentSlice } from './documentSlice.js';
+import { createDefaultPage, createDocumentSlice, createInitialDocumentState, type DocumentSlice } from './documentSlice.js';
 import { createImagePoolSlice, type ImagePoolSlice } from './imagePoolSlice.js';
 import { createInitialProjectState, createProjectSlice, type ProjectSlice } from './projectSlice.js';
 import { createSettingsSlice, type SettingsSlice } from './settingsSlice.js';
-import { createInitialUiState, createUiSlice, type UiSlice } from './uiSlice.js';
+import { computeActivePageUi, createInitialUiState, createUiSlice, type UiSlice } from './uiSlice.js';
 
 /** Derives a project's display name from a chosen file path, e.g. "/a/b/My Album.eppproj" -> "My Album". */
 function deriveProjectNameFromPath(filePath: string): string {
@@ -31,6 +31,10 @@ export type EPPStore = DocumentSlice &
     openProject: () => Promise<boolean>;
     /** Relinks a "missing" ImageAsset to a newly chosen file. No-op if the native picker is canceled. */
     relinkImage: (imageAssetId: string) => Promise<void>;
+    /** Appends a new page with the app's default page config and a blank rootNode, and makes it the active page. */
+    addPage: () => void;
+    /** Removes a page. No-op if it's the only remaining page. If it was the active page, activates the neighboring page that shifts into its former position (or the previous page, if it was last). */
+    removePage: (pageId: string) => void;
   };
 
 export const useEPPStore = create<EPPStore>()(
@@ -103,6 +107,41 @@ export const useEPPStore = create<EPPStore>()(
           imagePool: s.imagePool.map((asset) =>
             asset.id === imageAssetId ? { ...asset, ...refreshed, missing: undefined } : asset,
           ),
+        }));
+      },
+      addPage: () => {
+        // A single set() call for both document and ui: zundo pushes one history entry per
+        // set() call regardless of whether the tracked (document) slice actually changed, so
+        // calling the separate setActivePageId action here would fragment this into two undo
+        // steps instead of one.
+        const newPage = createDefaultPage();
+        set((s) => ({
+          document: { pages: [...s.document.pages, newPage] },
+          ui: computeActivePageUi(s.ui, newPage.id, newPage),
+        }));
+      },
+      removePage: (pageId) => {
+        const state = get();
+        if (state.document.pages.length <= 1) {
+          return;
+        }
+
+        const removedIndex = state.document.pages.findIndex((page) => page.id === pageId);
+        if (removedIndex === -1) {
+          return;
+        }
+
+        const remainingPages = state.document.pages.filter((page) => page.id !== pageId);
+
+        if (state.ui.activePageId !== pageId) {
+          set({ document: { pages: remainingPages } });
+          return;
+        }
+
+        const neighbor = remainingPages[Math.min(removedIndex, remainingPages.length - 1)];
+        set((s) => ({
+          document: { pages: remainingPages },
+          ui: computeActivePageUi(s.ui, neighbor.id, neighbor),
         }));
       },
     }),

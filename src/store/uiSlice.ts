@@ -1,4 +1,4 @@
-import type { EPPProjectPage } from '@epp/layout-engine';
+import { isSimpleModeCompatible, type EPPProjectPage } from '@epp/layout-engine';
 
 export interface UiState {
   activePageId: string;
@@ -39,6 +39,29 @@ function computeDefaultSelection(layoutMode: UiState['layoutMode'], page: EPPPro
   return layoutMode === 'simple' && page ? [page.rootNode.id] : [];
 }
 
+/**
+ * Computes the full `ui` patch for activating a given page: the layout mode always follows the
+ * newly active page's own structure (see page-navigation spec) rather than persisting whatever
+ * mode the previous page was in. Exported so cross-slice actions (e.g. addPage/removePage in
+ * store/index.ts) can fold this into their own single `set()` call instead of calling
+ * `setActivePageId` as a second, separately-tracked `set()` — zundo pushes one history entry per
+ * `set()` call regardless of whether the tracked slice changed, so two calls would fragment one
+ * logical action into two undo steps.
+ */
+export function computeActivePageUi(currentUi: UiState, activePageId: string, nextPage: EPPProjectPage | undefined): UiState {
+  const layoutMode = nextPage
+    ? isSimpleModeCompatible(nextPage.rootNode)
+      ? 'simple'
+      : 'nested'
+    : currentUi.layoutMode;
+  return {
+    ...currentUi,
+    activePageId,
+    layoutMode,
+    selectedElementIds: computeDefaultSelection(layoutMode, nextPage),
+  };
+}
+
 export function createUiSlice(
   set: (
     updater: (state: { ui: UiState }) => Partial<{ ui: UiState }>,
@@ -49,9 +72,7 @@ export function createUiSlice(
     ui: createInitialUiState(),
     setActivePageId: (activePageId) => {
       const nextPage = get().document.pages.find((page) => page.id === activePageId);
-      set((state) => ({
-        ui: { ...state.ui, activePageId, selectedElementIds: computeDefaultSelection(state.ui.layoutMode, nextPage) },
-      }));
+      set((state) => ({ ui: computeActivePageUi(state.ui, activePageId, nextPage) }));
     },
     setSelectedElementIds: (selectedElementIds) => {
       set((state) => ({ ui: { ...state.ui, selectedElementIds } }));

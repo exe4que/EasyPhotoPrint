@@ -14,6 +14,7 @@ import { useEPPStore } from '../../store/index.js';
 import { DimensionOverlay } from './DimensionOverlay.js';
 import { FreeformElementView } from './FreeformElement.js';
 import { NodeDivider } from './NodeDivider.js';
+import { PageSwitcher } from '../../components/panels/PageSwitcher.js';
 
 const PREVIEW_ZOOM_FALLBACK = 0.38;
 const PREVIEW_INNER_PADDING_PX = 48;
@@ -613,6 +614,9 @@ export function PageStage() {
           })}
           </div>
         </div>
+      </div>
+      <div className="flex justify-center mt-4">
+        <PageSwitcher />
       </div>
     </section>
   );

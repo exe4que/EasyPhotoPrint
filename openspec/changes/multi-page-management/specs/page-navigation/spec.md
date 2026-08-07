@@ -68,3 +68,19 @@ Whenever the active page changes — via the page switcher, adding a page, or re
 #### Scenario: A newly added page opens in Simple mode
 - **WHEN** a page is added via the "Add Page" control
 - **THEN** the layout mode becomes Simple, since a newly added page's blank single-`imageSlot` `rootNode` is always Simple-mode compatible
+
+### Requirement: The Active Page Re-Anchors After Undo or Redo
+Because undo/redo apply raw `document` snapshots and the active page id is UI state excluded from that tracked history (per the `undo-redo` capability), an undo or redo can leave the active page id pointing at a page that no longer exists in the reverted-to `document.pages` (for example, undoing an "Add Page"). Whenever this happens, the application SHALL re-anchor the active page to the document's first page immediately after the undo or redo completes, without that re-anchoring itself becoming a new undo/redo history entry.
+
+#### Scenario: Undoing the addition of a page re-anchors away from the now-deleted page
+- **WHEN** the active page is a page that was just added, and the user undoes that addition
+- **THEN** the active page becomes the document's first page
+- **AND** no new entry is added to the undo/redo history for this re-anchoring
+
+#### Scenario: Redoing the removal of the active page re-anchors to a page that still exists
+- **WHEN** the active page was removed, its neighbor became active, and the user redoes back past a state where that neighbor itself no longer exists in the resulting document
+- **THEN** the active page re-anchors to the document's first page rather than remaining on a nonexistent page id
+
+#### Scenario: An undo or redo that leaves the active page intact does not re-anchor
+- **WHEN** an undo or redo completes and the active page id still refers to a page present in the resulting `document.pages`
+- **THEN** the active page id is left unchanged

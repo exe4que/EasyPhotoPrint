@@ -4,8 +4,7 @@ import { PreviewStage } from './PreviewStage.js';
 
 /** Full-screen, gizmo-free print preview -- replaces the entire editor layout while
  * `ui.viewMode === 'preview'`. "Export PDF" and "Print" are visually present but intentionally
- * inert in this iteration; see print-preview spec, "Export and Print Controls Are Present
- * Without Behavior". */
+ * inert in this iteration -- wiring them to the actual PDF/print pipeline is future work. */
 export function PreviewScreen() {
   const setViewMode = useEPPStore((state) => state.setViewMode);
 

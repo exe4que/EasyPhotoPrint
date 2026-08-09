@@ -36,7 +36,7 @@ function collectFreeformCanvasNodes(node: LayoutNode): LayoutNode[] {
  * badges, hover states, drag-and-drop, dividers, or padding outline -- just the page at
  * fit-to-screen zoom with every placed image rendered exactly as the editor renders it (via the
  * same `SlotImage` the editor canvas uses). Unassigned slots and empty freeform elements render
- * as nothing, per the print-preview spec.
+ * as nothing.
  */
 export function PreviewStage() {
   const { page, pageBox, layout } = useLayoutResolution();
@@ -120,6 +120,7 @@ export function PreviewStage() {
                   rotationDeg={imageSlotConfig?.imageRotationDeg}
                   zoom={zoom}
                   unsatisfiedSizeContext="slot"
+                  showDiagnostics={false}
                 />
               </div>
             );
@@ -170,6 +171,10 @@ export function PreviewStage() {
                       height: mmToPx(heightMm, zoom),
                       transform: `rotate(${rotationDeg}deg)`,
                       transformOrigin: 'center',
+                      // Matches the editor's stacking order (FreeformElement.tsx) so overlapping
+                      // elements paint in the same order in preview -- element.zIndex isn't
+                      // reassigned on delete, so array order alone can drift from it over time.
+                      zIndex: (element.zIndex ?? 0) + 1,
                     }}
                   >
                     <SlotImage
@@ -181,6 +186,7 @@ export function PreviewStage() {
                       rotationDeg={undefined}
                       zoom={zoom}
                       unsatisfiedSizeContext="element"
+                      showDiagnostics={false}
                     />
                   </div>
                 );

@@ -13,6 +13,10 @@ interface SlotImageProps {
   zoom: number;
   /** Which noun the "specific size doesn't fit" tooltip uses — grid/flex imageSlots vs. freeform elements word it differently. */
   unsatisfiedSizeContext: 'slot' | 'element';
+  /** The unsatisfied-size outline/tooltip is an authoring-time warning, not something that would
+   * ever appear on the printed page — editor callers (PageStage, FreeformElementView) pass true,
+   * the print-preview screen passes false so it stays free of every editing gizmo. */
+  showDiagnostics: boolean;
 }
 
 /**
@@ -30,6 +34,7 @@ export function SlotImage({
   rotationDeg,
   zoom,
   unsatisfiedSizeContext,
+  showDiagnostics,
 }: SlotImageProps) {
   if (asset.missing) {
     return (
@@ -42,7 +47,7 @@ export function SlotImage({
   }
 
   const slotBox = { x: 0, y: 0, w: widthMm, h: heightMm };
-  const unsatisfied = scalingRule === 'specificSize' && isSpecificSizeUnsatisfied(specificSizeMm, slotBox);
+  const unsatisfied = showDiagnostics && scalingRule === 'specificSize' && isSpecificSizeUnsatisfied(specificSizeMm, slotBox);
   // Pre-rotation size, centered on the slot's own center then CSS-rotated -- the rotated
   // bounding box lands exactly on the slot with no offset math. At 90/270, this is routinely
   // wider than the slot itself (that's the point -- it's staged to become the slot's height

@@ -101,125 +101,127 @@ export function App() {
     };
   }, [clearSelection, viewMode, setViewMode]);
 
-  if (viewMode === 'preview') {
-    return <PreviewScreen />;
-  }
-
   return (
-    <main className="flex h-screen flex-col overflow-hidden bg-slate-950 text-slate-100">
-      <div className="sticky top-0 z-30 flex-none border-b border-slate-800 bg-slate-900/80 backdrop-blur">
-        <div className="mx-auto flex max-w-[1800px] items-center justify-between gap-4 px-6 py-4">
-          <div>
-            <h1 className="text-lg font-semibold text-white">Easy Photo Print</h1>
-            <p className="text-sm text-slate-400">
-              Electron shell + shared layout engine + persisted unit settings.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <UnitToggle />
-            <button
-              type="button"
-              onClick={() => setViewMode('preview')}
-              className="rounded-lg border border-cyan-500/60 bg-cyan-500/10 px-3 py-2 text-sm font-medium text-cyan-200 hover:bg-cyan-500/20"
-            >
-              Preview
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className="min-h-0 flex-1 px-6 py-6">
-        <div className="mx-auto grid h-full max-w-[1800px] gap-6 lg:grid-cols-[320px_minmax(0,1fr)_360px]">
-          <aside className="min-h-0 space-y-4 overflow-y-auto pr-1">
-            <CollapsiblePanel title="Document" defaultCollapsed={false}>
-              <dl className="grid gap-3 text-sm">
-                <div className="flex items-center justify-between">
-                  <dt className="text-slate-400">Pages</dt>
-                  <dd>{pageCount}</dd>
-                </div>
-                <div className="flex items-center justify-between">
-                  <dt className="text-slate-400">Current layout mode</dt>
-                  <dd className="capitalize">{layoutMode}</dd>
-                </div>
-                <div className="flex items-center justify-between">
-                  <dt className="text-slate-400">Image pool</dt>
-                  <dd>{imageCount}</dd>
-                </div>
-                <div className="flex items-center justify-between">
-                  <dt className="text-slate-400">Page size</dt>
-                  <dd>{`${formatLength(pageBox.w, unitSystem)} x ${formatLength(pageBox.h, unitSystem)}`}</dd>
-                </div>
-                <div className="flex items-center justify-between">
-                  <dt className="text-slate-400">Orientation</dt>
-                  <dd className="capitalize">{page.pageConfig.orientation}</dd>
-                </div>
-              </dl>
-
-              <div className="mt-4 grid grid-cols-2 gap-2">
-                {(['simple', 'nested'] as const).map((mode) => {
-                  const isDisabled = mode === 'simple' && !isSimpleModeAvailable;
-                  return (
-                    <button
-                      key={mode}
-                      type="button"
-                      disabled={isDisabled}
-                      title={
-                        isDisabled
-                          ? 'Simple mode requires a layout with at most two levels, where the bottom level is only image slots.'
-                          : undefined
-                      }
-                      onClick={() => {
-                        if (mode === 'simple') {
-                          normalizePageForSimpleMode(activePageId);
-                        }
-                        setLayoutMode(mode);
-                      }}
-                      className={`rounded-lg border px-3 py-2 text-xs font-medium uppercase tracking-wide ${
-                        layoutMode === mode
-                          ? 'border-cyan-500 bg-cyan-500/10 text-cyan-200'
-                          : isDisabled
-                            ? 'cursor-not-allowed border-slate-800 bg-slate-950 text-slate-600'
-                            : 'border-slate-700 bg-slate-950 text-slate-300 hover:border-slate-600'
-                      }`}
-                    >
-                      {mode}
-                    </button>
-                  );
-                })}
+    <>
+      {viewMode === 'preview' ? (
+        <PreviewScreen />
+      ) : (
+        <main className="flex h-screen flex-col overflow-hidden bg-slate-950 text-slate-100">
+          <div className="sticky top-0 z-30 flex-none border-b border-slate-800 bg-slate-900/80 backdrop-blur">
+            <div className="mx-auto flex max-w-[1800px] items-center justify-between gap-4 px-6 py-4">
+              <div>
+                <h1 className="text-lg font-semibold text-white">Easy Photo Print</h1>
+                <p className="text-sm text-slate-400">
+                  Electron shell + shared layout engine + persisted unit settings.
+                </p>
               </div>
-            </CollapsiblePanel>
 
-            <PageSetupPanel />
-            <SaveTemplateDialog templates={templateLibrary.templates} onSaved={templateLibrary.reload} />
-            <TemplateGallery
-              templates={templateLibrary.templates}
-              isLoading={templateLibrary.isLoading}
-              errorMessage={templateLibrary.errorMessage}
-              onReload={templateLibrary.reload}
-            />
-            {layoutMode === 'nested' ? <LayoutTreePanel /> : null}
-          </aside>
-
-          <div className="flex h-full min-h-0 flex-col gap-4">
-            <div className="min-h-0 flex-1">
-              <PageStage />
+              <div className="flex items-center gap-3">
+                <UnitToggle />
+                <button
+                  type="button"
+                  onClick={() => setViewMode('preview')}
+                  className="rounded-lg border border-cyan-500/60 bg-cyan-500/10 px-3 py-2 text-sm font-medium text-cyan-200 hover:bg-cyan-500/20"
+                >
+                  Preview
+                </button>
+              </div>
             </div>
-            <ImageLibraryPanel
-              selectedImageAssetId={selectedImageAssetId}
-              onSelectImageAssetId={setSelectedImageAssetId}
-            />
           </div>
 
-          <aside className="min-h-0 space-y-4 overflow-y-auto pr-1">
-            <SelectionPanel
-              selectedImageAssetId={selectedImageAssetId}
-              onClearSelectedImage={() => setSelectedImageAssetId(null)}
-            />
-            <PropertiesPanel />
-          </aside>
-        </div>
-      </div>
+          <div className="min-h-0 flex-1 px-6 py-6">
+            <div className="mx-auto grid h-full max-w-[1800px] gap-6 lg:grid-cols-[320px_minmax(0,1fr)_360px]">
+              <aside className="min-h-0 space-y-4 overflow-y-auto pr-1">
+                <CollapsiblePanel title="Document" defaultCollapsed={false}>
+                  <dl className="grid gap-3 text-sm">
+                    <div className="flex items-center justify-between">
+                      <dt className="text-slate-400">Pages</dt>
+                      <dd>{pageCount}</dd>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <dt className="text-slate-400">Current layout mode</dt>
+                      <dd className="capitalize">{layoutMode}</dd>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <dt className="text-slate-400">Image pool</dt>
+                      <dd>{imageCount}</dd>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <dt className="text-slate-400">Page size</dt>
+                      <dd>{`${formatLength(pageBox.w, unitSystem)} x ${formatLength(pageBox.h, unitSystem)}`}</dd>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <dt className="text-slate-400">Orientation</dt>
+                      <dd className="capitalize">{page.pageConfig.orientation}</dd>
+                    </div>
+                  </dl>
+
+                  <div className="mt-4 grid grid-cols-2 gap-2">
+                    {(['simple', 'nested'] as const).map((mode) => {
+                      const isDisabled = mode === 'simple' && !isSimpleModeAvailable;
+                      return (
+                        <button
+                          key={mode}
+                          type="button"
+                          disabled={isDisabled}
+                          title={
+                            isDisabled
+                              ? 'Simple mode requires a layout with at most two levels, where the bottom level is only image slots.'
+                              : undefined
+                          }
+                          onClick={() => {
+                            if (mode === 'simple') {
+                              normalizePageForSimpleMode(activePageId);
+                            }
+                            setLayoutMode(mode);
+                          }}
+                          className={`rounded-lg border px-3 py-2 text-xs font-medium uppercase tracking-wide ${
+                            layoutMode === mode
+                              ? 'border-cyan-500 bg-cyan-500/10 text-cyan-200'
+                              : isDisabled
+                                ? 'cursor-not-allowed border-slate-800 bg-slate-950 text-slate-600'
+                                : 'border-slate-700 bg-slate-950 text-slate-300 hover:border-slate-600'
+                          }`}
+                        >
+                          {mode}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </CollapsiblePanel>
+
+                <PageSetupPanel />
+                <SaveTemplateDialog templates={templateLibrary.templates} onSaved={templateLibrary.reload} />
+                <TemplateGallery
+                  templates={templateLibrary.templates}
+                  isLoading={templateLibrary.isLoading}
+                  errorMessage={templateLibrary.errorMessage}
+                  onReload={templateLibrary.reload}
+                />
+                {layoutMode === 'nested' ? <LayoutTreePanel /> : null}
+              </aside>
+
+              <div className="flex h-full min-h-0 flex-col gap-4">
+                <div className="min-h-0 flex-1">
+                  <PageStage />
+                </div>
+                <ImageLibraryPanel
+                  selectedImageAssetId={selectedImageAssetId}
+                  onSelectImageAssetId={setSelectedImageAssetId}
+                />
+              </div>
+
+              <aside className="min-h-0 space-y-4 overflow-y-auto pr-1">
+                <SelectionPanel
+                  selectedImageAssetId={selectedImageAssetId}
+                  onClearSelectedImage={() => setSelectedImageAssetId(null)}
+                />
+                <PropertiesPanel />
+              </aside>
+            </div>
+          </div>
+        </main>
+      )}
 
       <ConfirmDialog
         open={isNewProjectConfirmOpen}
@@ -281,6 +283,6 @@ export function App() {
           ))}
         </ul>
       </ConfirmDialog>
-    </main>
+    </>
   );
 }

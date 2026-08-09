@@ -338,6 +338,7 @@ export function PageStage() {
                           rotationDeg={imageSlotConfig?.imageRotationDeg}
                           zoom={previewZoom}
                           unsatisfiedSizeContext="slot"
+                          showDiagnostics
                         />
                       );
                     })()

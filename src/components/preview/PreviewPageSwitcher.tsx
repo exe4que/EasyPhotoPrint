@@ -2,7 +2,7 @@ import { useEPPStore } from '../../store/index.js';
 
 /** Page navigation for the print-preview screen: previous/next and "Page N of M" only -- no
  * Add/Remove controls, since those are editing actions that don't belong in a print-faithful
- * preview (see print-preview spec, "Page Navigation Within Preview"). */
+ * preview. */
 export function PreviewPageSwitcher() {
   const pages = useEPPStore((state) => state.document.pages);
   const activePageId = useEPPStore((state) => state.ui.activePageId);

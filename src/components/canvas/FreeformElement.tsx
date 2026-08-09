@@ -196,6 +196,7 @@ export function FreeformElementView({
             rotationDeg={undefined}
             zoom={previewZoom}
             unsatisfiedSizeContext="element"
+            showDiagnostics
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-slate-800/80 text-[10px] text-slate-400">Empty</div>

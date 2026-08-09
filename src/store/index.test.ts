@@ -66,12 +66,12 @@ describe('startNewProject', () => {
   });
 });
 
-describe('setViewMode', () => {
+describe('UI-only actions do not pollute undo/redo history', () => {
   afterEach(() => {
     useEPPStore.getState().startNewProject();
   });
 
-  it('toggles ui.viewMode without pushing an undo/redo history entry', () => {
+  it('setViewMode toggles ui.viewMode without pushing an undo/redo history entry', () => {
     const pastBefore = useEPPStore.temporal.getState().pastStates.length;
 
     useEPPStore.getState().setViewMode('preview');
@@ -81,6 +81,73 @@ describe('setViewMode', () => {
     useEPPStore.getState().setViewMode('editor');
     expect(useEPPStore.getState().ui.viewMode).toBe('editor');
     expect(useEPPStore.temporal.getState().pastStates.length).toBe(pastBefore);
+  });
+
+  it('setSelectedElementIds does not push a history entry', () => {
+    const pastBefore = useEPPStore.temporal.getState().pastStates.length;
+
+    useEPPStore.getState().setSelectedElementIds(['some-node']);
+
+    expect(useEPPStore.getState().ui.selectedElementIds).toEqual(['some-node']);
+    expect(useEPPStore.temporal.getState().pastStates.length).toBe(pastBefore);
+  });
+
+  it('setActiveTool does not push a history entry', () => {
+    const pastBefore = useEPPStore.temporal.getState().pastStates.length;
+
+    useEPPStore.getState().setActiveTool('pan');
+
+    expect(useEPPStore.getState().ui.activeTool).toBe('pan');
+    expect(useEPPStore.temporal.getState().pastStates.length).toBe(pastBefore);
+  });
+
+  it('clearSelection does not push a history entry', () => {
+    useEPPStore.getState().setSelectedElementIds(['some-node']);
+    const pastBefore = useEPPStore.temporal.getState().pastStates.length;
+
+    useEPPStore.getState().clearSelection();
+
+    expect(useEPPStore.temporal.getState().pastStates.length).toBe(pastBefore);
+  });
+
+  it('setActivePageId switching to an existing page does not push a history entry', () => {
+    useEPPStore.getState().addPage();
+    const secondPageId = useEPPStore.getState().document.pages[1].id;
+    const pastBefore = useEPPStore.temporal.getState().pastStates.length;
+
+    useEPPStore.getState().setActivePageId('page-1');
+    expect(useEPPStore.getState().ui.activePageId).toBe('page-1');
+    expect(useEPPStore.temporal.getState().pastStates.length).toBe(pastBefore);
+
+    useEPPStore.getState().setActivePageId(secondPageId);
+    expect(useEPPStore.getState().ui.activePageId).toBe(secondPageId);
+    expect(useEPPStore.temporal.getState().pastStates.length).toBe(pastBefore);
+  });
+
+  it('a sequence of UI-only actions after an undo does not clear the redo stack', () => {
+    useEPPStore.getState().updatePageConfig('page-1', { orientation: 'landscape' });
+    expect(useEPPStore.getState().document.pages[0].pageConfig.orientation).toBe('landscape');
+
+    useEPPStore.getState().undo();
+    expect(useEPPStore.getState().document.pages[0].pageConfig.orientation).toBe('portrait');
+    expect(useEPPStore.temporal.getState().futureStates.length).toBeGreaterThan(0);
+    const futureBefore = useEPPStore.temporal.getState().futureStates.length;
+
+    useEPPStore.getState().setSelectedElementIds(['some-node']);
+    useEPPStore.getState().setActiveTool('pan');
+    useEPPStore.getState().clearSelection();
+    expect(useEPPStore.temporal.getState().futureStates.length).toBe(futureBefore);
+
+    useEPPStore.getState().redo();
+    expect(useEPPStore.getState().document.pages[0].pageConfig.orientation).toBe('landscape');
+  });
+
+  it('a real document-mutating action still produces exactly one history entry', () => {
+    const pastBefore = useEPPStore.temporal.getState().pastStates.length;
+
+    useEPPStore.getState().addPage();
+
+    expect(useEPPStore.temporal.getState().pastStates.length).toBe(pastBefore + 1);
   });
 });
 
@@ -294,7 +361,10 @@ describe('openProject', () => {
   });
 
   it('replaces document/imagePool, clears undo history, and remembers the opened path', async () => {
-    useEPPStore.getState().setActiveTool('pan');
+    // A real document change, not a ui-only one -- ui-only actions correctly no longer push
+    // history (that's the very bug this store's `equality` config fixes), so this needs an
+    // actual document mutation to populate pastStates before asserting openProject clears it.
+    useEPPStore.getState().addPage();
     expect(useEPPStore.temporal.getState().pastStates.length).toBeGreaterThan(0);
 
     const openedProject: EPPProject = {

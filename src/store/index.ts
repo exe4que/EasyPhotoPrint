@@ -66,6 +66,16 @@ export const useEPPStore = create<EPPStore>()(
         ...createImagePoolSlice(set as never),
         ...createSettingsSlice(set as never),
         ...createProjectSlice(),
+        // Overrides createUiSlice's plain setViewMode: without pausing, zundo's temporal `set()`
+        // wrapper pushes a pastState on every call regardless of whether the tracked `document`
+        // slice actually changed (see zundo's temporalHandleSet, which only skips a push when a
+        // `diff`/`equality` option says nothing changed -- this store configures neither). Same
+        // pause/resume precaution reanchorActivePageId already needs below for the same reason.
+        setViewMode: (viewMode) => {
+          useEPPStore.temporal.getState().pause();
+          set((state) => ({ ui: { ...state.ui, viewMode } }));
+          useEPPStore.temporal.getState().resume();
+        },
         pauseHistory: () => {
           useEPPStore.temporal.getState().pause();
         },

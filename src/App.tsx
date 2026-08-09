@@ -7,6 +7,7 @@ import { LayoutTreePanel } from './components/panels/LayoutTreePanel.js';
 import { PageSetupPanel } from './components/panels/PageSetupPanel.js';
 import { PropertiesPanel } from './components/panels/PropertiesPanel.js';
 import { SelectionPanel } from './components/panels/SelectionPanel.js';
+import { PreviewScreen } from './components/preview/PreviewScreen.js';
 import { UnitToggle } from './components/settings/UnitToggle.js';
 import { SaveTemplateDialog } from './components/templates/SaveTemplateDialog.js';
 import { TemplateGallery } from './components/templates/TemplateGallery.js';
@@ -29,6 +30,8 @@ export function App() {
   const unitSystem = useEPPStore((state) => state.settings.unitSystem);
   const layoutMode = useEPPStore((state) => state.ui.layoutMode);
   const setLayoutMode = useEPPStore((state) => state.setLayoutMode);
+  const viewMode = useEPPStore((state) => state.ui.viewMode);
+  const setViewMode = useEPPStore((state) => state.setViewMode);
   const normalizePageForSimpleMode = useEPPStore((state) => state.normalizePageForSimpleMode);
   const startNewProject = useEPPStore((state) => state.startNewProject);
   const openProject = useEPPStore((state) => state.openProject);
@@ -82,16 +85,25 @@ export function App() {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        clearSelection();
+      if (event.key !== 'Escape') {
+        return;
       }
+      if (viewMode === 'preview') {
+        setViewMode('editor');
+        return;
+      }
+      clearSelection();
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [clearSelection]);
+  }, [clearSelection, viewMode, setViewMode]);
+
+  if (viewMode === 'preview') {
+    return <PreviewScreen />;
+  }
 
   return (
     <main className="flex h-screen flex-col overflow-hidden bg-slate-950 text-slate-100">
@@ -106,6 +118,13 @@ export function App() {
 
           <div className="flex items-center gap-3">
             <UnitToggle />
+            <button
+              type="button"
+              onClick={() => setViewMode('preview')}
+              className="rounded-lg border border-cyan-500/60 bg-cyan-500/10 px-3 py-2 text-sm font-medium text-cyan-200 hover:bg-cyan-500/20"
+            >
+              Preview
+            </button>
           </div>
         </div>
       </div>

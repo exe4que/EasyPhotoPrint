@@ -8,9 +8,10 @@ import {
 } from '@epp/layout-engine';
 import { useRef, useState } from 'react';
 
-import { computeImageDisplayRectMm, isSpecificSizeUnsatisfied, scalingRuleToObjectFit } from '../../lib/imageDisplay.js';
+import { computeImageDisplayRectMm } from '../../lib/imageDisplay.js';
 import { formatLength, mmToPx, pxToMm, type UnitSystem } from '../../lib/units.js';
 import { DimensionOverlay } from './DimensionOverlay.js';
+import { SlotImage } from './SlotImage.js';
 
 function normalizeRotationDeg(deg: number): number {
   return (((deg + 180) % 360) + 360) % 360 - 180;
@@ -138,7 +139,6 @@ export function FreeformElementView({
     ? computeImageDisplayRectMm(asset, { x: 0, y: 0, w: widthMm, h: heightMm }, scalingRule, specificSizeMm)
     : null;
   const isSpecificSize = scalingRule === 'specificSize' && !!specificSizeMm;
-  const specificSizeUnsatisfied = isSpecificSize && isSpecificSizeUnsatisfied(specificSizeMm, { x: 0, y: 0, w: widthMm, h: heightMm });
 
   return (
     <div
@@ -186,35 +186,17 @@ export function FreeformElementView({
           isSelected ? 'border-cyan-500 ring-2 ring-cyan-500/40' : 'border-white/50 hover:border-white'
         }`}
       >
-        {asset?.missing ? (
-          <div className="flex h-full w-full flex-col items-center justify-center gap-1 border-2 border-dashed border-amber-500/50 bg-amber-950/30 px-2 text-center">
-            <span className="text-sm font-semibold text-amber-400">!</span>
-            <span className="text-[10px] font-medium text-amber-300">Image missing</span>
-          </div>
-        ) : asset && displayRect ? (
-          isSpecificSize ? (
-            <img
-              src={asset.thumbnailDataUrl}
-              alt={asset.fileName}
-              title={specificSizeUnsatisfied ? 'El tamaño específico no entra en el espacio disponible del elemento' : undefined}
-              className={`pointer-events-none absolute object-fill ${
-                specificSizeUnsatisfied ? 'outline outline-2 outline-offset-[-2px] outline-rose-500' : ''
-              }`}
-              style={{
-                left: mmToPx(displayRect.offsetXMm, previewZoom),
-                top: mmToPx(displayRect.offsetYMm, previewZoom),
-                width: mmToPx(displayRect.widthMm, previewZoom),
-                height: mmToPx(displayRect.heightMm, previewZoom),
-              }}
-            />
-          ) : (
-            <img
-              src={asset.thumbnailDataUrl}
-              alt={asset.fileName}
-              className="pointer-events-none h-full w-full"
-              style={{ objectFit: scalingRuleToObjectFit(scalingRule) }}
-            />
-          )
+        {asset ? (
+          <SlotImage
+            asset={asset}
+            widthMm={widthMm}
+            heightMm={heightMm}
+            scalingRule={scalingRule}
+            specificSizeMm={specificSizeMm}
+            rotationDeg={undefined}
+            zoom={previewZoom}
+            unsatisfiedSizeContext="element"
+          />
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-slate-800/80 text-[10px] text-slate-400">Empty</div>
         )}

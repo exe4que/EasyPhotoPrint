@@ -117,6 +117,29 @@ describe('ui slice', () => {
     expect(state.ui.selectedElementIds).toEqual(['root-of-page-1']);
   });
 
+  it('viewMode defaults to editor and setViewMode toggles it without touching other ui state', () => {
+    let state: StoreState = {
+      ...createUiSlice(
+        (updater) => {
+          state = { ...state, ...updater(state) } as StoreState;
+        },
+        () => state,
+      ),
+      document: { pages: [createTestPage('page-1')] },
+    };
+
+    expect(state.ui.viewMode).toBe('editor');
+
+    state.setSelectedElementIds(['root-of-page-1']);
+    state.setViewMode('preview');
+    expect(state.ui.viewMode).toBe('preview');
+    expect(state.ui.selectedElementIds).toEqual(['root-of-page-1']);
+    expect(state.ui.activePageId).toBe('page-1');
+
+    state.setViewMode('editor');
+    expect(state.ui.viewMode).toBe('editor');
+  });
+
   it('setActivePageId keeps the current layout mode when the target id does not resolve to a page', () => {
     let state: StoreState = {
       ...createUiSlice(

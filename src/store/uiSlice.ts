@@ -5,6 +5,7 @@ export interface UiState {
   selectedElementIds: string[];
   activeTool: 'select' | 'pan' | 'crop';
   layoutMode: 'simple' | 'nested';
+  viewMode: 'editor' | 'preview';
 }
 
 export interface UiSlice {
@@ -13,6 +14,7 @@ export interface UiSlice {
   setSelectedElementIds: (ids: string[]) => void;
   setActiveTool: (tool: UiState['activeTool']) => void;
   setLayoutMode: (mode: UiState['layoutMode']) => void;
+  setViewMode: (mode: UiState['viewMode']) => void;
   clearSelection: () => void;
 }
 
@@ -22,6 +24,7 @@ export function createInitialUiState(): UiState {
     selectedElementIds: [],
     activeTool: 'select',
     layoutMode: 'simple',
+    viewMode: 'editor',
   };
 }
 
@@ -79,6 +82,9 @@ export function createUiSlice(
     },
     setActiveTool: (activeTool) => {
       set((state) => ({ ui: { ...state.ui, activeTool } }));
+    },
+    setViewMode: (viewMode) => {
+      set((state) => ({ ui: { ...state.ui, viewMode } }));
     },
     setLayoutMode: (layoutMode) => {
       const state = get();

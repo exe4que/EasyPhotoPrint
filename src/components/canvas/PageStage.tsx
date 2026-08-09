@@ -2,18 +2,14 @@ import { isDividerLocked, type LayoutNode } from '@epp/layout-engine';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useDragAndDrop } from '../../hooks/useDragAndDrop.js';
-import {
-  computeImageDisplayRectMm,
-  computeImageRenderRectMm,
-  isSpecificSizeUnsatisfied,
-  scalingRuleToObjectFit,
-} from '../../lib/imageDisplay.js';
+import { computeImageDisplayRectMm } from '../../lib/imageDisplay.js';
 import { formatLength, mmToPx, pxToMm } from '../../lib/units.js';
 import { useLayoutResolution } from '../../hooks/useLayoutResolution.js';
 import { useEPPStore } from '../../store/index.js';
 import { DimensionOverlay } from './DimensionOverlay.js';
 import { FreeformElementView } from './FreeformElement.js';
 import { NodeDivider } from './NodeDivider.js';
+import { SlotImage } from './SlotImage.js';
 import { PageSwitcher } from '../../components/panels/PageSwitcher.js';
 
 const PREVIEW_ZOOM_FALLBACK = 0.38;
@@ -331,72 +327,18 @@ export function PageStage() {
                 {page.assignments[id] && imageAssetMap.get(page.assignments[id])
                   ? (() => {
                       const asset = imageAssetMap.get(page.assignments[id])!;
-
-                      if (asset.missing) {
-                        return (
-                          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1 border-2 border-dashed border-amber-500/50 bg-amber-950/30 px-2 text-center">
-                            <span className="text-lg font-semibold text-amber-400">!</span>
-                            <span className="text-[11px] font-medium text-amber-300">Image missing</span>
-                            <span className="truncate text-[10px] text-amber-200/70">{asset.fileName}</span>
-                          </div>
-                        );
-                      }
-
                       const imageSlotConfig = imageSlotMap.get(id)?.imageSlotConfig;
-                      const scalingRule = imageSlotConfig?.scalingRule;
-                      const specificSizeMm = imageSlotConfig?.specificSizeMm;
-                      const imageRotationDeg = imageSlotConfig?.imageRotationDeg;
-                      const unsatisfied = scalingRule === 'specificSize' && isSpecificSizeUnsatisfied(specificSizeMm, box);
-                      // Pre-rotation size, centered on the slot's own center then CSS-rotated --
-                      // the rotated bounding box lands exactly on the slot with no offset math.
-                      // At 90/270, this is routinely wider than the slot itself (that's the point --
-                      // it's staged to become the slot's height once rotated), so the <img> below
-                      // must override the base stylesheet's `max-width: 100%`, or the browser clips
-                      // it to the slot's own width *before* rotating, corrupting the whole layout.
-                      const renderRect = computeImageRenderRectMm(asset, box, scalingRule, specificSizeMm, imageRotationDeg);
-                      const renderLeftMm = box.w / 2 - renderRect.widthMm / 2;
-                      const renderTopMm = box.h / 2 - renderRect.heightMm / 2;
-                      const rotationTransform = imageRotationDeg ? `rotate(${imageRotationDeg}deg)` : undefined;
-
-                      if (scalingRule === 'specificSize' && specificSizeMm) {
-                        return (
-                          <img
-                            src={asset.thumbnailDataUrl}
-                            alt={asset.fileName}
-                            title={unsatisfied ? 'El tamaño específico no entra en el espacio disponible del slot' : undefined}
-                            className={`pointer-events-none absolute object-fill ${
-                              unsatisfied ? 'outline outline-2 outline-offset-[-2px] outline-rose-500' : ''
-                            }`}
-                            style={{
-                              left: mmToPx(renderLeftMm, previewZoom),
-                              top: mmToPx(renderTopMm, previewZoom),
-                              width: mmToPx(renderRect.widthMm, previewZoom),
-                              height: mmToPx(renderRect.heightMm, previewZoom),
-                              maxWidth: 'none',
-                              maxHeight: 'none',
-                              transform: rotationTransform,
-                              transformOrigin: 'center',
-                            }}
-                          />
-                        );
-                      }
-
                       return (
-                        <img
-                          src={asset.thumbnailDataUrl}
-                          alt={asset.fileName}
-                          className="pointer-events-none absolute"
-                          style={{
-                            left: mmToPx(renderLeftMm, previewZoom),
-                            top: mmToPx(renderTopMm, previewZoom),
-                            width: mmToPx(renderRect.widthMm, previewZoom),
-                            height: mmToPx(renderRect.heightMm, previewZoom),
-                            maxWidth: 'none',
-                            maxHeight: 'none',
-                            objectFit: scalingRuleToObjectFit(scalingRule),
-                            transform: rotationTransform,
-                            transformOrigin: 'center',
-                          }}
+                        <SlotImage
+                          asset={asset}
+                          widthMm={box.w}
+                          heightMm={box.h}
+                          scalingRule={imageSlotConfig?.scalingRule}
+                          specificSizeMm={imageSlotConfig?.specificSizeMm}
+                          rotationDeg={imageSlotConfig?.imageRotationDeg}
+                          zoom={previewZoom}
+                          unsatisfiedSizeContext="slot"
+                          showDiagnostics
                         />
                       );
                     })()

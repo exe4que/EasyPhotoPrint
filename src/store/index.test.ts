@@ -59,9 +59,28 @@ describe('startNewProject', () => {
       selectedElementIds: [],
       activeTool: 'select',
       layoutMode: 'simple',
+      viewMode: 'editor',
     });
     expect(useEPPStore.temporal.getState().pastStates).toHaveLength(0);
     expect(useEPPStore.temporal.getState().futureStates).toHaveLength(0);
+  });
+});
+
+describe('setViewMode', () => {
+  afterEach(() => {
+    useEPPStore.getState().startNewProject();
+  });
+
+  it('toggles ui.viewMode without pushing an undo/redo history entry', () => {
+    const pastBefore = useEPPStore.temporal.getState().pastStates.length;
+
+    useEPPStore.getState().setViewMode('preview');
+    expect(useEPPStore.getState().ui.viewMode).toBe('preview');
+    expect(useEPPStore.temporal.getState().pastStates.length).toBe(pastBefore);
+
+    useEPPStore.getState().setViewMode('editor');
+    expect(useEPPStore.getState().ui.viewMode).toBe('editor');
+    expect(useEPPStore.temporal.getState().pastStates.length).toBe(pastBefore);
   });
 });
 

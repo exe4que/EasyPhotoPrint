@@ -20,7 +20,7 @@
 ## 4. Wiring into the app shell
 
 - [x] 4.1 In `src/App.tsx`, add the "Preview" button to the header, to the right of `<UnitToggle />`, calling `setViewMode('preview')`.
-- [x] 4.2 In `src/App.tsx`, branch the root render on `ui.viewMode`: `'editor'` renders the existing layout unchanged, `'preview'` renders the new preview screen (header/aside/canvas/image-library/dialogs all replaced while active).
+- [x] 4.2 In `src/App.tsx`, branch the root render on `ui.viewMode`: `'editor'` renders the existing layout unchanged, `'preview'` renders the new preview screen (header/aside/canvas/image-library replaced while active). **Deviation, caught by `/adversarial-review`**: the three `ConfirmDialog`s (New/Open project, missing images) are NOT replaced by the branch — they render as always-mounted siblings of both branches, since the menu listeners that open them (File > New, File > Open) stay active regardless of `viewMode`, and nesting the dialogs only inside the editor branch left them silently unshown while in preview. See design.md and the branch's fix commit.
 - [x] 4.3 Update the existing `keydown` Escape handler in `src/App.tsx` to check `ui.viewMode` first: in `'preview'`, call `setViewMode('editor')` and return without calling `clearSelection()`; otherwise keep the current behavior unchanged.
 
 ## 5. Tests

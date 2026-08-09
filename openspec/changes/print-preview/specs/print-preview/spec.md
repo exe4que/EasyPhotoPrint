@@ -25,12 +25,16 @@ Every image already placed in the page — in a grid/flex `imageSlot` or as a `f
 - **WHEN** an image is assigned to an `imageSlot`, or placed as a `freeformCanvas` element, with a given scaling rule, specific size, and/or rotation
 - **THEN** the preview renders that image at the same resulting position, scale, and rotation the editor canvas computes for it
 
-### Requirement: Empty Slots Render Blank
-An `imageSlot` with no image assigned SHALL render as empty page background in preview mode, with no placeholder text, border, or other visual indicator of the empty slot's boundaries.
+### Requirement: Empty and Missing-Asset Slots Render Blank
+An `imageSlot` with no image assigned, and an `imageSlot` whose assigned image asset is missing (its source file can no longer be found), SHALL both render as empty page background in preview mode, with no placeholder text, border, badge, or other visual indicator — including the editor's own "Image missing" indicator, which is an authoring-time diagnostic that would never appear on a printed page.
 
 #### Scenario: An unassigned slot shows nothing
 - **WHEN** the active page has an `imageSlot` with no assigned image
 - **THEN** preview mode shows no placeholder text, outline, or badge at that slot's position — only the page's blank background
+
+#### Scenario: A slot with a missing image asset shows nothing
+- **WHEN** the active page has an `imageSlot` assigned to an image asset whose source file is missing
+- **THEN** preview mode shows no "Image missing" indicator, outline, or filename at that slot's position — only the page's blank background, the same as an unassigned slot
 
 ### Requirement: Page Navigation Within Preview
 While in preview mode, the application SHALL provide controls to move to the previous or next page and an indicator of the active page's position among the total page count, using the same active-page navigation the editor's page switcher uses. These controls SHALL NOT include adding or removing pages. Navigating to a different page while in preview mode SHALL remain in preview mode.

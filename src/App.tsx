@@ -88,6 +88,13 @@ export function App() {
       if (event.key !== 'Escape') {
         return;
       }
+      // A ConfirmDialog has its own Escape listener (dismiss the dialog) that fires independently
+      // of this one -- without this guard, Escape while a dialog is open in preview would both
+      // close the dialog and exit preview in the same keystroke, when the user only meant to
+      // dismiss the modal on top.
+      if (isNewProjectConfirmOpen || isOpenProjectConfirmOpen || isMissingImagesDialogOpen) {
+        return;
+      }
       if (viewMode === 'preview') {
         setViewMode('editor');
         return;
@@ -99,7 +106,7 @@ export function App() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [clearSelection, viewMode, setViewMode]);
+  }, [clearSelection, viewMode, setViewMode, isNewProjectConfirmOpen, isOpenProjectConfirmOpen, isMissingImagesDialogOpen]);
 
   return (
     <>

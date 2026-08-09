@@ -13,9 +13,10 @@ interface SlotImageProps {
   zoom: number;
   /** Which noun the "specific size doesn't fit" tooltip uses — grid/flex imageSlots vs. freeform elements word it differently. */
   unsatisfiedSizeContext: 'slot' | 'element';
-  /** The unsatisfied-size outline/tooltip is an authoring-time warning, not something that would
-   * ever appear on the printed page — editor callers (PageStage, FreeformElementView) pass true,
-   * the print-preview screen passes false so it stays free of every editing gizmo. */
+  /** Authoring-time warnings (the unsatisfied-size outline/tooltip, the "Image missing" badge) --
+   * neither would ever appear on the printed page. Editor callers (PageStage, FreeformElementView)
+   * pass true; the print-preview screen passes false so it stays free of every editing gizmo,
+   * rendering a missing image's slot the same blank way an unassigned slot renders. */
   showDiagnostics: boolean;
 }
 
@@ -37,6 +38,9 @@ export function SlotImage({
   showDiagnostics,
 }: SlotImageProps) {
   if (asset.missing) {
+    if (!showDiagnostics) {
+      return null;
+    }
     return (
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1 border-2 border-dashed border-amber-500/50 bg-amber-950/30 px-2 text-center">
         <span className="text-lg font-semibold text-amber-400">!</span>

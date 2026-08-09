@@ -46,18 +46,16 @@ export const useEPPStore = create<EPPStore>()(
     (set, get) => {
       // Undo/redo apply raw document snapshots (see undo-redo spec: ui is intentionally excluded
       // from tracked history), so activePageId can end up pointing at a page that no longer exists
-      // (undoing an addPage) or at a stale neighbor (undoing a removePage). Re-anchoring here — outside
-      // the tracked set() calls, wrapped in pause/resume so it never itself becomes a history entry —
-      // keeps activePageId valid without ever tracking ui through zundo.
+      // (undoing an addPage) or at a stale neighbor (undoing a removePage). Re-anchoring here is a
+      // plain, ui-only set() call -- the store's `equality` option (below, in temporal()'s config)
+      // already keeps any ui-only set() out of tracked history, so no pause/resume is needed here.
       const reanchorActivePageId = () => {
         const state = get();
         if (state.document.pages.some((page) => page.id === state.ui.activePageId)) {
           return;
         }
         const fallback = state.document.pages[0];
-        useEPPStore.temporal.getState().pause();
         set({ ui: computeActivePageUi(state.ui, fallback.id, fallback) });
-        useEPPStore.temporal.getState().resume();
       };
 
       return {
@@ -66,16 +64,6 @@ export const useEPPStore = create<EPPStore>()(
         ...createImagePoolSlice(set as never),
         ...createSettingsSlice(set as never),
         ...createProjectSlice(),
-        // Overrides createUiSlice's plain setViewMode: without pausing, zundo's temporal `set()`
-        // wrapper pushes a pastState on every call regardless of whether the tracked `document`
-        // slice actually changed (see zundo's temporalHandleSet, which only skips a push when a
-        // `diff`/`equality` option says nothing changed -- this store configures neither). Same
-        // pause/resume precaution reanchorActivePageId already needs below for the same reason.
-        setViewMode: (viewMode) => {
-          useEPPStore.temporal.getState().pause();
-          set((state) => ({ ui: { ...state.ui, viewMode } }));
-          useEPPStore.temporal.getState().resume();
-        },
         pauseHistory: () => {
           useEPPStore.temporal.getState().pause();
         },
@@ -189,6 +177,11 @@ export const useEPPStore = create<EPPStore>()(
       partialize: (state) => ({
         document: state.document,
       }),
+      // Without this, zundo pushes a pastState on every set() call regardless of whether the
+      // tracked (partialized) state actually changed -- every document-mutating action always
+      // constructs a fresh `document` object (never mutates in place), so a set() call that
+      // leaves this reference untouched genuinely changed nothing worth tracking.
+      equality: (pastState, currentState) => pastState.document === currentState.document,
     },
   ),
 );

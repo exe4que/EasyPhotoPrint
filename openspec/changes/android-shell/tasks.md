@@ -38,21 +38,21 @@
 
 ## 6. Custom print plugin
 
-- [ ] 6.1 Scaffold a second custom Capacitor plugin (Kotlin) — e.g. `PrintPlugin` — with a `printPdf` method taking base64 PDF bytes.
-- [ ] 6.2 Implement `printPdf` to write the bytes to a temp file and invoke `PrintManager.print(...)` with a `PrintDocumentAdapter` that streams that file, opening Android's native print dialog.
-- [ ] 6.3 Register the plugin and confirm it's callable from TS.
+- [x] 6.1 Scaffold a second custom Capacitor plugin (Kotlin) — e.g. `PrintPlugin` — with a `printPdf` method taking base64 PDF bytes.
+- [x] 6.2 Implement `printPdf` to write the bytes to a temp file and invoke `PrintManager.print(...)` with a `PrintDocumentAdapter` that streams that file, opening Android's native print dialog.
+- [x] 6.3 Register the plugin and confirm it's callable from TS.
 
 ## 7. Wire the remaining adapter members
 
-- [ ] 7.1 Implement `dialog.openImages`: call the SAF plugin's `openImages`, then for each picked file, store its bytes in IndexedDB working storage (5.1) under a fresh `assetId`, decode dimensions and generate a thumbnail via the modules from 5.2/5.3, and return a fully-formed `ImageAsset[]` with `storedPath` set to that `assetId` — the Android counterpart to `fs.handlers.ts`'s `createImageAssetFromPath`.
-- [ ] 7.2 Implement `dialog.relinkImage` using the SAF plugin's `openDocument`, following the same store/decode/thumbnail sequence as 7.1 for a single file.
-- [ ] 7.3 Implement `fs.openProject`: use the SAF plugin's `openDocument` filtered to `.eppproj`, unzip via `fflate` (already a portable dependency), store each bundled image's bytes in IndexedDB working storage under its persisted `assetId`, decode/thumbnail each via 5.2/5.3, and return `{ project, filePath }` with `filePath` set to the opaque `content://` URI string for the project file itself (each image's `storedPath` is set to its `assetId`, not a URI).
-- [ ] 7.4 Implement `fs.saveProject`: zip the project JSON plus every pool image's current bytes (read back from IndexedDB working storage via each asset's `storedPath`/`assetId`) via `fflate`, and write it via the SAF plugin's `createDocument` (first save / Save As) or `writeDocument` (subsequent saves to an already-known URI), returning the URI string.
-- [ ] 7.5 Implement `fs.resetWorkingStorage`: clear the IndexedDB working-storage object store.
-- [ ] 7.6 Implement `images.decodeAtSize` using the modules from 5.2/5.3 against the `Blob` read back from IndexedDB working storage for the requested asset.
-- [ ] 7.7 Implement `pdf.export`: run the composition module from 5.4, then hand the resulting bytes to the SAF plugin's `createDocument` to let the user choose a save location, returning the URI string or `null` if canceled.
-- [ ] 7.8 Implement `print.document`: run the same composition module from 5.4, then pass the resulting bytes to the print plugin's `printPdf`.
-- [ ] 7.9 Implement `templates.list`/`save`/`delete` using the app's private storage (e.g. `@capacitor/preferences` or a private-directory JSON file per template) — templates carry no image references (per `packaged-project-files`'s proposal), so no SAF/content-URI involvement is needed here.
+- [x] 7.1 Implement `dialog.openImages`: call the SAF plugin's `openImages`, then for each picked file, store its bytes in IndexedDB working storage (5.1) under a fresh `assetId`, decode dimensions and generate a thumbnail via the modules from 5.2/5.3, and return a fully-formed `ImageAsset[]` with `storedPath` set to that `assetId` — the Android counterpart to `fs.handlers.ts`'s `createImageAssetFromPath`.
+- [x] 7.2 Implement `dialog.relinkImage` using the SAF plugin's `openDocument`, following the same store/decode/thumbnail sequence as 7.1 for a single file.
+- [x] 7.3 Implement `fs.openProject`: use the SAF plugin's `openDocument` filtered to `.eppproj`, unzip via `fflate` (already a portable dependency), store each bundled image's bytes in IndexedDB working storage under its persisted `assetId`, decode/thumbnail each via 5.2/5.3, and return `{ project, filePath }` with `filePath` set to the opaque `content://` URI string for the project file itself (each image's `storedPath` is set to its `assetId`, not a URI).
+- [x] 7.4 Implement `fs.saveProject`: zip the project JSON plus every pool image's current bytes (read back from IndexedDB working storage via each asset's `storedPath`/`assetId`) via `fflate`, and write it via the SAF plugin's `createDocument` (first save / Save As) or `writeDocument` (subsequent saves to an already-known URI), returning the URI string.
+- [x] 7.5 Implement `fs.resetWorkingStorage`: clear the IndexedDB working-storage object store.
+- [x] 7.6 Implement `images.decodeAtSize` using the modules from 5.2/5.3 against the `Blob` read back from IndexedDB working storage for the requested asset.
+- [x] 7.7 Implement `pdf.export`: run the composition module from 5.4, then hand the resulting bytes to the SAF plugin's `createDocument` to let the user choose a save location, returning the URI string or `null` if canceled.
+- [x] 7.8 Implement `print.document`: run the same composition module from 5.4, then pass the resulting bytes to the print plugin's `printPdf`.
+- [x] 7.9 Implement `templates.list`/`save`/`delete` using the app's private storage (e.g. `@capacitor/preferences` or a private-directory JSON file per template) — templates carry no image references (per `packaged-project-files`'s proposal), so no SAF/content-URI involvement is needed here.
 
 ## 8. Build, install, and run
 

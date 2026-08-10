@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
 
 import type { EPPTemplate } from '@epp/layout-engine';
 
@@ -8,13 +8,18 @@ import { ConfirmDialog } from '../ui/ConfirmDialog.js';
 
 type ConfirmMode = 'save' | 'saveAs' | null;
 
-export function SaveTemplateDialog({
-  templates,
-  onSaved,
-}: {
-  templates: EPPTemplate[];
-  onSaved: () => Promise<void> | void;
-}) {
+/** Imperative handle so a toolbar button (rendered elsewhere in the tree, see `App.tsx`) can
+ * trigger the exact same save/save-as flow the `Edit > Save Template` menu items already do,
+ * without duplicating the `linkedTemplate`/overwrite-vs-prompt logic that lives here. */
+export interface SaveTemplateDialogHandle {
+  openSave: () => void;
+  openSaveAs: () => void;
+}
+
+export const SaveTemplateDialog = forwardRef<
+  SaveTemplateDialogHandle,
+  { templates: EPPTemplate[]; onSaved: () => Promise<void> | void }
+>(function SaveTemplateDialog({ templates, onSaved }, ref) {
   const [confirmMode, setConfirmMode] = useState<ConfirmMode>(null);
   const [saveAsName, setSaveAsName] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -36,21 +41,25 @@ export function SaveTemplateDialog({
     setConfirmMode('saveAs');
   };
 
+  const triggerSave = () => {
+    // No linked template to overwrite -- the same fallback the old panel's UI achieved by
+    // simply not showing a "Save" button when there was nothing to overwrite.
+    if (!linkedTemplate) {
+      openSaveAs();
+      return;
+    }
+    setErrorMessage(null);
+    setConfirmMode('save');
+  };
+
+  useImperativeHandle(ref, () => ({ openSave: triggerSave, openSaveAs }));
+
   useEffect(() => {
     return getEppApi().menu.onSaveTemplateAs(openSaveAs);
   }, []);
 
   useEffect(() => {
-    return getEppApi().menu.onSaveTemplate(() => {
-      // No linked template to overwrite -- the same fallback the old panel's UI achieved by
-      // simply not showing a "Save" button when there was nothing to overwrite.
-      if (!linkedTemplate) {
-        openSaveAs();
-        return;
-      }
-      setErrorMessage(null);
-      setConfirmMode('save');
-    });
+    return getEppApi().menu.onSaveTemplate(triggerSave);
   }, [linkedTemplate]);
 
   const closeConfirm = () => {
@@ -152,4 +161,4 @@ export function SaveTemplateDialog({
       </ConfirmDialog>
     </>
   );
-}
+});

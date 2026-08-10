@@ -1,5 +1,5 @@
 import { isSimpleModeCompatible } from '@epp/layout-engine';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { PageStage } from './components/canvas/PageStage.js';
 import { ImageLibraryPanel } from './components/panels/ImageLibraryPanel.js';
@@ -8,7 +8,7 @@ import { PageSetupPanel } from './components/panels/PageSetupPanel.js';
 import { PropertiesPanel } from './components/panels/PropertiesPanel.js';
 import { PreviewScreen } from './components/preview/PreviewScreen.js';
 import { UnitToggle } from './components/settings/UnitToggle.js';
-import { SaveTemplateDialog } from './components/templates/SaveTemplateDialog.js';
+import { SaveTemplateDialog, type SaveTemplateDialogHandle } from './components/templates/SaveTemplateDialog.js';
 import { TemplateGallery } from './components/templates/TemplateGallery.js';
 import { CollapsiblePanel } from './components/ui/CollapsiblePanel.js';
 import { ConfirmDialog } from './components/ui/ConfirmDialog.js';
@@ -19,7 +19,11 @@ import { getEppApi } from './lib/platform/contract.js';
 import { formatLength } from './lib/units.js';
 import { useEPPStore } from './store/index.js';
 
+const TOOLBAR_BUTTON_CLASS =
+  'whitespace-nowrap rounded-lg border border-slate-700 bg-slate-950 px-3 py-1.5 text-sm font-medium text-slate-200 hover:border-slate-600';
+
 export function App() {
+  const saveTemplateDialogRef = useRef<SaveTemplateDialogHandle>(null);
   const [isNewProjectConfirmOpen, setIsNewProjectConfirmOpen] = useState(false);
   const [isOpenProjectConfirmOpen, setIsOpenProjectConfirmOpen] = useState(false);
   const [isMissingImagesDialogOpen, setIsMissingImagesDialogOpen] = useState(false);
@@ -132,6 +136,40 @@ export function App() {
                 </button>
               </div>
             </div>
+
+            {/* Shared File/Edit toolbar -- the same component on every host. It's the only
+             * trigger for these actions on a host with no native application menu (see the
+             * android-shell change's design.md, Decision 8); on a host that does have one
+             * (Electron), it's an additional trigger alongside the menu, which keeps working
+             * unchanged. */}
+            <div className="mx-auto flex max-w-[1800px] items-center gap-2 overflow-x-auto px-6 pb-3">
+              <span className="mr-1 text-xs font-semibold uppercase tracking-wide text-slate-500">File</span>
+              <button type="button" onClick={() => setIsNewProjectConfirmOpen(true)} className={TOOLBAR_BUTTON_CLASS}>
+                New
+              </button>
+              <button type="button" onClick={() => setIsOpenProjectConfirmOpen(true)} className={TOOLBAR_BUTTON_CLASS}>
+                Open
+              </button>
+              <button type="button" onClick={() => void saveProject(false)} className={TOOLBAR_BUTTON_CLASS}>
+                Save
+              </button>
+              <button type="button" onClick={() => void saveProject(true)} className={TOOLBAR_BUTTON_CLASS}>
+                Save As
+              </button>
+              <span className="ml-3 mr-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Edit</span>
+              <button type="button" onClick={undo} className={TOOLBAR_BUTTON_CLASS}>
+                Undo
+              </button>
+              <button type="button" onClick={redo} className={TOOLBAR_BUTTON_CLASS}>
+                Redo
+              </button>
+              <button type="button" onClick={() => saveTemplateDialogRef.current?.openSave()} className={TOOLBAR_BUTTON_CLASS}>
+                Save Template
+              </button>
+              <button type="button" onClick={() => saveTemplateDialogRef.current?.openSaveAs()} className={TOOLBAR_BUTTON_CLASS}>
+                Save Template As
+              </button>
+            </div>
           </div>
 
           <div className="min-h-0 flex-1 px-6 py-6">
@@ -220,7 +258,7 @@ export function App() {
         </main>
       )}
 
-      <SaveTemplateDialog templates={templateLibrary.templates} onSaved={templateLibrary.reload} />
+      <SaveTemplateDialog ref={saveTemplateDialogRef} templates={templateLibrary.templates} onSaved={templateLibrary.reload} />
 
       <ConfirmDialog
         open={isNewProjectConfirmOpen}

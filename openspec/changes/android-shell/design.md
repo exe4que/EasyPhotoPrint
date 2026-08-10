@@ -12,7 +12,7 @@ No mobile toolchain, Capacitor dependency, or `android/` project exists in this 
 ## Goals / Non-Goals
 
 **Goals:**
-- The existing renderer (`src/`) runs unmodified inside an Android WebView, proving the four prior phases actually decoupled it from Electron.
+- The existing renderer (`src/`) runs on Android with no *architectural* changes, proving the four prior phases actually decoupled it from Electron — the one exception found by end-to-end verification (Decision 8, the shared toolbar) is a deliberate, additive UI change, not evidence shared code was Electron-coupled.
 - Every `EppAPI` member has a real, working Android implementation — no member throws "not implemented" or silently no-ops except the `menu` namespace, which the contract itself defines as legitimately no-op on a host without a menu bar.
 - The whole thing is verifiable by building, installing, and driving the app on a real emulator or device.
 
@@ -77,6 +77,20 @@ Alternative considered: driving print through the WebView's own `window.print()`
 
 Directly required by `platform-adapter`'s existing "Platform Contract Is Total" requirement, already scenario'd for exactly this case ("a host without host-initiated commands still satisfies the contract"). No new spec requirement needed for this — it's `android-shell`'s adapter simply doing what `platform-adapter` already mandates.
 
+### 8. A shared toolbar replaces "menu-only" for eight actions, on both hosts
+
+End-to-end verification on a real device (section 10 of tasks.md) surfaced that `New`/`Open`/`Save`/`Save As`/`Undo`/`Redo`/`Save Template`/`Save Template As` are wired in `App.tsx` and `SaveTemplateDialog.tsx` exclusively through `getEppApi().menu.on*` listeners. Decision 7 makes those listeners correctly inert on Android (no native menu bar) — but nothing else in the app can trigger the actions they gate, so as shipped through task group 8, an Android user could ingest images, lay out a page, export a PDF, and print, but could never save or reopen a project, or undo/redo a mistake. That's not a cosmetic gap; it's most of `project-persistence` and all of `undo-redo` being practically unreachable on this host.
+
+Two requirements stood in the way of the obvious fix:
+- `undo-redo`'s "Undo and Redo Controls" requirement: "There SHALL NOT be a dedicated in-app toolbar button for undo or redo."
+- `editor-layout`'s "Save Template Has No Standalone Panel" requirement: saving/overwriting a template "SHALL be reachable only through the `Edit > Save Template` and `Edit > Save Template As...` menu items."
+
+Both were correct, deliberate decisions *when written* — `wire-menu-undo-redo` and `trim-edit-menu-and-reorganize-panels` were about not cluttering a single-host desktop UI with a second way to do something the native menu already covered well. Neither anticipated a host with no native menu at all. Confirmed with the user rather than resolved silently (per AGENTS.md §3): both requirements are revised (`MODIFIED Requirements` in this change's `undo-redo`/`editor-layout` delta specs) so a toolbar becomes the second, host-uniform trigger path for all eight actions, alongside the still-unchanged native menu on Electron.
+
+**Why one shared toolbar component instead of an Android-only one:** the alternative — a toolbar rendered only when `getEppApi()` is the Android adapter, or gated behind some `isTouchHost` flag — would work, but it reintroduces exactly the kind of host-conditional branching in shared code that `platform-adapter`'s whole contract exists to avoid, for a problem that doesn't need it: nothing about these eight actions is Android-specific, a toolbar is a perfectly normal desktop affordance too, and one code path is easier to keep correct than two. `SaveTemplateDialog` is refactored (`forwardRef`/`useImperativeHandle`) to expose its existing save/save-as logic to the new toolbar button without duplicating it — the menu listener and the toolbar button end up calling the identical function.
+
+**Why not disable Undo/Redo based on history availability:** `electron-shell`'s existing "menu item is not disabled based on history state" scenario already establishes that a no-op undo/redo is acceptable UX in this app; the toolbar buttons follow the same rule for consistency, and to avoid adding new store surface (a `canUndo`/`canRedo` selector) this change doesn't otherwise need.
+
 ## Risks / Trade-offs
 
 - [Two independent PDF compositors (Electron's `nativeImage`-backed, Android's Canvas-backed) can drift in behavior over time as each is modified independently] → Accepted per Non-Goals; both call the same pure placement math, so drift is limited to decode/resize/encode fidelity, not layout correctness. Revisit sharing a real abstraction only once a second real implementation's rough edges are known, not speculatively.
@@ -84,6 +98,7 @@ Directly required by `platform-adapter`'s existing "Platform Contract Is Total" 
 - [No CI or emulator automation verifies this on every future change] → Accepted per Non-Goals; the existing desktop E2E recipe has the same property (manual, Playwright-driven, run on demand) and this change doesn't raise the bar beyond that precedent.
 - [Copying picked bytes into IndexedDB means large image libraries consume device storage twice (source + IndexedDB copy), same trade-off `packaged-project-files` already accepted on desktop] → Same reasoning applies: acceptable for a photo-layout tool's typical project size.
 - [IndexedDB storage is per-WebView-origin and is something the OS/user can clear (e.g. "Clear storage" in Android's app-info settings) independently of the app being uninstalled] → Accepted: this is working storage, not the permanent record (the saved `.eppproj` file is); the existing "missing image" detection and relink flow already handles a working copy becoming unreadable, the same way it handles a corrupted bundle entry today.
+- [The toolbar (Decision 8) is a second, always-visible way to reach eight actions on Electron that previously had exactly one, discoverable path (the native menu) — a minor desktop UX change nobody explicitly asked for on that host] → Accepted: it's strictly additive (the menu and its accelerators are untouched), and the alternative (host-conditional UI, or leaving Android without these features) was worse per Decision 8's own reasoning. If the extra desktop toolbar real estate turns out to bother users in practice, that's a small, separable follow-up (e.g. collapsing it) rather than something to speculate about now.
 
 ## Migration Plan
 

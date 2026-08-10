@@ -60,17 +60,25 @@
 - [x] 8.2 Run `npm run build:android` and `npx cap open android` (or `./gradlew installDebug`) to build and install the app.
 - [x] 8.3 Launch the app and confirm the renderer boots (same UI as desktop, no console errors from a missing adapter).
 
-## 9. End-to-end verification (manual, on emulator/device)
+## 9. Shared File/Edit toolbar (closes the New/Open/Save/Undo/Redo/Save Template gap found in section 10's verification)
 
-- [x] 9.1 Load images via "Load images": confirm the native picker opens, selected images appear in the Image Library with correct thumbnails.
-- [x] 9.2 Assign an image to a slot (tap-to-assign, per `pointer-based-gestures`) and confirm it renders correctly in the page preview.
-- [x] 9.3 Change the unit toggle, fully close and relaunch the app, confirm the preference persisted.
-- [x] 9.4 Export PDF: confirm the native "create document" picker opens, the resulting file is a valid multi-page PDF with correctly placed/cropped/resized images.
-- [x] 9.5 Print: confirm Android's native print dialog opens with the same content as the exported PDF.
-- [ ] 9.6 Save a project, fully close and relaunch the app, open that project via "Open project", confirm all pages/images/layout restore correctly.
-- [ ] 9.7 Confirm no shared component under `src/components`, `src/store`, `src/hooks`, or `src/lib` (other than the new Android-specific modules) needed any changes to make the above work.
+- [x] 9.1 Refactor `SaveTemplateDialog` to expose its "open Save" / "open Save As" logic imperatively (`forwardRef` + `useImperativeHandle`), so both the existing `menu.onSaveTemplate`/`onSaveTemplateAs` listeners and a new toolbar button can trigger the exact same code path — no duplicated logic between the two trigger sources.
+- [x] 9.2 Add a toolbar to `App.tsx`'s header with buttons for New, Open, Save, Save As, Undo, Redo, Save Template, and Save Template As, calling the same store actions / dialog triggers the existing `menu.*` listeners already call (`setIsNewProjectConfirmOpen`, `setIsOpenProjectConfirmOpen`, `saveProject(false/true)`, `undo`, `redo`, and the ref from 9.1). Rendered identically on every host — no `isAndroid`/host branching in this component. Undo/Redo buttons are not disabled based on history state, matching `electron-shell`'s existing "menu item is not disabled based on history state" scenario.
+- [x] 9.3 Update `openspec/changes/android-shell/proposal.md`'s Capabilities section to list `undo-redo` and `editor-layout` under Modified Capabilities, and add delta spec files (`specs/undo-redo/spec.md`, `specs/editor-layout/spec.md`) with `MODIFIED Requirements` replacing "reachable only via the application menu" / "no standalone panel" with "reachable via the application menu (where the host has one) and the shared toolbar."
+- [x] 9.4 Update `design.md` with the decision and rationale (host-uniform toolbar over host-conditional UI, since the goal is minimizing divergence between the two builds — see design.md).
+- [x] 9.5 Verify on desktop (Electron): typecheck, full test suite, and a manual run confirming the new toolbar buttons work correctly (New/Open/Save/Save As/Undo/Redo/Save Template/Save Template As all still function, and the native menu equivalents still work unchanged side by side).
 
-## 10. Spec closure
+## 10. End-to-end verification (manual, on emulator/device)
 
-- [ ] 10.1 Run the full test suite and typecheck (desktop build must remain unaffected).
-- [ ] 10.2 Run `openspec validate --strict --changes android-shell` and confirm it passes.
+- [x] 10.1 Load images via "Load images": confirm the native picker opens, selected images appear in the Image Library with correct thumbnails.
+- [x] 10.2 Assign an image to a slot (tap-to-assign, per `pointer-based-gestures`) and confirm it renders correctly in the page preview.
+- [x] 10.3 Change the unit toggle, fully close and relaunch the app, confirm the preference persisted.
+- [x] 10.4 Export PDF: confirm the native "create document" picker opens, the resulting file is a valid multi-page PDF with correctly placed/cropped/resized images.
+- [x] 10.5 Print: confirm Android's native print dialog opens with the same content as the exported PDF.
+- [ ] 10.6 Using the new toolbar (section 9): save a project, fully close and relaunch the app, open that project via the toolbar's Open button, confirm all pages/images/layout restore correctly.
+- [ ] 10.7 Confirm the toolbar from section 9 is the only shared-code (`src/components`/`src/App.tsx`) change this whole verification pass required, and that it's the exact same component/code path on both hosts — no `src/store`, `src/hooks`, or other shared logic needed changes beyond it.
+
+## 11. Spec closure
+
+- [ ] 11.1 Run the full test suite and typecheck (desktop build must remain unaffected).
+- [ ] 11.2 Run `openspec validate --strict --changes android-shell` and confirm it passes.

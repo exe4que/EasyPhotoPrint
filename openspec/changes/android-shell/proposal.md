@@ -2,7 +2,7 @@
 
 Four desktop-verifiable phases (`extract-platform-adapter`, `packaged-project-files`, `pointer-based-gestures`, `portable-pdf-pipeline`) have deliberately prepared the renderer to run on a second host without knowing it yet: every native capability goes through one `EppAPI` contract, `.eppproj` is a self-contained archive with no external path references, every canvas gesture is input-agnostic Pointer Events, and PDF/thumbnail/preview decoding no longer hardcodes Electron's `nativeImage`. None of that has been proven against a real second host — this change is where it gets proven, by standing up the actual Android target: a Capacitor-wrapped WebView running this same renderer, with a real `AndroidPlatformAdapter` behind it.
 
-This is the point where the payoff of those four phases is collected: shared renderer code (`App.tsx`, the store, every component) is expected to need zero changes to run correctly on Android, because it was never written to know Electron exists.
+This is the point where the payoff of those four phases is collected: shared renderer code (`App.tsx`, the store, every component) is expected to need no *architectural* changes to run correctly on Android, because it was never written to know Electron exists. End-to-end verification on a real device surfaced one real, honest exception to that: `New`/`Open`/`Save`/`Save As`/`Undo`/`Redo`/`Save Template`/`Save Template As` were reachable *exclusively* through `getEppApi().menu.on*` listeners — which is exactly correct behavior for a host with a native menu bar, and exactly useless on a host without one. Closing that gap with a toolbar shared by both hosts (see "What Changes" and the `undo-redo`/`editor-layout` capability updates below) is a small, deliberate, additive UI change — not evidence the four prior phases' groundwork was wrong, but the first real place a genuinely new UI affordance was needed once a second host existed to need it.
 
 ## What Changes
 
@@ -15,6 +15,7 @@ This is the point where the payoff of those four phases is collected: shared ren
   - `print.document` reuses that same in-WebView PDF composition, then hands the resulting bytes to a second small custom Capacitor plugin that invokes Android's `PrintManager` with a `PrintDocumentAdapter`, so the OS print dialog opens the way `printing`'s spec already describes generically.
   - `menu.*` subscriptions are all no-ops that return a working unsubscribe function — Android has no native menu bar, which `platform-adapter`'s totality requirement already accounts for.
 - Working storage on Android (the equivalent of the Electron working directory `packaged-project-files` introduced) is an IndexedDB object store in the WebView, populated by copying bytes out of picked `content://` URIs at ingest/open time, mirroring the existing "copy at ingest, not at save" design — no native filesystem plugin needed for this (see design.md, Decision 3a).
+- **New, shared UI**: a toolbar in `App.tsx`'s header exposing `New`/`Open`/`Save`/`Save As`/`Undo`/`Redo`/`Save Template`/`Save Template As` — the same component, same code, on both Electron and Android, calling the same store actions the existing `menu.*` listeners already call. This is additive on Electron (the native menu and its accelerators keep working exactly as they do today, side by side with the toolbar) and is the *only* way to reach these eight actions on Android, which has no native menu bar to fall back on. See design.md and the `undo-redo`/`editor-layout` capability updates below for why this required revising two already-archived requirements rather than just adding UI.
 - Explicitly out of scope: Play Store packaging/signing, app icons and branding, any touch/mobile-specific UI layout redesign beyond what `pointer-based-gestures` already covers, and byte-for-byte PDF parity with the Electron output (the WebView-based compositor is a real, working implementation, not a stub — but it is a second implementation of the same placement math against a different decode backend, and minor rendering differences versus Electron's `nativeImage`-based resize/crop are accepted, not chased, in this change).
 
 ## Capabilities
@@ -25,13 +26,16 @@ This is the point where the payoff of those four phases is collected: shared ren
 
 ### Modified Capabilities
 
-(none — `platform-adapter`, `pdf-export`, `printing`, and `project-persistence` all already describe their requirements in host-neutral terms; this change satisfies them with a second adapter, it does not change what any of them require)
+- `undo-redo`: the "Undo and Redo Controls" requirement's "no dedicated in-app toolbar button" constraint is replaced — Undo/Redo are now reachable via the application menu (where the host has one) *and* the shared toolbar, on every host.
+- `editor-layout`: the "Save Template Has No Standalone Panel" requirement is replaced — saving/overwriting a template is now also reachable via the shared toolbar, not exclusively the `Edit` menu.
+- (`platform-adapter`, `pdf-export`, `printing`, and `project-persistence` are unaffected — all already describe their requirements in host-neutral terms; this change satisfies them with a second adapter, it does not change what any of them require)
 
 ## Impact
 
 - New: `android/` (Capacitor-generated Gradle project), `src/main.android.tsx` (or equivalent mobile entry point), `src/lib/platform/androidAdapter.ts`, a mobile-target Vite/build config, and the two custom Kotlin plugins (SAF file access, PrintManager printing).
 - New: an in-WebView PDF composition module reusing `composeProjectPdf.helpers.ts`'s pure placement math and `pdfPlacement.ts`, paired with a Canvas-based `DecodedImage`-shaped decode step analogous to `electron/main/imageDecoder.ts`'s contract but implemented against browser APIs instead of `nativeImage`.
 - `package.json`: adds `@capacitor/core`, `@capacitor/android`, `@capacitor/cli`, `@capacitor/preferences`, and a new `build:android`-style script.
-- No changes to `electron/**`, `packages/layout-engine`, `packages/migrations`, or any existing renderer component — verifying that is part of this change's own acceptance criteria.
+- `src/App.tsx` and `src/components/templates/SaveTemplateDialog.tsx` (the latter refactored to expose its save-template logic imperatively via a ref) gain the shared toolbar — the one deliberate, shared-code exception to "no changes to existing renderer code," found and justified by end-to-end verification (see "Why").
+- No changes to `electron/**`, `packages/layout-engine`, `packages/migrations`, or any other existing renderer component beyond the toolbar above.
 - New Kotlin source under `android/app/src/main/`, following the plugin structure Capacitor generates.
 - Verification is end-to-end on a real emulator or device (build, install, launch, ingest an image, place it, export a PDF, print, save/reopen a project), not just a Gradle build succeeding — this is a UI-facing change with no existing automated test harness that can exercise a WebView/native-plugin boundary.

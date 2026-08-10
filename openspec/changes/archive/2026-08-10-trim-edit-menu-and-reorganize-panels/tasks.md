@@ -1,12 +1,12 @@
 ## 1. Menu changes (Main process)
 
-- [ ] 1.1 In `electron/main/menu.ts`, remove `{ role: 'cut' }`, `{ role: 'copy' }`, `{ role: 'paste' }`, `{ role: 'selectAll' }` from the `Edit` submenu.
-- [ ] 1.2 In `electron/main/menu.ts`, add two new channel constants (`SAVE_TEMPLATE_CHANNEL = 'menu:save-template'`, `SAVE_TEMPLATE_AS_CHANNEL = 'menu:save-template-as'`) and two new `Edit` submenu items — `Save Template` and `Save Template As...` — each calling `sendToFocusedWindow(...)` with its channel, placed after the existing `Undo`/`Redo`/separator, no accelerators.
+- [x] 1.1 In `electron/main/menu.ts`, remove `{ role: 'cut' }`, `{ role: 'copy' }`, `{ role: 'paste' }`, `{ role: 'selectAll' }` from the `Edit` submenu.
+- [x] 1.2 In `electron/main/menu.ts`, add two new channel constants (`SAVE_TEMPLATE_CHANNEL = 'menu:save-template'`, `SAVE_TEMPLATE_AS_CHANNEL = 'menu:save-template-as'`) and two new `Edit` submenu items — `Save Template` and `Save Template As...` — each calling `sendToFocusedWindow(...)` with its channel, placed after the existing `Undo`/`Redo`/separator, no accelerators.
 
 ## 2. IPC plumbing (preload + renderer types)
 
-- [ ] 2.1 In `electron/preload/index.ts`, add `onSaveTemplate`/`onSaveTemplateAs` to `eppAPI.menu`, each wrapping `onMenuEvent('menu:save-template', callback)` / `onMenuEvent('menu:save-template-as', callback)`, matching the existing `onUndo`/`onRedo` pattern.
-- [ ] 2.2 In `src/lib/ipc-client.ts`, add `onSaveTemplate`/`onSaveTemplateAs` to `EppAPI['menu']`'s type, matching `onUndo`/`onRedo`.
+- [x] 2.1 In `electron/preload/index.ts`, add `onSaveTemplate`/`onSaveTemplateAs` to `eppAPI.menu`, each wrapping `onMenuEvent('menu:save-template', callback)` / `onMenuEvent('menu:save-template-as', callback)`, matching the existing `onUndo`/`onRedo` pattern.
+- [x] 2.2 In `src/lib/ipc-client.ts`, add `onSaveTemplate`/`onSaveTemplateAs` to `EppAPI['menu']`'s type, matching `onUndo`/`onRedo`.
 
 ## 3. Save Template: drop the sidebar panel, wire to the menu
 

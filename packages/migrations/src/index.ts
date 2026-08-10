@@ -75,29 +75,6 @@ export function migrateTemplate(raw: unknown): MigratedTemplateDocument {
   };
 }
 
-const DEFAULT_SHEET_SIZE: Record<string, unknown> = { sizePreset: 'A4' };
-
-/** Projects saved before sheet size became document-level carry no top-level `sheetSize` --
- * every page had its own `pageConfig.sizePreset`/`customSizeMm` instead, and the UI never
- * exposed a way to diverge them across pages. For such a file, the first page's size becomes
- * the document's `sheetSize`; any other page's size value is discarded (never reachable
- * downstream once `pageConfig` is narrowed to orientation/dpi only). */
-function deriveSheetSize(rawSheetSize: unknown, pages: Record<string, unknown>[]): Record<string, unknown> {
-  if (typeof rawSheetSize === 'object' && rawSheetSize != null && !Array.isArray(rawSheetSize)) {
-    return rawSheetSize as Record<string, unknown>;
-  }
-
-  const firstPageConfig = pages[0]?.pageConfig;
-  if (typeof firstPageConfig === 'object' && firstPageConfig != null && !Array.isArray(firstPageConfig)) {
-    const { sizePreset, customSizeMm } = firstPageConfig as Record<string, unknown>;
-    if (typeof sizePreset === 'string') {
-      return customSizeMm !== undefined ? { sizePreset, customSizeMm } : { sizePreset };
-    }
-  }
-
-  return DEFAULT_SHEET_SIZE;
-}
-
 export function migrateProject(raw: unknown): MigratedProjectDocument {
   const record = assertRecord(raw, 'project');
   const schemaVersion = assertSupportedVersion(record, 'project');
@@ -107,7 +84,7 @@ export function migrateProject(raw: unknown): MigratedProjectDocument {
     schemaVersion,
     id: assertString(record, 'id', 'project'),
     name: assertString(record, 'name', 'project'),
-    sheetSize: deriveSheetSize(record.sheetSize, pages),
+    sheetSize: assertRecord(record.sheetSize, 'project.sheetSize'),
     pages,
     imagePool: assertArray(record, 'imagePool', 'project'),
   };

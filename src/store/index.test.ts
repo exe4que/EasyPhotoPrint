@@ -27,12 +27,18 @@ function installMockEppApi(overrides: {
     fs: {
       saveProject: overrides.saveProject ?? (async () => null),
       openProject: overrides.openProject ?? (async () => null),
+      resetWorkingStorage: async () => {},
     },
     dialog: {
       relinkImage: overrides.relinkImage ?? (async () => null),
     },
   } as unknown as EppAPI);
 }
+
+// startNewProject() (exercised via afterEach in most describe blocks below, not always preceded
+// by an explicit installMockEppApi() call) fire-and-forgets fs.resetWorkingStorage() -- register a
+// safe default up front so every test in this file has a working adapter from the start.
+installMockEppApi({});
 
 describe('startNewProject', () => {
   it('resets document/ui/imagePool to a fresh single-page project and clears undo/redo history', () => {

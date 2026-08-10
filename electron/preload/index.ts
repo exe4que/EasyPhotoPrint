@@ -20,6 +20,7 @@ const eppAPI = {
     openProject: () => ipcRenderer.invoke('fs:open-project') as Promise<{ project: EPPProject; filePath: string } | null>,
     saveProject: (project: EPPProject, options: { existingPath: string | null; forceDialog: boolean }) =>
       ipcRenderer.invoke('fs:save-project', project, options) as Promise<string | null>,
+    resetWorkingStorage: () => ipcRenderer.invoke('fs:reset-working-storage') as Promise<void>,
   },
   images: {
     decodeAtSize: (filePath: string, minWidthPx: number, minHeightPx: number) =>

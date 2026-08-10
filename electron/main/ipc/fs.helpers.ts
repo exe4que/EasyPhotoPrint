@@ -3,8 +3,13 @@ import { migrateProject } from '@epp/migrations';
 
 import { assertLayoutNode } from './templates.helpers.js';
 
-/** An ImageAsset as persisted on disk -- never carries thumbnailDataUrl or missing (both are derived at load time, not saved). */
-export type PersistedImageAsset = Omit<ImageAsset, 'thumbnailDataUrl' | 'missing'>;
+/** An ImageAsset as persisted in a project's `project.json` entry -- never carries
+ * `thumbnailDataUrl` or `missing` (both are derived at load time, not saved), and never carries
+ * `storedPath` (a session-local working-directory path, recomputed fresh every time the process
+ * needs it -- see the `project-persistence` capability's "Project Working Storage Is
+ * Session-Scoped, Not Persisted" requirement). The image's actual bytes travel as a separate zip
+ * entry, keyed by this asset's `id` (see `projectBundle.ts`). */
+export type PersistedImageAsset = Omit<ImageAsset, 'thumbnailDataUrl' | 'missing' | 'storedPath'>;
 
 /** A project page's own config -- orientation/dpi only. Sheet size lives solely on the
  * document-level `sheetSize` (see assertSheetSize below), never per page. */
@@ -76,12 +81,11 @@ function assertProjectPage(value: Record<string, unknown>): EPPProjectPage {
 }
 
 function assertPersistedImageAsset(value: Record<string, unknown>): PersistedImageAsset {
-  const { id, originalPath, storedPath, fileName, widthPx, heightPx, dpiOriginal } = value;
+  const { id, originalPath, fileName, widthPx, heightPx, dpiOriginal } = value;
 
   if (
     typeof id !== 'string' ||
     typeof originalPath !== 'string' ||
-    typeof storedPath !== 'string' ||
     typeof fileName !== 'string' ||
     typeof widthPx !== 'number' ||
     typeof heightPx !== 'number'
@@ -92,7 +96,6 @@ function assertPersistedImageAsset(value: Record<string, unknown>): PersistedIma
   return {
     id,
     originalPath,
-    storedPath,
     fileName,
     widthPx,
     heightPx,
@@ -122,12 +125,14 @@ export function normalizeProjectDocument(raw: unknown): {
 /** Merges a successfully re-decoded thumbnail into a persisted asset, or -- when decoding failed
  * (regenerated is null) -- flags the asset missing and gives it a placeholder thumbnail instead,
  * keeping its persisted widthPx/heightPx/fileName/originalPath as-is. Pure and decode-mechanism-agnostic
- * so it's testable without a real Electron nativeImage call. */
+ * so it's testable without a real Electron nativeImage call. Doesn't know about `storedPath` at all
+ * -- attaching it (the working-directory path the regenerated/placeholder thumbnail was actually
+ * decoded from) is the caller's job, since only the caller knows what that path was. */
 export function applyRegeneratedImage(
   persisted: PersistedImageAsset,
   regenerated: { widthPx: number; heightPx: number; thumbnailDataUrl: string } | null,
   missingPlaceholderDataUrl: string,
-): ImageAsset {
+): Omit<ImageAsset, 'storedPath'> {
   if (regenerated) {
     return { ...persisted, ...regenerated };
   }
@@ -135,7 +140,9 @@ export function applyRegeneratedImage(
   return { ...persisted, thumbnailDataUrl: missingPlaceholderDataUrl, missing: true };
 }
 
-/** Strips fields that are never persisted (thumbnailDataUrl, missing) before writing a project to disk. */
+/** Strips fields that are never persisted (thumbnailDataUrl, missing, storedPath -- a session-local
+ * working-directory path) before writing a project's `project.json` entry. Image bytes travel as
+ * separate zip entries, not through this JSON payload -- see `projectBundle.ts`. */
 export function prepareProjectForSave(project: EPPProject): unknown {
   return {
     schemaVersion: project.schemaVersion,
@@ -143,7 +150,9 @@ export function prepareProjectForSave(project: EPPProject): unknown {
     name: project.name,
     sheetSize: project.sheetSize,
     pages: project.pages,
-    imagePool: project.imagePool.map(({ thumbnailDataUrl: _thumbnailDataUrl, missing: _missing, ...persisted }) => persisted),
+    imagePool: project.imagePool.map(
+      ({ thumbnailDataUrl: _thumbnailDataUrl, missing: _missing, storedPath: _storedPath, ...persisted }) => persisted,
+    ),
   };
 }
 

@@ -21,6 +21,8 @@ export interface EppAPI {
     openProject: () => Promise<{ project: EPPProject; filePath: string } | null>;
     /** existingPath is the project's currently remembered file path (null if never saved); forceDialog is true for "Save As". Returns the resolved path, or null if canceled. Both are opaque location identifiers -- round-trip them unmodified, never join/resolve/normalize them (see the `platform-adapter` capability's "Location Identifiers Are Opaque" requirement). */
     saveProject: (project: EPPProject, options: { existingPath: string | null; forceDialog: boolean }) => Promise<string | null>;
+    /** Discards the current session's working copies of every ingested image (see the `project-persistence` capability's "Project Working Storage Is Session-Scoped, Not Persisted" requirement). Called fire-and-forget when the document is discarded wholesale (`File > New`) so ingested-but-unsaved images don't accumulate for the rest of the running session. */
+    resetWorkingStorage: () => Promise<void>;
   };
   images: {
     /** Decodes filePath at (up to) native resolution, only as small as still covers (minWidthPx, minHeightPx) -- used for print-resolution preview rendering, distinct from an ImageAsset's bounded-edge thumbnailDataUrl. */

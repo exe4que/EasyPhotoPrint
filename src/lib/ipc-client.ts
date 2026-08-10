@@ -26,6 +26,9 @@ export interface EppAPI {
     /** Subscribes to the native "Edit > Undo"/"Edit > Redo" menu clicks (and their accelerators); returns an unsubscribe function. */
     onUndo: (callback: () => void) => () => void;
     onRedo: (callback: () => void) => () => void;
+    /** Subscribes to the native "Edit > Save Template"/"Edit > Save Template As..." menu clicks; returns an unsubscribe function. */
+    onSaveTemplate: (callback: () => void) => () => void;
+    onSaveTemplateAs: (callback: () => void) => () => void;
   };
   pdf: {
     export: (project: EPPProject) => Promise<Uint8Array>;

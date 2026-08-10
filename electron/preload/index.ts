@@ -28,6 +28,8 @@ const eppAPI = {
     onSaveProjectAs: (callback: () => void) => onMenuEvent('menu:save-project-as', callback),
     onUndo: (callback: () => void) => onMenuEvent('menu:undo', callback),
     onRedo: (callback: () => void) => onMenuEvent('menu:redo', callback),
+    onSaveTemplate: (callback: () => void) => onMenuEvent('menu:save-template', callback),
+    onSaveTemplateAs: (callback: () => void) => onMenuEvent('menu:save-template-as', callback),
   },
   pdf: {
     export: (project: unknown) => ipcRenderer.invoke('pdf:export', project) as Promise<Uint8Array>,

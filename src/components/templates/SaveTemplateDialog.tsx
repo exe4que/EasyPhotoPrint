@@ -1,11 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import type { EPPTemplate } from '@epp/layout-engine';
 
 import { getEppApi } from '../../lib/ipc-client.js';
 import { useEPPStore } from '../../store/index.js';
 import { ConfirmDialog } from '../ui/ConfirmDialog.js';
-import { CollapsiblePanel } from '../ui/CollapsiblePanel.js';
 
 type ConfirmMode = 'save' | 'saveAs' | null;
 
@@ -30,6 +29,29 @@ export function SaveTemplateDialog({
   const linkedTemplate = activePage.templateRef
     ? (templates.find((template) => template.id === activePage.templateRef) ?? null)
     : null;
+
+  const openSaveAs = () => {
+    setErrorMessage(null);
+    setSaveAsName('');
+    setConfirmMode('saveAs');
+  };
+
+  useEffect(() => {
+    return getEppApi().menu.onSaveTemplateAs(openSaveAs);
+  }, []);
+
+  useEffect(() => {
+    return getEppApi().menu.onSaveTemplate(() => {
+      // No linked template to overwrite -- the same fallback the old panel's UI achieved by
+      // simply not showing a "Save" button when there was nothing to overwrite.
+      if (!linkedTemplate) {
+        openSaveAs();
+        return;
+      }
+      setErrorMessage(null);
+      setConfirmMode('save');
+    });
+  }, [linkedTemplate]);
 
   const closeConfirm = () => {
     if (isSaving) {
@@ -83,38 +105,6 @@ export function SaveTemplateDialog({
 
   return (
     <>
-      <CollapsiblePanel
-        title="Save template"
-        description="Store the current page structure without its image assignments."
-        defaultCollapsed={true}
-      >
-        <div className="flex gap-2">
-          {linkedTemplate ? (
-            <button
-              type="button"
-              onClick={() => {
-                setErrorMessage(null);
-                setConfirmMode('save');
-              }}
-              className="flex-1 rounded-lg border border-cyan-500/60 bg-cyan-500/10 px-3 py-2 text-sm font-medium text-cyan-200 hover:bg-cyan-500/20"
-            >
-              Save
-            </button>
-          ) : null}
-          <button
-            type="button"
-            onClick={() => {
-              setErrorMessage(null);
-              setSaveAsName('');
-              setConfirmMode('saveAs');
-            }}
-            className="flex-1 rounded-lg border border-slate-700 px-3 py-2 text-sm font-medium text-slate-200 hover:border-slate-600"
-          >
-            Save as…
-          </button>
-        </div>
-      </CollapsiblePanel>
-
       <ConfirmDialog
         open={confirmMode === 'save'}
         title="Overwrite template?"

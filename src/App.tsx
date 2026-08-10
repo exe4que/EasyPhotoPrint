@@ -196,14 +196,12 @@ export function App() {
                 </CollapsiblePanel>
 
                 <PageSetupPanel />
-                <SaveTemplateDialog templates={templateLibrary.templates} onSaved={templateLibrary.reload} />
                 <TemplateGallery
                   templates={templateLibrary.templates}
                   isLoading={templateLibrary.isLoading}
                   errorMessage={templateLibrary.errorMessage}
                   onReload={templateLibrary.reload}
                 />
-                {layoutMode === 'nested' ? <LayoutTreePanel /> : null}
               </aside>
 
               <div className="flex h-full min-h-0 flex-col gap-4">
@@ -215,11 +213,14 @@ export function App() {
 
               <aside className="min-h-0 space-y-4 overflow-y-auto pr-1">
                 <PropertiesPanel />
+                {layoutMode === 'nested' ? <LayoutTreePanel /> : null}
               </aside>
             </div>
           </div>
         </main>
       )}
+
+      <SaveTemplateDialog templates={templateLibrary.templates} onSaved={templateLibrary.reload} />
 
       <ConfirmDialog
         open={isNewProjectConfirmOpen}

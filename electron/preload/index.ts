@@ -21,6 +21,10 @@ const eppAPI = {
     saveProject: (project: EPPProject, options: { existingPath: string | null; forceDialog: boolean }) =>
       ipcRenderer.invoke('fs:save-project', project, options) as Promise<string | null>,
   },
+  images: {
+    decodeAtSize: (filePath: string, minWidthPx: number, minHeightPx: number) =>
+      ipcRenderer.invoke('images:decode-at-size', filePath, minWidthPx, minHeightPx) as Promise<string>,
+  },
   menu: {
     onNewProject: (callback: () => void) => onMenuEvent('menu:new-project', callback),
     onOpenProject: (callback: () => void) => onMenuEvent('menu:open-project', callback),

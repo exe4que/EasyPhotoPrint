@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { applyRegeneratedImage, normalizeProjectDocument, prepareProjectForSave, type PersistedImageAsset } from './fs.helpers.js';
+import {
+  applyRegeneratedImage,
+  computeCoverDecodeSize,
+  normalizeProjectDocument,
+  prepareProjectForSave,
+  type PersistedImageAsset,
+} from './fs.helpers.js';
 
 const PLACEHOLDER = 'data:image/svg+xml;utf8,placeholder';
 
@@ -112,5 +118,28 @@ describe('applyRegeneratedImage', () => {
     );
 
     expect(assets.map((asset) => asset.missing ?? false)).toEqual([false, true, false]);
+  });
+});
+
+describe('computeCoverDecodeSize', () => {
+  it('scales a landscape source down, preserving aspect, when the height axis is the binding constraint', () => {
+    expect(computeCoverDecodeSize(4000, 2000, 1000, 800)).toEqual({ width: 1600, height: 800 });
+  });
+
+  it('scales a portrait source down, preserving aspect, when the width axis is the binding constraint', () => {
+    expect(computeCoverDecodeSize(2000, 4000, 800, 1000)).toEqual({ width: 800, height: 1600 });
+  });
+
+  it('clamps to the native size instead of upscaling when the requested minimum exceeds it', () => {
+    expect(computeCoverDecodeSize(500, 500, 2000, 1000)).toEqual({ width: 500, height: 500 });
+  });
+
+  it('scales down aspect-preserving when the requested minimum is smaller than native in both dimensions', () => {
+    expect(computeCoverDecodeSize(3000, 2000, 300, 150)).toEqual({ width: 300, height: 200 });
+  });
+
+  it('throws for non-positive native dimensions', () => {
+    expect(() => computeCoverDecodeSize(0, 100, 10, 10)).toThrow();
+    expect(() => computeCoverDecodeSize(100, 0, 10, 10)).toThrow();
   });
 });

@@ -1,7 +1,8 @@
-import type { LayoutNode } from '@epp/layout-engine';
+import type { BoxMm, ImageAsset, ImageSlotConfig, LayoutNode } from '@epp/layout-engine';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useLayoutResolution } from '../../hooks/useLayoutResolution.js';
+import { usePrintResolutionSrc } from '../../hooks/usePrintResolutionSrc.js';
 import { mmToPx } from '../../lib/units.js';
 import { useEPPStore } from '../../store/index.js';
 import { SlotImage } from '../canvas/SlotImage.js';
@@ -31,12 +32,122 @@ function collectFreeformCanvasNodes(node: LayoutNode): LayoutNode[] {
   return nodes;
 }
 
+/** A single placed imageSlot's image, at print resolution once available (falling back to the
+ * asset's thumbnail while it loads) -- its own component because usePrintResolutionSrc is a hook
+ * and this is rendered from inside a .map(). */
+function PreviewImageSlot({
+  box,
+  asset,
+  imageSlotConfig,
+  zoom,
+  dpi,
+}: {
+  box: BoxMm;
+  asset: ImageAsset;
+  imageSlotConfig: ImageSlotConfig | undefined;
+  zoom: number;
+  dpi: number;
+}) {
+  const srcOverride = usePrintResolutionSrc(asset, box.w, box.h, dpi);
+
+  return (
+    <div
+      className="absolute overflow-hidden"
+      style={{
+        left: mmToPx(box.x, zoom),
+        top: mmToPx(box.y, zoom),
+        width: mmToPx(box.w, zoom),
+        height: mmToPx(box.h, zoom),
+      }}
+    >
+      <SlotImage
+        asset={asset}
+        widthMm={box.w}
+        heightMm={box.h}
+        scalingRule={imageSlotConfig?.scalingRule}
+        specificSizeMm={imageSlotConfig?.specificSizeMm}
+        rotationDeg={imageSlotConfig?.imageRotationDeg}
+        zoom={zoom}
+        unsatisfiedSizeContext="slot"
+        showDiagnostics={false}
+        srcOverride={srcOverride}
+      />
+    </div>
+  );
+}
+
+/** A single freeform element's image, at print resolution once available -- same reasoning as
+ * PreviewImageSlot. */
+function PreviewFreeformImage({
+  elementId,
+  elementZIndex,
+  asset,
+  widthMm,
+  heightMm,
+  xMm,
+  yMm,
+  rotationDeg,
+  offsetXMm,
+  offsetYMm,
+  imageSlotConfig,
+  zoom,
+  dpi,
+}: {
+  elementId: string;
+  elementZIndex: number | undefined;
+  asset: ImageAsset;
+  widthMm: number;
+  heightMm: number;
+  xMm: number;
+  yMm: number;
+  rotationDeg: number;
+  offsetXMm: number;
+  offsetYMm: number;
+  imageSlotConfig: ImageSlotConfig | undefined;
+  zoom: number;
+  dpi: number;
+}) {
+  const srcOverride = usePrintResolutionSrc(asset, widthMm, heightMm, dpi);
+
+  return (
+    <div
+      key={elementId}
+      className="absolute overflow-hidden"
+      style={{
+        left: mmToPx(xMm + offsetXMm, zoom),
+        top: mmToPx(yMm + offsetYMm, zoom),
+        width: mmToPx(widthMm, zoom),
+        height: mmToPx(heightMm, zoom),
+        transform: `rotate(${rotationDeg}deg)`,
+        transformOrigin: 'center',
+        // Matches the editor's stacking order (FreeformElement.tsx) so overlapping
+        // elements paint in the same order in preview -- element.zIndex isn't
+        // reassigned on delete, so array order alone can drift from it over time.
+        zIndex: (elementZIndex ?? 0) + 1,
+      }}
+    >
+      <SlotImage
+        asset={asset}
+        widthMm={widthMm}
+        heightMm={heightMm}
+        scalingRule={imageSlotConfig?.scalingRule}
+        specificSizeMm={imageSlotConfig?.specificSizeMm}
+        rotationDeg={undefined}
+        zoom={zoom}
+        unsatisfiedSizeContext="element"
+        showDiagnostics={false}
+        srcOverride={srcOverride}
+      />
+    </div>
+  );
+}
+
 /**
  * The full-screen, gizmo-free rendering of the active page for print-preview: no slot borders,
  * badges, hover states, drag-and-drop, dividers, or padding outline -- just the page at
  * fit-to-screen zoom with every placed image rendered exactly as the editor renders it (via the
- * same `SlotImage` the editor canvas uses). Unassigned slots and empty freeform elements render
- * as nothing.
+ * same `SlotImage` the editor canvas uses), at print resolution rather than the Image Library's
+ * bounded-edge thumbnail. Unassigned slots and empty freeform elements render as nothing.
  */
 export function PreviewStage() {
   const { page, pageBox, layout } = useLayoutResolution();
@@ -47,6 +158,7 @@ export function PreviewStage() {
   const imageSlots = collectImageSlotNodes(page.rootNode);
   const imageSlotMap = new Map(imageSlots.map((node) => [node.id, node]));
   const freeformCanvasNodes = collectFreeformCanvasNodes(page.rootNode);
+  const dpi = page.pageConfig.dpi;
   const pageWidthAtZoomOne = mmToPx(pageBox.w, 1);
   const pageHeightAtZoomOne = mmToPx(pageBox.h, 1);
   const pageWidthPx = mmToPx(pageBox.w, zoom);
@@ -99,30 +211,15 @@ export function PreviewStage() {
               return null;
             }
 
-            const imageSlotConfig = imageSlotMap.get(id)?.imageSlotConfig;
             return (
-              <div
+              <PreviewImageSlot
                 key={id}
-                className="absolute overflow-hidden"
-                style={{
-                  left: mmToPx(box.x, zoom),
-                  top: mmToPx(box.y, zoom),
-                  width: mmToPx(box.w, zoom),
-                  height: mmToPx(box.h, zoom),
-                }}
-              >
-                <SlotImage
-                  asset={asset}
-                  widthMm={box.w}
-                  heightMm={box.h}
-                  scalingRule={imageSlotConfig?.scalingRule}
-                  specificSizeMm={imageSlotConfig?.specificSizeMm}
-                  rotationDeg={imageSlotConfig?.imageRotationDeg}
-                  zoom={zoom}
-                  unsatisfiedSizeContext="slot"
-                  showDiagnostics={false}
-                />
-              </div>
+                box={box}
+                asset={asset}
+                imageSlotConfig={imageSlotMap.get(id)?.imageSlotConfig}
+                zoom={zoom}
+                dpi={dpi}
+              />
             );
           })}
 
@@ -157,38 +254,23 @@ export function PreviewStage() {
                   return null;
                 }
 
-                const { xMm, yMm, widthMm, heightMm, rotationDeg } = element.transform;
-                const imageSlotConfig = imageSlotMap.get(element.imageNodeId)?.imageSlotConfig;
-
                 return (
-                  <div
+                  <PreviewFreeformImage
                     key={element.id}
-                    className="absolute overflow-hidden"
-                    style={{
-                      left: mmToPx(xMm + offsetXMm, zoom),
-                      top: mmToPx(yMm + offsetYMm, zoom),
-                      width: mmToPx(widthMm, zoom),
-                      height: mmToPx(heightMm, zoom),
-                      transform: `rotate(${rotationDeg}deg)`,
-                      transformOrigin: 'center',
-                      // Matches the editor's stacking order (FreeformElement.tsx) so overlapping
-                      // elements paint in the same order in preview -- element.zIndex isn't
-                      // reassigned on delete, so array order alone can drift from it over time.
-                      zIndex: (element.zIndex ?? 0) + 1,
-                    }}
-                  >
-                    <SlotImage
-                      asset={asset}
-                      widthMm={widthMm}
-                      heightMm={heightMm}
-                      scalingRule={imageSlotConfig?.scalingRule}
-                      specificSizeMm={imageSlotConfig?.specificSizeMm}
-                      rotationDeg={undefined}
-                      zoom={zoom}
-                      unsatisfiedSizeContext="element"
-                      showDiagnostics={false}
-                    />
-                  </div>
+                    elementId={element.id}
+                    elementZIndex={element.zIndex}
+                    asset={asset}
+                    widthMm={element.transform.widthMm}
+                    heightMm={element.transform.heightMm}
+                    xMm={element.transform.xMm}
+                    yMm={element.transform.yMm}
+                    rotationDeg={element.transform.rotationDeg}
+                    offsetXMm={offsetXMm}
+                    offsetYMm={offsetYMm}
+                    imageSlotConfig={imageSlotMap.get(element.imageNodeId)?.imageSlotConfig}
+                    zoom={zoom}
+                    dpi={dpi}
+                  />
                 );
               })}
             </div>

@@ -16,7 +16,7 @@ function LayoutTreeNode({
   selectedNodeId: string | null;
   activePageId: string;
 }) {
-  const setSelectedElementIds = useEPPStore((state) => state.setSelectedElementIds);
+  const setSelection = useEPPStore((state) => state.setSelection);
   const retypeLayoutNode = useEPPStore((state) => state.retypeLayoutNode);
   const addNestedChildNode = useEPPStore((state) => state.addNestedChildNode);
   const removeLayoutNode = useEPPStore((state) => state.removeLayoutNode);
@@ -32,13 +32,13 @@ function LayoutTreeNode({
         style={{ marginLeft: depth * 14 }}
         role="button"
         tabIndex={0}
-        onClick={() => setSelectedElementIds(isSelected ? [] : [node.id])}
+        onClick={() => setSelection(isSelected ? null : { kind: 'node', id: node.id })}
         onKeyDown={(event) => {
           if (event.key !== 'Enter' && event.key !== ' ') {
             return;
           }
           event.preventDefault();
-          setSelectedElementIds(isSelected ? [] : [node.id]);
+          setSelection(isSelected ? null : { kind: 'node', id: node.id });
         }}
       >
         <div className="flex items-center gap-2">
@@ -112,7 +112,8 @@ function LayoutTreeNode({
 
 export function LayoutTreePanel() {
   const activePageId = useEPPStore((state) => state.ui.activePageId);
-  const selectedNodeId = useEPPStore((state) => state.ui.selectedElementIds[0] ?? null);
+  const selection = useEPPStore((state) => state.ui.selection);
+  const selectedNodeId = selection?.kind === 'node' ? selection.id : null;
   const activePage = useEPPStore(
     (state) => state.document.pages.find((page) => page.id === activePageId) ?? state.document.pages[0],
   );

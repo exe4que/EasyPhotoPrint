@@ -1,8 +1,11 @@
 import { isSimpleModeCompatible, type EPPProjectPage } from '@epp/layout-engine';
 
+/** At most one thing selected app-wide: a layout node, or an Image Library asset -- never both. */
+export type Selection = { kind: 'node'; id: string } | { kind: 'image'; id: string } | null;
+
 export interface UiState {
   activePageId: string;
-  selectedElementIds: string[];
+  selection: Selection;
   activeTool: 'select' | 'pan' | 'crop';
   layoutMode: 'simple' | 'nested';
   viewMode: 'editor' | 'preview';
@@ -11,7 +14,7 @@ export interface UiState {
 export interface UiSlice {
   ui: UiState;
   setActivePageId: (pageId: string) => void;
-  setSelectedElementIds: (ids: string[]) => void;
+  setSelection: (selection: Selection) => void;
   setActiveTool: (tool: UiState['activeTool']) => void;
   setLayoutMode: (mode: UiState['layoutMode']) => void;
   setViewMode: (mode: UiState['viewMode']) => void;
@@ -21,7 +24,7 @@ export interface UiSlice {
 export function createInitialUiState(): UiState {
   return {
     activePageId: 'page-1',
-    selectedElementIds: [],
+    selection: null,
     activeTool: 'select',
     layoutMode: 'simple',
     viewMode: 'editor',
@@ -38,8 +41,8 @@ interface UiSliceDependencies {
  * would leave the root's Container/Slot properties permanently unreachable (§2.3). Deselect
  * actions fall back to the active page's root instead of an empty selection.
  */
-function computeDefaultSelection(layoutMode: UiState['layoutMode'], page: EPPProjectPage | undefined): string[] {
-  return layoutMode === 'simple' && page ? [page.rootNode.id] : [];
+function computeDefaultSelection(layoutMode: UiState['layoutMode'], page: EPPProjectPage | undefined): Selection {
+  return layoutMode === 'simple' && page ? { kind: 'node', id: page.rootNode.id } : null;
 }
 
 /**
@@ -61,7 +64,7 @@ export function computeActivePageUi(currentUi: UiState, activePageId: string, ne
     ...currentUi,
     activePageId,
     layoutMode,
-    selectedElementIds: computeDefaultSelection(layoutMode, nextPage),
+    selection: computeDefaultSelection(layoutMode, nextPage),
   };
 }
 
@@ -77,8 +80,8 @@ export function createUiSlice(
       const nextPage = get().document.pages.find((page) => page.id === activePageId);
       set((state) => ({ ui: computeActivePageUi(state.ui, activePageId, nextPage) }));
     },
-    setSelectedElementIds: (selectedElementIds) => {
-      set((state) => ({ ui: { ...state.ui, selectedElementIds } }));
+    setSelection: (selection) => {
+      set((state) => ({ ui: { ...state.ui, selection } }));
     },
     setActiveTool: (activeTool) => {
       set((state) => ({ ui: { ...state.ui, activeTool } }));
@@ -95,7 +98,7 @@ export function createUiSlice(
           layoutMode,
           // Only force a default selection when entering Simple — Nested keeps whatever
           // was already selected (it has the LayoutTree to reselect the root manually).
-          selectedElementIds: layoutMode === 'simple' ? computeDefaultSelection(layoutMode, activePage) : current.ui.selectedElementIds,
+          selection: layoutMode === 'simple' ? computeDefaultSelection(layoutMode, activePage) : current.ui.selection,
         },
       }));
     },
@@ -103,7 +106,7 @@ export function createUiSlice(
       const state = get();
       const activePage = state.document.pages.find((page) => page.id === state.ui.activePageId);
       set((current) => ({
-        ui: { ...current.ui, selectedElementIds: computeDefaultSelection(current.ui.layoutMode, activePage) },
+        ui: { ...current.ui, selection: computeDefaultSelection(current.ui.layoutMode, activePage) },
       }));
     },
   };

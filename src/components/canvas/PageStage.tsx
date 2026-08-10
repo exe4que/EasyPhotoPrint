@@ -71,8 +71,9 @@ export function PageStage() {
   const imagePool = useEPPStore((state) => state.imagePool);
   const layoutMode = useEPPStore((state) => state.ui.layoutMode);
   const unitSystem = useEPPStore((state) => state.settings.unitSystem);
-  const selectedSlotId = useEPPStore((state) => state.ui.selectedElementIds[0] ?? null);
-  const setSelectedElementIds = useEPPStore((state) => state.setSelectedElementIds);
+  const selection = useEPPStore((state) => state.ui.selection);
+  const selectedSlotId = selection?.kind === 'node' ? selection.id : null;
+  const setSelection = useEPPStore((state) => state.setSelection);
   const clearSelection = useEPPStore((state) => state.clearSelection);
   const assignImageToSlot = useEPPStore((state) => state.assignImageToSlot);
   const clearImageFromSlot = useEPPStore((state) => state.clearImageFromSlot);
@@ -268,7 +269,7 @@ export function PageStage() {
                     return;
                   }
 
-                  setSelectedElementIds([id]);
+                  setSelection({ kind: 'node', id });
                 }}
                 onKeyDown={(event) => {
                   if (event.key !== 'Enter' && event.key !== ' ') {
@@ -281,11 +282,11 @@ export function PageStage() {
                     return;
                   }
 
-                  setSelectedElementIds([id]);
+                  setSelection({ kind: 'node', id });
                 }}
                 {...(page.assignments[id] ? createImageDragProps(page.assignments[id], 'page') : {})}
                 {...createSlotDropProps((imageAssetId, source) => {
-                  setSelectedElementIds([id]);
+                  setSelection({ kind: 'node', id });
                   assignImageToSlot(page.id, id, imageAssetId, source);
                 })}
                 onMouseEnter={() => setHoveredSlotId(id)}
@@ -443,7 +444,7 @@ export function PageStage() {
                       return;
                     }
 
-                    setSelectedElementIds([id]);
+                    setSelection({ kind: 'node', id });
                   }}
                   {...createPositionalDropProps((imageAssetId, event) => {
                     const rect = event.currentTarget.getBoundingClientRect();
@@ -479,7 +480,7 @@ export function PageStage() {
                         isSelected={selectedSlotId === element.imageNodeId}
                         previewZoom={previewZoom}
                         unitSystem={unitSystem}
-                        onSelect={() => setSelectedElementIds([element.imageNodeId])}
+                        onSelect={() => setSelection({ kind: 'node', id: element.imageNodeId })}
                         onRemove={() => removeFreeformElement(page.id, id, element.id)}
                         onTransform={(patch) => updateFreeformElementTransform(page.id, id, element.id, patch)}
                         onDragStart={() => {

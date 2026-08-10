@@ -28,11 +28,11 @@ describe('ui slice', () => {
       document: { pages: [createTestPage('page-1')] },
     };
 
-    state.setSelectedElementIds(['root-of-page-1']);
-    expect(state.ui.selectedElementIds).toEqual(['root-of-page-1']);
+    state.setSelection({ kind: 'node', id: 'root-of-page-1' });
+    expect(state.ui.selection).toEqual({ kind: 'node', id: 'root-of-page-1' });
 
     state.clearSelection();
-    expect(state.ui.selectedElementIds).toEqual(['root-of-page-1']);
+    expect(state.ui.selection).toEqual({ kind: 'node', id: 'root-of-page-1' });
   });
 
   it('clearSelection empties the selection in Nested mode (LayoutTree can reselect the root)', () => {
@@ -47,9 +47,9 @@ describe('ui slice', () => {
     };
 
     state.setLayoutMode('nested');
-    state.setSelectedElementIds(['some-nested-node']);
+    state.setSelection({ kind: 'node', id: 'some-nested-node' });
     state.clearSelection();
-    expect(state.ui.selectedElementIds).toEqual([]);
+    expect(state.ui.selection).toBeNull();
   });
 
   it('setLayoutMode("simple") defaults the selection to the active page root', () => {
@@ -64,10 +64,10 @@ describe('ui slice', () => {
     };
 
     state.setLayoutMode('nested');
-    state.setSelectedElementIds(['some-nested-node']);
+    state.setSelection({ kind: 'node', id: 'some-nested-node' });
     state.setLayoutMode('simple');
 
-    expect(state.ui.selectedElementIds).toEqual(['root-of-page-1']);
+    expect(state.ui.selection).toEqual({ kind: 'node', id: 'root-of-page-1' });
   });
 
   it('setActivePageId selects the new active page root while in Simple mode', () => {
@@ -82,7 +82,7 @@ describe('ui slice', () => {
     };
 
     state.setActivePageId('page-2');
-    expect(state.ui.selectedElementIds).toEqual(['root-of-page-2']);
+    expect(state.ui.selection).toEqual({ kind: 'node', id: 'root-of-page-2' });
   });
 
   it("setActivePageId derives the layout mode from the newly active page's structure", () => {
@@ -110,11 +110,11 @@ describe('ui slice', () => {
 
     state.setActivePageId('nested-page');
     expect(state.ui.layoutMode).toBe('nested');
-    expect(state.ui.selectedElementIds).toEqual([]);
+    expect(state.ui.selection).toBeNull();
 
     state.setActivePageId('page-1');
     expect(state.ui.layoutMode).toBe('simple');
-    expect(state.ui.selectedElementIds).toEqual(['root-of-page-1']);
+    expect(state.ui.selection).toEqual({ kind: 'node', id: 'root-of-page-1' });
   });
 
   it('viewMode defaults to editor and setViewMode toggles it without touching other ui state', () => {
@@ -130,10 +130,10 @@ describe('ui slice', () => {
 
     expect(state.ui.viewMode).toBe('editor');
 
-    state.setSelectedElementIds(['root-of-page-1']);
+    state.setSelection({ kind: 'node', id: 'root-of-page-1' });
     state.setViewMode('preview');
     expect(state.ui.viewMode).toBe('preview');
-    expect(state.ui.selectedElementIds).toEqual(['root-of-page-1']);
+    expect(state.ui.selection).toEqual({ kind: 'node', id: 'root-of-page-1' });
     expect(state.ui.activePageId).toBe('page-1');
 
     state.setViewMode('editor');
@@ -155,5 +155,26 @@ describe('ui slice', () => {
     state.setActivePageId('missing-page');
 
     expect(state.ui.layoutMode).toBe('nested');
+  });
+
+  it('selecting an image clears a previously selected node, and vice versa (at most one selection at a time)', () => {
+    let state: StoreState = {
+      ...createUiSlice(
+        (updater) => {
+          state = { ...state, ...updater(state) } as StoreState;
+        },
+        () => state,
+      ),
+      document: { pages: [createTestPage('page-1')] },
+    };
+
+    state.setSelection({ kind: 'node', id: 'root-of-page-1' });
+    expect(state.ui.selection).toEqual({ kind: 'node', id: 'root-of-page-1' });
+
+    state.setSelection({ kind: 'image', id: 'asset-1' });
+    expect(state.ui.selection).toEqual({ kind: 'image', id: 'asset-1' });
+
+    state.setSelection({ kind: 'node', id: 'root-of-page-1' });
+    expect(state.ui.selection).toEqual({ kind: 'node', id: 'root-of-page-1' });
   });
 });

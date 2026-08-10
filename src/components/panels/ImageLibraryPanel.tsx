@@ -5,11 +5,6 @@ import { useDragAndDrop } from '../../hooks/useDragAndDrop.js';
 import { useEPPStore } from '../../store/index.js';
 import { CollapsiblePanel } from '../ui/CollapsiblePanel.js';
 
-interface ImageLibraryPanelProps {
-  selectedImageAssetId: string | null;
-  onSelectImageAssetId: (imageAssetId: string | null) => void;
-}
-
 function countAssignments(assignments: Record<string, string>): Map<string, number> {
   const counts = new Map<string, number>();
   for (const imageAssetId of Object.values(assignments)) {
@@ -93,10 +88,13 @@ function ImageCard({
   );
 }
 
-export function ImageLibraryPanel({ selectedImageAssetId, onSelectImageAssetId }: ImageLibraryPanelProps) {
+export function ImageLibraryPanel() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const imagePool = useEPPStore((state) => state.imagePool);
   const activePageId = useEPPStore((state) => state.ui.activePageId);
+  const selection = useEPPStore((state) => state.ui.selection);
+  const setSelection = useEPPStore((state) => state.setSelection);
+  const selectedImageAssetId = selection?.kind === 'image' ? selection.id : null;
   const activePage = useEPPStore(
     (state) => state.document.pages.find((page) => page.id === activePageId) ?? state.document.pages[0],
   );
@@ -117,7 +115,7 @@ export function ImageLibraryPanel({ selectedImageAssetId, onSelectImageAssetId }
   return (
     <CollapsiblePanel
       title="Image library"
-      description="Load images from the native dialog, then drag them into the grid slots. Click an image to view its details in the Selection panel."
+      description="Load images from the native dialog, then drag them into the grid slots. Click an image to view its details in the Properties panel."
       defaultCollapsed={false}
       headerAction={
         <button
@@ -151,7 +149,7 @@ export function ImageLibraryPanel({ selectedImageAssetId, onSelectImageAssetId }
                 isSelected={isSelected}
                 assignmentsOnPage={assignmentCounts.get(asset.id) ?? 0}
                 dragProps={createImageDragProps(asset.id)}
-                onSelect={() => onSelectImageAssetId(isSelected ? null : asset.id)}
+                onSelect={() => setSelection(isSelected ? null : { kind: 'image', id: asset.id })}
                 onRelink={() => void relinkImage(asset.id)}
               />
             );

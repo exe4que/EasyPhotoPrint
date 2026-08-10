@@ -6,6 +6,8 @@ const SAVE_PROJECT_CHANNEL = 'menu:save-project';
 const SAVE_PROJECT_AS_CHANNEL = 'menu:save-project-as';
 const UNDO_CHANNEL = 'menu:undo';
 const REDO_CHANNEL = 'menu:redo';
+const SAVE_TEMPLATE_CHANNEL = 'menu:save-template';
+const SAVE_TEMPLATE_AS_CHANNEL = 'menu:save-template-as';
 
 function sendToFocusedWindow(channel: string): void {
   BrowserWindow.getFocusedWindow()?.webContents.send(channel);
@@ -58,10 +60,14 @@ export function buildApplicationMenu(): void {
           click: () => sendToFocusedWindow(REDO_CHANNEL),
         },
         { type: 'separator' },
-        { role: 'cut' },
-        { role: 'copy' },
-        { role: 'paste' },
-        { role: 'selectAll' },
+        {
+          label: 'Save Template',
+          click: () => sendToFocusedWindow(SAVE_TEMPLATE_CHANNEL),
+        },
+        {
+          label: 'Save Template As...',
+          click: () => sendToFocusedWindow(SAVE_TEMPLATE_AS_CHANNEL),
+        },
       ],
     },
     { role: 'help' },

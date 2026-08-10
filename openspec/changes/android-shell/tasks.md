@@ -56,17 +56,17 @@
 
 ## 8. Build, install, and run
 
-- [ ] 8.1 Build an AVD (or confirm a physical device is available) for manual verification.
-- [ ] 8.2 Run `npm run build:android` and `npx cap open android` (or `./gradlew installDebug`) to build and install the app.
-- [ ] 8.3 Launch the app and confirm the renderer boots (same UI as desktop, no console errors from a missing adapter).
+- [x] 8.1 Build an AVD (or confirm a physical device is available) for manual verification.
+- [x] 8.2 Run `npm run build:android` and `npx cap open android` (or `./gradlew installDebug`) to build and install the app.
+- [x] 8.3 Launch the app and confirm the renderer boots (same UI as desktop, no console errors from a missing adapter).
 
 ## 9. End-to-end verification (manual, on emulator/device)
 
-- [ ] 9.1 Load images via "Load images": confirm the native picker opens, selected images appear in the Image Library with correct thumbnails.
-- [ ] 9.2 Assign an image to a slot (tap-to-assign, per `pointer-based-gestures`) and confirm it renders correctly in the page preview.
-- [ ] 9.3 Change the unit toggle, fully close and relaunch the app, confirm the preference persisted.
-- [ ] 9.4 Export PDF: confirm the native "create document" picker opens, the resulting file is a valid multi-page PDF with correctly placed/cropped/resized images.
-- [ ] 9.5 Print: confirm Android's native print dialog opens with the same content as the exported PDF.
+- [x] 9.1 Load images via "Load images": confirm the native picker opens, selected images appear in the Image Library with correct thumbnails.
+- [x] 9.2 Assign an image to a slot (tap-to-assign, per `pointer-based-gestures`) and confirm it renders correctly in the page preview.
+- [x] 9.3 Change the unit toggle, fully close and relaunch the app, confirm the preference persisted.
+- [x] 9.4 Export PDF: confirm the native "create document" picker opens, the resulting file is a valid multi-page PDF with correctly placed/cropped/resized images.
+- [x] 9.5 Print: confirm Android's native print dialog opens with the same content as the exported PDF.
 - [ ] 9.6 Save a project, fully close and relaunch the app, open that project via "Open project", confirm all pages/images/layout restore correctly.
 - [ ] 9.7 Confirm no shared component under `src/components`, `src/store`, `src/hooks`, or `src/lib` (other than the new Android-specific modules) needed any changes to make the above work.
 

@@ -35,7 +35,8 @@ export interface EppAPI {
     onSaveTemplateAs: (callback: () => void) => () => void;
   };
   pdf: {
-    export: (project: EPPProject) => Promise<Uint8Array>;
+    /** Prompts a native save dialog and writes the exported PDF there; returns the saved path, or null if canceled. */
+    export: (project: EPPProject) => Promise<string | null>;
   };
   print: {
     document: (project: EPPProject) => Promise<void>;

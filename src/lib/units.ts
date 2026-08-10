@@ -1,5 +1,6 @@
 export const MM_PER_INCH = 25.4;
 export const PT_PER_INCH = 72;
+export const MICRONS_PER_MM = 1000;
 
 export type UnitSystem = 'metric' | 'imperial';
 
@@ -37,6 +38,11 @@ export function pxToMm(px: number, zoomLevel = 1, screenDpi = 96): number {
 
 export function mmToPt(mm: number): number {
   return (mm / MM_PER_INCH) * PT_PER_INCH;
+}
+
+/** Electron's print `pageSize` is expressed in microns, and only accepts whole numbers. */
+export function mmToMicrons(mm: number): number {
+  return Math.round(mm * MICRONS_PER_MM);
 }
 
 export function mmToInches(mm: number): number {

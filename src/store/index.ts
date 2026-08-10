@@ -16,6 +16,19 @@ function deriveProjectNameFromPath(filePath: string): string {
   return base.replace(/\.eppproj$/i, '') || 'Untitled';
 }
 
+/** Assembles the full `EPPProject` payload IPC calls that operate on the whole document (save,
+ * PDF export, print) send across the boundary -- the same fields, from the same state slices,
+ * every time. */
+function buildEppProject(state: Pick<EPPStore, 'project' | 'document' | 'imagePool'>): EPPProject {
+  return {
+    schemaVersion: '1.0.0',
+    id: state.project.id,
+    name: state.project.name,
+    pages: state.document.pages,
+    imagePool: state.imagePool,
+  };
+}
+
 export type EPPStore = DocumentSlice &
   UiSlice &
   ImagePoolSlice &
@@ -33,6 +46,10 @@ export type EPPStore = DocumentSlice &
     saveProject: (forceDialog: boolean) => Promise<void>;
     /** Opens a project from disk, replacing the current document/image pool and clearing undo/redo history. Returns false (no-op) if the native picker was canceled, true if a project was loaded. */
     openProject: () => Promise<boolean>;
+    /** Composes the current project into a PDF and prompts a native save dialog. Returns the saved path, or null if canceled. */
+    exportPdf: () => Promise<string | null>;
+    /** Composes the current project into a PDF (every page, in order) and opens the native print dialog against it as a single job. */
+    printDocument: () => Promise<void>;
     /** Relinks a "missing" ImageAsset to a newly chosen file. No-op if the native picker is canceled. */
     relinkImage: (imageAssetId: string) => Promise<void>;
     /** Appends a new page with the app's default page config and a blank rootNode, and makes it the active page. */
@@ -89,13 +106,7 @@ export const useEPPStore = create<EPPStore>()(
         },
         saveProject: async (forceDialog) => {
           const state = get();
-          const project: EPPProject = {
-            schemaVersion: '1.0.0',
-            id: state.project.id,
-            name: state.project.name,
-            pages: state.document.pages,
-            imagePool: state.imagePool,
-          };
+          const project = buildEppProject(state);
 
           const resolvedPath = await getEppApi().fs.saveProject(project, {
             existingPath: state.project.filePath,
@@ -109,6 +120,8 @@ export const useEPPStore = create<EPPStore>()(
             project: { ...s.project, filePath: resolvedPath, name: deriveProjectNameFromPath(resolvedPath) },
           }));
         },
+        exportPdf: () => getEppApi().pdf.export(buildEppProject(get())),
+        printDocument: () => getEppApi().print.document(buildEppProject(get())),
         openProject: async () => {
           const result = await getEppApi().fs.openProject();
           if (result == null) {

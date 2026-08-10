@@ -6,6 +6,7 @@ import {
   formatLength,
   inchesToMm,
   mmToInches,
+  mmToMicrons,
   mmToPt,
   parseLength,
   pxToMm,
@@ -20,6 +21,11 @@ describe('units', () => {
   it('formats and parses imperial lengths', () => {
     expect(formatLength(25.4, 'imperial')).toBe('1.00"');
     expect(parseLength('1.00"', 'imperial')).toBeCloseTo(25.4);
+  });
+
+  it('converts mm to whole microns for Electron print page sizes', () => {
+    expect(mmToMicrons(297)).toBe(297000);
+    expect(mmToMicrons(215.9)).toBe(215900);
   });
 
   it('converts between mm, px and pt', () => {

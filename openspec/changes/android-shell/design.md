@@ -1,0 +1,85 @@
+## Context
+
+Everything shared renderer code needs from its host already goes through one contract (`EppAPI` in `src/lib/platform/contract.ts`), selected at startup by `registerPlatformAdapter` and read via `getEppApi()` — see `openspec/specs/platform-adapter/spec.md`. The Electron adapter (`src/lib/platform/electronAdapter.ts`) is a thin pass-through over `window.eppAPI`. This change writes the second adapter the contract was built for, plus the native shell around it.
+
+Three things `platform-adapter`'s own spec already commits to make this tractable:
+- Location identifiers (`storedPath`, a saved project's path) are opaque — Android's `content://` URIs satisfy the contract exactly as well as Electron's filesystem paths, with zero renderer-visible difference.
+- The contract is total — Android's missing native menu bar is absorbed as eight no-op subscriptions, not a branch in shared code.
+- `.eppproj` is fully self-contained (`packaged-project-files`) and PDF/thumbnail/preview decoding no longer needs a host-specific image API (`portable-pdf-pipeline`) — both preconditions this change was explicitly staged to depend on.
+
+No mobile toolchain, Capacitor dependency, or `android/` project exists in this repo yet. This design covers standing all of that up for the first time.
+
+## Goals / Non-Goals
+
+**Goals:**
+- The existing renderer (`src/`) runs unmodified inside an Android WebView, proving the four prior phases actually decoupled it from Electron.
+- Every `EppAPI` member has a real, working Android implementation — no member throws "not implemented" or silently no-ops except the `menu` namespace, which the contract itself defines as legitimately no-op on a host without a menu bar.
+- The whole thing is verifiable by building, installing, and driving the app on a real emulator or device.
+
+**Non-Goals:**
+- Not publishing to the Play Store, not app icons/branding, not a touch-optimized layout redesign (`pointer-based-gestures` already made every gesture input-agnostic; this change doesn't revisit layout).
+- Not byte-for-byte PDF output parity with Electron. The Android compositor reuses the same pure placement math but a different decode/resize backend (browser Canvas instead of `nativeImage`); minor rendering differences are accepted.
+- Not building a CI/emulator matrix. Verification for this change is manual, the same posture every prior phase's E2E recipe already took for desktop.
+- Not sharing one compositor module between Electron Main and the Android WebView at the source level in this change. Both call the same pure helpers (`composeProjectPdf.helpers.ts`, `pdfPlacement.ts`); the decode/encode glue around them is written twice, once per runtime, because the two runtimes' decode APIs (`nativeImage` vs. `createImageBitmap`/`OffscreenCanvas`) are different enough that a shared abstraction would be speculative before a second real caller exists to validate it against — the same YAGNI reasoning `portable-pdf-pipeline`'s design.md used for not generalizing `ImageDecoder` beyond Electron.
+
+## Decisions
+
+### 1. Capacitor, not a hand-rolled WebView shell
+
+Capacitor is the vehicle every prior proposal's language ("Capacitor/Android WebView") already assumed. It gives a maintained `android/` Gradle project, a WebView host with a sane default security posture (HTTPS-scheme local server, not raw `file://`), a plugin SDK for the two custom Kotlin plugins this change needs, and an official `Preferences` plugin for settings. Building a raw `WebView`-in-an-`Activity` shell by hand would mean reimplementing all of that (plugin bridging, JS↔native message passing, lifecycle handling) for no benefit — Capacitor's whole purpose is to be this layer.
+
+Alternative considered: React Native. Rejected outright — it would mean rewriting every component in `src/`, not reusing them, which defeats the entire point of the four prior phases.
+
+### 2. Two build targets, one `src/`
+
+`electron-vite` already builds `src/` for the Electron renderer. This change adds a second Vite build (a new `vite.mobile.config.ts` or an additional target in the existing Vite config) that produces a plain static bundle — no Electron-specific chunking, no `out/main`/`out/preload` — written to a directory Capacitor's `capacitor.config.ts` `webDir` points at. A new entry point (`src/main.android.tsx`, mirroring `src/main.tsx`) calls `registerPlatformAdapter(createAndroidAdapter())` before rendering; `src/main.tsx` is untouched.
+
+Both entry points import the same `App.tsx` and the same store. Nothing under `src/components`, `src/store`, `src/hooks`, or `src/lib` (other than the new `androidAdapter.ts` file and its supporting modules) changes — confirming that is part of this change's acceptance criteria, per the proposal.
+
+### 3. `dialog`/`fs` go through a custom SAF-backed Capacitor plugin, not `@capacitor/filesystem`
+
+`@capacitor/filesystem` operates on Capacitor's own `Directory` enum (app data, cache, external storage) — it has no `ACTION_OPEN_DOCUMENT`/`ACTION_CREATE_DOCUMENT` picker and no persistent `content://` URI story, so it can't produce the "user picks a file, gets a real result back" interaction `dialog.openImages`/`fs.openProject`/`fs.saveProject` need. A small custom Kotlin plugin (`SafFilePlugin` or similar) wraps three Android intents directly:
+- `ACTION_OPEN_DOCUMENT` (`GetContent`-style multi-select, MIME-filtered to image types) for `dialog.openImages`.
+- `ACTION_OPEN_DOCUMENT` (single-select, MIME-filtered) for `dialog.relinkImage` and `fs.openProject` (filtered by `.eppproj`'s registered MIME/extension).
+- `ACTION_CREATE_DOCUMENT` for `fs.saveProject`'s "Save As" path; the plain "Save" path (an already-known `content://` URI) writes directly via `ContentResolver.openOutputStream` with no new intent.
+
+Each returned `content://` URI is read via `ContentResolver` and its bytes copied into the app's private cache directory — the Android equivalent of `packaged-project-files`'s Electron working directory — because a `content://` grant is not guaranteed to stay readable indefinitely (per the research `packaged-project-files`'s own proposal cites) and every existing decode/compose code path in this change expects a real, locally-decodable resource. The TS-side `AndroidAdapter` methods that call this plugin are what perform the "copy in, decode, thumbnail" sequence `fs.handlers.ts`'s `createImageAssetFromPath`/`regenerateImageAsset` perform on Electron — the plugin's job stops at "here are the picked URI(s) and their raw bytes."
+
+Alternative considered: a community file-picker plugin (e.g. `@capawesome-team/capacitor-file-picker`). Rejected for `fs.saveProject`/`fs.openProject` specifically — community pickers are typically read-oriented (`ACTION_OPEN_DOCUMENT` only) and don't cover the `ACTION_CREATE_DOCUMENT` "Save As" flow this contract needs; mixing a community plugin for reads with a custom plugin for writes would be more total complexity than one small custom plugin covering both.
+
+### 4. PDF composition and image decode run in the WebView, not in a plugin
+
+`portable-pdf-pipeline` deliberately shaped `ImageDecoder`/`DecodedImage` around exactly the operations `composeProjectPdf.ts` uses, and its design.md named the WebView's own `createImageBitmap`/`OffscreenCanvas` as a viable decode backend. This change cashes that in: a new TS module (parallel to `electron/main/pdf/composeProjectPdf.ts`, not a shared file — see Non-Goals) runs entirely in the renderer bundle, calling `composeProjectPdf.helpers.ts`'s `computePagePlacements` (pure, already portable) and `pdfPlacement.ts`'s placement math (pure, already portable) exactly as Electron's compositor does, but decoding/cropping/resizing images via `createImageBitmap` + `OffscreenCanvas.getContext('2d')` instead of `nativeImage`, and encoding via `OffscreenCanvas.convertToBlob({ type: 'image/jpeg' })` instead of `toJPEG`. `pdf-lib` itself needs no substitution — it already runs identically in a browser.
+
+`images.decodeAtSize` (print-resolution preview) and ingest-time thumbnailing follow the same pattern at smaller scale: `createImageBitmap` from the copied-in cache file, draw to an `OffscreenCanvas` sized per `computeCoverDecodeSize`/`computeThumbnailSize` (both already pure, already reused from `fs.helpers.ts`... actually these are Main-process-local; this change ports their pure logic, not their file, into a renderer-side module, since `fs.helpers.ts` lives under `electron/main/ipc/` and importing across the Electron/renderer boundary isn't meaningful — Android's equivalent helper is a new module with the same pure logic, not a shared import).
+
+This means: no native image-decoding plugin exists in this change at all. That's the direct payoff `portable-pdf-pipeline`'s proposal named as the reason for building that contract in the first place.
+
+### 5. Printing reuses the same in-WebView compositor, handed off to a second small Kotlin plugin
+
+`print.document` calls the same in-WebView compositor `pdf.export` uses to produce PDF bytes, then passes those bytes (as a base64 string, Capacitor's standard plugin-call payload shape) to a second custom Kotlin plugin (`PrintPlugin`) that writes them to a temp file and calls `PrintManager.print(...)` with a `PrintDocumentAdapter` implementation that streams that file — the standard, well-documented Android pattern for "print an already-rendered PDF." This opens the real OS print dialog, satisfying `printing`'s existing host-neutral requirement text ("the operating system's native print dialog") the same way Electron's `webContents.print()` does today.
+
+Alternative considered: driving print through the WebView's own `window.print()`. Rejected — that prints the currently-loaded HTML page's rendered content via Chrome's print pipeline, not the composed PDF (which accounts for exact placement/crop/DPI the same way Export does); using it would mean `print.document` and `pdf.export` diverge in what they actually produce, which `printing`'s spec explicitly requires them not to ("rendered exactly as print preview renders it").
+
+### 6. Settings via the official `@capacitor/preferences` plugin
+
+`AppSettings` is a small, flat key-value shape (`unitSystem`, `defaultPrinterName?`) with no query/relational needs — exactly `@capacitor/preferences`'s (SharedPreferences-backed) use case. Using the official, maintained plugin here instead of a third custom one keeps the two custom plugins in this change scoped to the things Capacitor genuinely has no first-party answer for (SAF document picking, PDF printing).
+
+### 7. `menu` is eight no-op subscriptions
+
+Directly required by `platform-adapter`'s existing "Platform Contract Is Total" requirement, already scenario'd for exactly this case ("a host without host-initiated commands still satisfies the contract"). No new spec requirement needed for this — it's `android-shell`'s adapter simply doing what `platform-adapter` already mandates.
+
+## Risks / Trade-offs
+
+- [Two independent PDF compositors (Electron's `nativeImage`-backed, Android's Canvas-backed) can drift in behavior over time as each is modified independently] → Accepted per Non-Goals; both call the same pure placement math, so drift is limited to decode/resize/encode fidelity, not layout correctness. Revisit sharing a real abstraction only once a second real implementation's rough edges are known, not speculatively.
+- [Custom Kotlin plugins are new surface with no prior art in this repo — SAF intent handling and `PrintDocumentAdapter` both have real edge cases (permission denial, `ACTION_CREATE_DOCUMENT` cancellation, print job failure)] → Scoped narrowly (three SAF intents, one print call) and covered by the manual E2E verification pass this change requires before archiving, the same bar `pointer-based-gestures` set for gesture code with no unit-test harness.
+- [No CI or emulator automation verifies this on every future change] → Accepted per Non-Goals; the existing desktop E2E recipe has the same property (manual, Playwright-driven, run on demand) and this change doesn't raise the bar beyond that precedent.
+- [`content://` byte-copy-to-cache means large image libraries consume device storage twice (source + cached copy), same trade-off `packaged-project-files` already accepted on desktop] → Same reasoning applies: acceptable for a photo-layout tool's typical project size.
+
+## Migration Plan
+
+None — this is wholly new, additive surface (a new build target, a new adapter, a new native project). No existing Electron code path, IPC channel, or file format changes. Nothing to roll back beyond removing the new files if the approach needs revisiting.
+
+## Open Questions
+
+- Exact minimum Android API level / target SDK version to declare in `android/app/build.gradle` — left to `tasks.md` to pin against whatever Capacitor's current stable release recommends at implementation time, rather than freezing a number here that may already be stale.

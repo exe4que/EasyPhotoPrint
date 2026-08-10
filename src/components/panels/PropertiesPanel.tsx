@@ -209,7 +209,6 @@ export function PropertiesPanel() {
   const activePageId = useEPPStore((state) => state.ui.activePageId);
   const layoutMode = useEPPStore((state) => state.ui.layoutMode);
   const selection = useEPPStore((state) => state.ui.selection);
-  const setSelection = useEPPStore((state) => state.setSelection);
   const unitSystem = useEPPStore((state) => state.settings.unitSystem);
   const activePage = useEPPStore(
     (state) => state.document.pages.find((page) => page.id === activePageId) ?? state.document.pages[0],
@@ -234,14 +233,6 @@ export function PropertiesPanel() {
             {selectedAsset ? `${selectedAsset.widthPx}×${selectedAsset.heightPx}` : 'Click a thumbnail to see its details, or drag it to a slot to assign it.'}
           </div>
         </div>
-
-        <button
-          type="button"
-          onClick={() => setSelection(null)}
-          className="mt-4 w-full rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-200 hover:border-slate-600"
-        >
-          Clear selected image
-        </button>
       </CollapsiblePanel>
     );
   }

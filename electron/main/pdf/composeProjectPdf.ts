@@ -97,7 +97,7 @@ async function embedPlacedImage(pdfDoc: PDFDocument, page: PDFPage, spec: ImageP
 }
 
 /** Composes an entire project into a single, multi-page PDF: one page per `project.pages` entry,
- * each at its own configured size/orientation, with every placed image drawn directly via
+ * all sharing the project's single `sheetSize` but each at its own configured orientation, with every placed image drawn directly via
  * `pdf-lib` (no browser rendering pass) using the same pure fit/crop/rotation math print-preview's
  * on-screen rendering already uses. Used by both `pdf:export` (written straight to disk) and
  * `print:document` (written to a temp file and handed to Chromium's built-in PDF viewer). */
@@ -106,7 +106,7 @@ export async function composeProjectPdf(project: EPPProject): Promise<Uint8Array
   const imageAssetMap = new Map(project.imagePool.map((asset) => [asset.id, asset]));
 
   for (const page of project.pages) {
-    const { pageBoxMm, dpi, imageSlots, freeformCanvases } = computePagePlacements(page, imageAssetMap);
+    const { pageBoxMm, dpi, imageSlots, freeformCanvases } = computePagePlacements(project.sheetSize, page, imageAssetMap);
     const pdfPage = pdfDoc.addPage([mmToPt(pageBoxMm.w), mmToPt(pageBoxMm.h)]);
     const pageHeightMm = pageBoxMm.h;
 

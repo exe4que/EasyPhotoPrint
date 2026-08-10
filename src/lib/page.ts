@@ -1,4 +1,4 @@
-import type { BoxMm, PageConfig } from '@epp/layout-engine';
+import type { BoxMm, SheetSize } from '@epp/layout-engine';
 
 const PAGE_PRESETS_MM = {
   A4: { widthMm: 210, heightMm: 297 },
@@ -9,13 +9,16 @@ const PAGE_PRESETS_MM = {
   A3: { widthMm: 297, heightMm: 420 },
 } as const;
 
-export function resolvePageSizeMm(pageConfig: PageConfig): { widthMm: number; heightMm: number } {
+export function resolvePageSizeMm(
+  sheetSize: SheetSize,
+  orientation: 'portrait' | 'landscape',
+): { widthMm: number; heightMm: number } {
   const baseSize =
-    pageConfig.sizePreset === 'Custom'
-      ? pageConfig.customSizeMm ?? { widthMm: 210, heightMm: 297 }
-      : PAGE_PRESETS_MM[pageConfig.sizePreset];
+    sheetSize.sizePreset === 'Custom'
+      ? sheetSize.customSizeMm ?? { widthMm: 210, heightMm: 297 }
+      : PAGE_PRESETS_MM[sheetSize.sizePreset];
 
-  if (pageConfig.orientation === 'landscape') {
+  if (orientation === 'landscape') {
     return {
       widthMm: baseSize.heightMm,
       heightMm: baseSize.widthMm,
@@ -25,8 +28,8 @@ export function resolvePageSizeMm(pageConfig: PageConfig): { widthMm: number; he
   return baseSize;
 }
 
-export function createPageBoxMm(pageConfig: PageConfig): BoxMm {
-  const size = resolvePageSizeMm(pageConfig);
+export function createPageBoxMm(sheetSize: SheetSize, orientation: 'portrait' | 'landscape'): BoxMm {
+  const size = resolvePageSizeMm(sheetSize, orientation);
   return {
     x: 0,
     y: 0,

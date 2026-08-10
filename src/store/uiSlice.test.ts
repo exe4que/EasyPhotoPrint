@@ -7,7 +7,7 @@ import { createUiSlice, type UiSlice } from './uiSlice.js';
 function createTestPage(id: string): EPPProjectPage {
   return {
     id,
-    pageConfig: { sizePreset: 'A4', orientation: 'portrait', dpi: 300 },
+    pageConfig: { orientation: 'portrait', dpi: 300 },
     templateRef: undefined,
     rootNode: { id: `root-of-${id}`, type: 'imageSlot' },
     assignments: {},
@@ -88,7 +88,7 @@ describe('ui slice', () => {
   it("setActivePageId derives the layout mode from the newly active page's structure", () => {
     const nestedPage: EPPProjectPage = {
       id: 'nested-page',
-      pageConfig: { sizePreset: 'A4', orientation: 'portrait', dpi: 300 },
+      pageConfig: { orientation: 'portrait', dpi: 300 },
       templateRef: undefined,
       rootNode: {
         id: 'nested-root',

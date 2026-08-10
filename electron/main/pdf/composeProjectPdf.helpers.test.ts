@@ -1,7 +1,9 @@
-import type { EPPProjectPage, ImageAsset, LayoutNode } from '@epp/layout-engine';
+import type { EPPProjectPage, ImageAsset, LayoutNode, SheetSize } from '@epp/layout-engine';
 import { describe, expect, it } from 'vitest';
 
 import { computePagePlacements } from './composeProjectPdf.helpers.js';
+
+const A4: SheetSize = { sizePreset: 'A4' };
 
 function asset(overrides: Partial<ImageAsset> = {}): ImageAsset {
   return {
@@ -23,7 +25,7 @@ function imageSlotNode(id: string, overrides: Partial<LayoutNode> = {}): LayoutN
 function page(rootNode: LayoutNode, assignments: Record<string, string> = {}, overrides: Partial<EPPProjectPage> = {}): EPPProjectPage {
   return {
     id: 'page-1',
-    pageConfig: { sizePreset: 'A4', orientation: 'portrait', dpi: 300 },
+    pageConfig: { orientation: 'portrait', dpi: 300 },
     rootNode,
     assignments,
     ...overrides,
@@ -31,10 +33,10 @@ function page(rootNode: LayoutNode, assignments: Record<string, string> = {}, ov
 }
 
 describe('computePagePlacements', () => {
-  it('sizes the page from pageConfig, honoring orientation', () => {
+  it('sizes the page from the document sheet size, honoring the page orientation', () => {
     const root = imageSlotNode('root');
-    const portrait = computePagePlacements(page(root, {}, { pageConfig: { sizePreset: 'A4', orientation: 'portrait', dpi: 300 } }), new Map());
-    const landscape = computePagePlacements(page(root, {}, { pageConfig: { sizePreset: 'A4', orientation: 'landscape', dpi: 300 } }), new Map());
+    const portrait = computePagePlacements(A4, page(root, {}, { pageConfig: { orientation: 'portrait', dpi: 300 } }), new Map());
+    const landscape = computePagePlacements(A4, page(root, {}, { pageConfig: { orientation: 'landscape', dpi: 300 } }), new Map());
 
     expect(portrait.pageBoxMm).toEqual({ x: 0, y: 0, w: 210, h: 297 });
     expect(landscape.pageBoxMm).toEqual({ x: 0, y: 0, w: 297, h: 210 });
@@ -43,7 +45,7 @@ describe('computePagePlacements', () => {
 
   it('skips an imageSlot with no assignment', () => {
     const root = imageSlotNode('root');
-    const result = computePagePlacements(page(root), new Map());
+    const result = computePagePlacements(A4, page(root), new Map());
 
     expect(result.imageSlots).toHaveLength(0);
   });
@@ -51,7 +53,7 @@ describe('computePagePlacements', () => {
   it('skips an imageSlot assigned to a missing asset', () => {
     const root = imageSlotNode('root');
     const assetMap = new Map([['asset-1', asset({ missing: true })]]);
-    const result = computePagePlacements(page(root, { root: 'asset-1' }), assetMap);
+    const result = computePagePlacements(A4, page(root, { root: 'asset-1' }), assetMap);
 
     expect(result.imageSlots).toHaveLength(0);
   });
@@ -61,7 +63,7 @@ describe('computePagePlacements', () => {
       imageSlotConfig: { scalingRule: 'envelopeParent', imageRotationDeg: 90 },
     });
     const assetMap = new Map([['asset-1', asset()]]);
-    const result = computePagePlacements(page(root, { root: 'asset-1' }), assetMap);
+    const result = computePagePlacements(A4, page(root, { root: 'asset-1' }), assetMap);
 
     expect(result.imageSlots).toHaveLength(1);
     const placed = result.imageSlots[0];
@@ -85,7 +87,7 @@ describe('computePagePlacements', () => {
       ],
     };
     const assetMap = new Map([['asset-1', asset()]]);
-    const result = computePagePlacements(page(canvas, { 'shadow-1': 'asset-1' }), assetMap);
+    const result = computePagePlacements(A4, page(canvas, { 'shadow-1': 'asset-1' }), assetMap);
 
     expect(result.imageSlots).toHaveLength(0); // the shadow node has no layout box of its own
     expect(result.freeformCanvases).toHaveLength(1);
@@ -106,7 +108,7 @@ describe('computePagePlacements', () => {
       paddingMm: { top: 5, right: 10, bottom: 15, left: 20 },
       freeformElements: [],
     };
-    const result = computePagePlacements(page(canvas), new Map());
+    const result = computePagePlacements(A4, page(canvas), new Map());
 
     expect(result.freeformCanvases[0].clipBoxMm).toEqual({ x: 20, y: 5, w: 210 - 20 - 10, h: 297 - 5 - 15 });
   });
@@ -120,7 +122,7 @@ describe('computePagePlacements', () => {
       ],
     };
     const assetMap = new Map([['asset-1', asset({ missing: true })]]);
-    const result = computePagePlacements(page(canvas, { 'shadow-1': 'asset-1' }), assetMap);
+    const result = computePagePlacements(A4, page(canvas, { 'shadow-1': 'asset-1' }), assetMap);
 
     expect(result.freeformCanvases[0].elements).toHaveLength(0);
   });

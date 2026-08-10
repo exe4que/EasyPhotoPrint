@@ -1,10 +1,51 @@
-import type { EPPProject, EPPProjectPage, ImageAsset } from '@epp/layout-engine';
+import type { EPPProject, EPPProjectPage, ImageAsset, ProjectPageConfig, SheetSize } from '@epp/layout-engine';
 import { migrateProject } from '@epp/migrations';
 
-import { assertLayoutNode, assertPageConfig } from './templates.helpers.js';
+import { assertLayoutNode } from './templates.helpers.js';
 
 /** An ImageAsset as persisted on disk -- never carries thumbnailDataUrl or missing (both are derived at load time, not saved). */
 export type PersistedImageAsset = Omit<ImageAsset, 'thumbnailDataUrl' | 'missing'>;
+
+/** A project page's own config -- orientation/dpi only. Sheet size lives solely on the
+ * document-level `sheetSize` (see assertSheetSize below), never per page. */
+function assertProjectPageConfig(value: Record<string, unknown>): ProjectPageConfig {
+  const orientation = value.orientation;
+  const dpi = value.dpi;
+
+  if ((orientation !== 'portrait' && orientation !== 'landscape') || typeof dpi !== 'number') {
+    throw new Error('Project page config is invalid.');
+  }
+
+  return { orientation, dpi };
+}
+
+function assertSheetSize(value: Record<string, unknown>): SheetSize {
+  const sizePreset = value.sizePreset;
+
+  if (
+    sizePreset !== 'A4' &&
+    sizePreset !== 'Letter' &&
+    sizePreset !== 'Legal' &&
+    sizePreset !== '4x6' &&
+    sizePreset !== '5x7' &&
+    sizePreset !== 'A3' &&
+    sizePreset !== 'Custom'
+  ) {
+    throw new Error('Project sheet size is invalid.');
+  }
+
+  const customSizeRaw = value.customSizeMm as Record<string, unknown> | undefined;
+  const customSizeMm =
+    typeof customSizeRaw === 'object' &&
+    customSizeRaw != null &&
+    !Array.isArray(customSizeRaw) &&
+    typeof customSizeRaw.widthMm === 'number' &&
+    typeof customSizeRaw.heightMm === 'number'
+      ? { widthMm: customSizeRaw.widthMm, heightMm: customSizeRaw.heightMm }
+      : undefined;
+
+  return { sizePreset, customSizeMm };
+}
 
 function assertProjectPage(value: Record<string, unknown>): EPPProjectPage {
   const id = value.id;
@@ -27,7 +68,7 @@ function assertProjectPage(value: Record<string, unknown>): EPPProjectPage {
 
   return {
     id,
-    pageConfig: assertPageConfig(pageConfigRaw as Record<string, unknown>),
+    pageConfig: assertProjectPageConfig(pageConfigRaw as Record<string, unknown>),
     templateRef: typeof value.templateRef === 'string' ? value.templateRef : undefined,
     rootNode: assertLayoutNode(rootNodeRaw as Record<string, unknown>),
     assignments: assignments as Record<string, string>,
@@ -71,6 +112,7 @@ export function normalizeProjectDocument(raw: unknown): {
       schemaVersion: migrated.schemaVersion,
       id: migrated.id,
       name: migrated.name,
+      sheetSize: assertSheetSize(migrated.sheetSize),
       pages: migrated.pages.map(assertProjectPage),
     },
     imagePool: migrated.imagePool.map(assertPersistedImageAsset),
@@ -99,6 +141,7 @@ export function prepareProjectForSave(project: EPPProject): unknown {
     schemaVersion: project.schemaVersion,
     id: project.id,
     name: project.name,
+    sheetSize: project.sheetSize,
     pages: project.pages,
     imagePool: project.imagePool.map(({ thumbnailDataUrl: _thumbnailDataUrl, missing: _missing, ...persisted }) => persisted),
   };

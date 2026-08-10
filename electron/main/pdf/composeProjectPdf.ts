@@ -1,4 +1,3 @@
-import { nativeImage } from 'electron';
 import {
   PDFDocument,
   clip,
@@ -18,9 +17,11 @@ import { computeImageRenderRectMm } from '../../../src/lib/imageDisplay.js';
 import { computePdfImagePlacement } from '../../../src/lib/pdfPlacement.js';
 import { domainToPdfCoords, mmToPt, mmToPx } from '../../../src/lib/units.js';
 import { computeCoverDecodeSize } from '../ipc/fs.helpers.js';
+import { createElectronImageDecoder } from '../imageDecoder.js';
 import { computePagePlacements, type ImagePlacementSpec } from './composeProjectPdf.helpers.js';
 
 const JPEG_QUALITY = 92;
+const decoder = createElectronImageDecoder();
 
 /** Restricts subsequent drawing on `page` to `boxMm` (converted to PDF space) until `unclip` is
  * called -- mirrors the `overflow-hidden` wrapper `PreviewStage.tsx` uses per imageSlot and per
@@ -54,7 +55,7 @@ async function embedPlacedImage(pdfDoc: PDFDocument, page: PDFPage, spec: ImageP
     return;
   }
 
-  let bitmap = nativeImage.createFromPath(spec.asset.storedPath);
+  let bitmap = await decoder.decodeFromPath(spec.asset.storedPath);
   const nativeSize = bitmap.getSize();
   if (nativeSize.width <= 0 || nativeSize.height <= 0) {
     return;

@@ -1,0 +1,42 @@
+## 1. Dependencies and placement/rotation geometry
+
+- [ ] 1.1 Add `pdf-lib` to `package.json` (Main-only usage; do not import it from renderer code).
+- [ ] 1.2 Add `mmToPt`/`domainToPdfCoords`-adjacent pure helper(s) for converting a domain-space (mm, Y-down, top-left origin) box's absolute center + pre-rotation size + rotation angle (continuous degrees, clockwise-positive) into the `x`/`y`/`rotate` `pdf-lib`'s `page.drawImage` needs, accounting for `pdf-lib` rotating around its own anchor corner rather than the box's center, and for PDF's Y-up axis. Put it alongside `src/lib/units.ts` (or a new `src/lib/pdfPlacement.ts`) so it can be unit-tested with the same tooling as `computeImageRenderRectMm`.
+- [ ] 1.3 Unit test that helper directly: 0°, 90°, and at least one non-axis-aligned angle, asserting against manually-derived expected coordinates (this is the highest-risk new math in this change — see design.md Risks).
+
+## 2. PDF page composition
+
+- [ ] 2.1 Create `electron/main/pdf/composeProjectPdf.ts`: given an `EPPProject`, build a `pdf-lib` `PDFDocument` with one page per project page, each sized via `mmToPt` from that page's `pageConfig` (honoring orientation).
+- [ ] 2.2 For each `imageSlot` with an assigned, non-missing asset: resolve its absolute box via `resolveLayout`, compute the pre-rotation render size via `computeImageRenderRectMm` (passing `imageSlotConfig.imageRotationDeg` as the discrete rotation), and — for `envelopeParent` — the source crop rect via `computeEnvelopeCrop`.
+- [ ] 2.3 For each `freeformElement` with an assigned, non-missing asset: same as 2.2 but using the element's own `transform` (width/height/x/y) plus its parent `freeformCanvas`'s padding offset for the absolute box, `computeImageRenderRectMm` called with `discreteRotation = undefined` (freeform's rotation is whole-box, applied in 2.5, not baked into the fit math), matching how `SlotImage`/`PreviewFreeformImage` split the two rotation concepts today.
+- [ ] 2.4 Decode the source image at print resolution: `nativeImage.createFromPath` + the existing `computeCoverDecodeSize` targeting the render rect's pixel size at the page's DPI, `.crop()` first when 2.2/2.3 computed a crop rect, then `.toJPEG(92)` for embeddable bytes. Reuse/extract this from the existing `fs.helpers.ts`/`fs.handlers.ts` decode logic rather than duplicating it.
+- [ ] 2.5 Embed each JPEG (`pdfDoc.embedJpg`) and draw it (`page.drawImage`) using the placement helper from 1.2, rotated by `imageSlotConfig.imageRotationDeg ?? 0` (imageSlot) or `element.transform.rotationDeg` (freeform) around the slot/element box's own center.
+- [ ] 2.6 Leave unassigned slots and slots with a missing-asset assignment untouched (the page's own blank background already satisfies "renders blank" — no placeholder drawing).
+- [ ] 2.7 Unit tests for `composeProjectPdf`'s non-geometry logic where practical (e.g. page count/sizing matches `pages.length` and each page's `pageConfig`, slots with no assignment produce no draw calls) — full visual correctness is covered by 1.3's geometry tests plus manual verification (task 6.2), not by asserting on raw PDF bytes.
+
+## 3. Main: PDF export
+
+- [ ] 3.1 Implement `pdf:export` in `electron/main/ipc/pdf.handlers.ts`: receive the project payload from the renderer, open a save dialog (`dialog.showSaveDialog`, default filename from the project name, `.pdf` filter); return `null` immediately without composing anything if cancelled.
+- [ ] 3.2 Call `composeProjectPdf(project)`, `pdfDoc.save()`, write the bytes to the chosen path, return the saved path.
+- [ ] 3.3 On any failure (a source image that fails to decode, a `pdf-lib` error, a file write error), reject the IPC call with a descriptive error instead of leaving the renderer waiting, and don't leave a partial file at the destination (only write after composition succeeds).
+
+## 4. Main: print pipeline
+
+- [ ] 4.1 Implement `print:document` in `electron/main/ipc/print.handlers.ts`: receive the full project payload (all pages), call `composeProjectPdf(project)`, `pdfDoc.save()` to bytes, write to a temp file under `app.getPath('temp')`.
+- [ ] 4.2 Create the hidden-window module in Main (e.g. `electron/main/print-render/pdfPrintWindow.ts`): lazily creates a single reusable `BrowserWindow` (`show: false`, `webPreferences: { plugins: true, contextIsolation: true, nodeIntegration: false, sandbox: true }` — `plugins: true` is required for Electron's built-in PDF viewer), and tears it down on `app.on('before-quit')`.
+- [ ] 4.3 Load the temp PDF file into that window (`loadURL('file://' + tempPath)`), await its `did-finish-load` (with a timeout that rejects the IPC call), then call `webContents.print()` once; resolve the IPC call once the print callback fires (whether printed or cancelled — both are non-error outcomes per the `printing` spec).
+- [ ] 4.4 Delete the temp PDF file once the print callback fires (or the operation otherwise settles, including on failure/timeout).
+- [ ] 4.5 On any failure preparing the document (composition error, load timeout, etc.) before the dialog opens, reject the IPC call with a descriptive error.
+
+## 5. Preload and renderer wiring
+
+- [ ] 5.1 Update `electron/preload/index.ts`: change `pdf.export`'s return type from `Promise<Uint8Array>` to `Promise<string | null>` (saved path or `null` on cancel) and give `pdf.export`/`print.document`'s payload a concrete `EPPProject` type instead of `unknown`.
+- [ ] 5.2 Wire `PreviewScreen.tsx`'s "Export PDF" button to call `window.eppAPI.pdf.export(...)` with the current project (from the store): disable/show-busy on the button while in flight, show an inline success/error indication matching the `pdf-export` spec's failure-is-surfaced requirement.
+- [ ] 5.3 Wire `PreviewScreen.tsx`'s "Print" button to call `window.eppAPI.print.document(...)` with the full project (all pages): same busy/error handling pattern as 5.2, matching the `printing` spec.
+- [ ] 5.4 Ensure both buttons independently guard against re-activation while their own action is in flight (per the `print-preview` MODIFIED requirement), without blocking the other control.
+
+## 6. Tests and verification
+
+- [ ] 6.1 Add/extend unit tests for the new pure helper logic (placement/rotation from 1.3, `composeProjectPdf`'s structural checks from 2.7) alongside existing test patterns (`fs.helpers.test.ts`, `units.test.ts`).
+- [ ] 6.2 Manually verify in the running Electron app: export a single-page project, export a multi-page project with pages of different sizes/orientations, print a single-page project, print a multi-page project and confirm every page reaches the native print dialog in order, cancel each dialog, confirm a forced failure (e.g. a page with a missing image asset) still exports/prints with a blank slot rather than erroring, and visually compare a page with a rotated/cropped image against what print-preview shows on screen for the same page.
+- [ ] 6.3 Run `openspec validate --strict --all` before archiving.

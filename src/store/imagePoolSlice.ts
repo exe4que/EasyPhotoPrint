@@ -1,6 +1,6 @@
 import type { ImageAsset } from '@epp/layout-engine';
 
-import { getEppApi } from '../lib/ipc-client.js';
+import { getEppApi } from '../lib/platform/contract.js';
 
 async function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {

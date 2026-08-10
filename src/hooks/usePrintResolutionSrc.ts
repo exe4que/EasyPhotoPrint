@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 
 import type { ImageAsset } from '@epp/layout-engine';
 
-import { getEppApi } from '../lib/ipc-client.js';
+import { getEppApi } from '../lib/platform/contract.js';
 import { mmToPx } from '../lib/units.js';
 
 /** Session-lifetime cache, keyed by (file, target size) -- decoding is requested at most once per

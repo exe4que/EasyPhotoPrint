@@ -1,7 +1,7 @@
 import { isSimpleModeCompatible, type EPPTemplate } from '@epp/layout-engine';
 import { useState } from 'react';
 
-import { getEppApi } from '../../lib/ipc-client.js';
+import { getEppApi } from '../../lib/platform/contract.js';
 import { useEPPStore } from '../../store/index.js';
 import { ConfirmDialog } from '../ui/ConfirmDialog.js';
 import { CollapsiblePanel } from '../ui/CollapsiblePanel.js';

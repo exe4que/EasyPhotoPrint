@@ -3,7 +3,7 @@ import { temporal } from 'zundo';
 
 import type { EPPProject } from '@epp/layout-engine';
 
-import { getEppApi } from '../lib/ipc-client.js';
+import { getEppApi } from '../lib/platform/contract.js';
 import { createDefaultPage, createDocumentSlice, createInitialDocumentState, type DocumentSlice } from './documentSlice.js';
 import { createImagePoolSlice, type ImagePoolSlice } from './imagePoolSlice.js';
 import { createInitialProjectState, createProjectSlice, type ProjectSlice } from './projectSlice.js';

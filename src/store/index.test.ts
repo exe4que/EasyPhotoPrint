@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import type { EPPProject, ImageAsset } from '@epp/layout-engine';
 
-import type { EppAPI } from '../lib/ipc-client.js';
+import { registerPlatformAdapter, type EppAPI } from '../lib/platform/contract.js';
 import { useEPPStore } from './index.js';
 
 function createTestAsset(id: string, overrides: Partial<ImageAsset> = {}): ImageAsset {
@@ -23,17 +23,15 @@ function installMockEppApi(overrides: {
   openProject?: EppAPI['fs']['openProject'];
   relinkImage?: EppAPI['dialog']['relinkImage'];
 }) {
-  (globalThis as { window?: unknown }).window = {
-    eppAPI: {
-      fs: {
-        saveProject: overrides.saveProject ?? (async () => null),
-        openProject: overrides.openProject ?? (async () => null),
-      },
-      dialog: {
-        relinkImage: overrides.relinkImage ?? (async () => null),
-      },
-    } as unknown as EppAPI,
-  };
+  registerPlatformAdapter({
+    fs: {
+      saveProject: overrides.saveProject ?? (async () => null),
+      openProject: overrides.openProject ?? (async () => null),
+    },
+    dialog: {
+      relinkImage: overrides.relinkImage ?? (async () => null),
+    },
+  } as unknown as EppAPI);
 }
 
 describe('startNewProject', () => {
@@ -287,7 +285,6 @@ describe('removePage', () => {
 
 describe('saveProject', () => {
   afterEach(() => {
-    delete (globalThis as { window?: unknown }).window;
     useEPPStore.getState().startNewProject();
   });
 
@@ -348,7 +345,6 @@ describe('saveProject', () => {
 
 describe('openProject', () => {
   afterEach(() => {
-    delete (globalThis as { window?: unknown }).window;
     useEPPStore.getState().startNewProject();
   });
 
@@ -400,7 +396,6 @@ describe('openProject', () => {
 
 describe('relinkImage', () => {
   afterEach(() => {
-    delete (globalThis as { window?: unknown }).window;
     useEPPStore.getState().startNewProject();
   });
 

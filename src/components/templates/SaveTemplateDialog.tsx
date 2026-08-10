@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 
 import type { EPPTemplate } from '@epp/layout-engine';
 
-import { getEppApi } from '../../lib/ipc-client.js';
+import { getEppApi } from '../../lib/platform/contract.js';
 import { useEPPStore } from '../../store/index.js';
 import { ConfirmDialog } from '../ui/ConfirmDialog.js';
 

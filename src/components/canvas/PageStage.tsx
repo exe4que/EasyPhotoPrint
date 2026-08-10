@@ -264,6 +264,15 @@ export function PageStage() {
                     return;
                   }
 
+                  // Tap-to-assign: a selected library image is armed the same way a
+                  // library-source drag is, so activating a slot assigns it here instead of
+                  // the ordinary select/toggle behavior below.
+                  if (selection?.kind === 'image') {
+                    assignImageToSlot(page.id, id, selection.id, 'library');
+                    setSelection({ kind: 'node', id });
+                    return;
+                  }
+
                   if (selectedSlotId === id) {
                     clearSelection();
                     return;
@@ -441,6 +450,18 @@ export function PageStage() {
                     // canvas out from under an element the user was just transforming.
                     if (suppressNextClickRef.current) {
                       suppressNextClickRef.current = false;
+                      return;
+                    }
+
+                    // Tap-to-assign: a selected library image is armed the same way a
+                    // library-source drag is, so activating the canvas places it (centered, per
+                    // addFreeformElement's own default when no position is given) instead of the
+                    // ordinary node-selection behavior below. Selecting the new element (not the
+                    // canvas) afterward is what makes the gesture single-shot -- it consumes the
+                    // armed image selection.
+                    if (selection?.kind === 'image') {
+                      const newElementNodeId = addFreeformElement(page.id, id, selection.id);
+                      setSelection({ kind: 'node', id: newElementNodeId });
                       return;
                     }
 

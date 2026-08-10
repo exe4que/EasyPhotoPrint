@@ -789,12 +789,15 @@ export interface DocumentSlice {
   rotateSlotImage: (pageId: string, nodeId: string) => void;
   clearImageFromSlot: (pageId: string, nodeId: string) => void;
   resizeSiblingsByDrag: (pageId: string, parentNodeId: string, siblingIndexA: number, deltaMm: number) => void;
+  /** Returns the id of the newly created shadow imageSlot node (`FreeformElement.imageNodeId`),
+   * so a caller that needs to select the placed element afterward (e.g. tap-to-place) doesn't
+   * have to re-derive it. */
   addFreeformElement: (
     pageId: string,
     freeformCanvasNodeId: string,
     imageAssetId: string,
     centerAtMm?: { xMm: number; yMm: number },
-  ) => void;
+  ) => string;
   removeFreeformElement: (pageId: string, freeformCanvasNodeId: string, freeformElementId: string) => void;
   updateFreeformElementTransform: (
     pageId: string,
@@ -1222,6 +1225,8 @@ export function createDocumentSlice(
           }),
         },
       }));
+
+      return imageSlotId;
     },
     removeFreeformElement: (pageId, freeformCanvasNodeId, freeformElementId) => {
       set((state) => ({

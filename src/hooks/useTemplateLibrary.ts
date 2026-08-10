@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import type { EPPTemplate } from '@epp/layout-engine';
 
-import { getEppApi } from '../lib/ipc-client.js';
+import { getEppApi } from '../lib/platform/contract.js';
 
 export function useTemplateLibrary() {
   const [templates, setTemplates] = useState<EPPTemplate[]>([]);

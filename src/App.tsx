@@ -15,7 +15,7 @@ import { ConfirmDialog } from './components/ui/ConfirmDialog.js';
 import { useLayoutResolution } from './hooks/useLayoutResolution.js';
 import { useTemplateLibrary } from './hooks/useTemplateLibrary.js';
 import { useUndoRedo } from './hooks/useUndoRedo.js';
-import { getEppApi } from './lib/ipc-client.js';
+import { getEppApi } from './lib/platform/contract.js';
 import { formatLength } from './lib/units.js';
 import { useEPPStore } from './store/index.js';
 

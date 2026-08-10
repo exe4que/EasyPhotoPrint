@@ -1,4 +1,4 @@
-import { getEppApi, type AppSettings } from '../lib/ipc-client.js';
+import { getEppApi, type AppSettings } from '../lib/platform/contract.js';
 
 export interface SettingsSlice {
   settings: AppSettings;

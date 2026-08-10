@@ -75,10 +75,10 @@
 - [x] 10.3 Change the unit toggle, fully close and relaunch the app, confirm the preference persisted.
 - [x] 10.4 Export PDF: confirm the native "create document" picker opens, the resulting file is a valid multi-page PDF with correctly placed/cropped/resized images.
 - [x] 10.5 Print: confirm Android's native print dialog opens with the same content as the exported PDF.
-- [ ] 10.6 Using the new toolbar (section 9): save a project, fully close and relaunch the app, open that project via the toolbar's Open button, confirm all pages/images/layout restore correctly.
-- [ ] 10.7 Confirm the toolbar from section 9 is the only shared-code (`src/components`/`src/App.tsx`) change this whole verification pass required, and that it's the exact same component/code path on both hosts — no `src/store`, `src/hooks`, or other shared logic needed changes beyond it.
+- [x] 10.6 Using the new toolbar (section 9): save a project, fully close and relaunch the app, open that project via the toolbar's Open button, confirm all pages/images/layout restore correctly.
+- [x] 10.7 Confirm the toolbar from section 9 is the only shared-code (`src/components`/`src/App.tsx`) change this whole verification pass required, and that it's the exact same component/code path on both hosts — no `src/store`, `src/hooks`, or other shared logic needed changes beyond it.
 
 ## 11. Spec closure
 
-- [ ] 11.1 Run the full test suite and typecheck (desktop build must remain unaffected).
-- [ ] 11.2 Run `openspec validate --strict --changes android-shell` and confirm it passes.
+- [x] 11.1 Run the full test suite and typecheck (desktop build must remain unaffected).
+- [x] 11.2 Run `openspec validate --strict --changes android-shell` and confirm it passes.

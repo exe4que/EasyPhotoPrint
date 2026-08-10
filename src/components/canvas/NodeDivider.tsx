@@ -1,3 +1,5 @@
+import { useRef } from 'react';
+
 import { pxToMm } from '../../lib/units.js';
 
 const HIT_SIZE_PX = 14;
@@ -17,7 +19,7 @@ interface NodeDividerProps {
    * Called with the delta since the *previous* call (not since the drag started) — the store
    * action re-derives each sibling's current size from the live tree on every call, so handing
    * it an already-cumulative delta on top of that would double-count and make the divider
-   * drift away from the cursor, compounding with every mousemove event fired during the drag.
+   * drift away from the cursor, compounding with every pointermove event fired during the drag.
    */
   onDragDeltaMm: (deltaMm: number) => void;
   onDragEnd: () => void;
@@ -34,38 +36,59 @@ export function NodeDivider({
   onDragDeltaMm,
   onDragEnd,
 }: NodeDividerProps) {
-  const handleMouseDown = (event: React.MouseEvent) => {
+  // A ref, not state: this drives synchronous per-event math, not a render. Tracking the
+  // pointerId (rather than a boolean) means a second finger touching the divider mid-drag is
+  // ignored instead of corrupting the active drag -- multi-touch on a single divider was never a
+  // supported interaction.
+  const activePointerId = useRef<number | null>(null);
+  const lastClientPosRef = useRef(0);
+
+  const handlePointerDown = (event: React.PointerEvent) => {
     if (locked || event.button !== 0) {
       return;
     }
     event.stopPropagation();
     event.preventDefault();
 
-    let lastClientPos = direction === 'horizontal' ? event.clientX : event.clientY;
+    // Pointer capture routes every subsequent event for this pointerId to this element
+    // regardless of where the pointer physically moves -- no window listeners needed, and the
+    // drag can't "escape" the divider's small hit area the way a plain element-level mouse
+    // listener could.
+    event.currentTarget.setPointerCapture(event.pointerId);
+    activePointerId.current = event.pointerId;
+    lastClientPosRef.current = direction === 'horizontal' ? event.clientX : event.clientY;
     onDragStart();
+  };
 
-    const handleMouseMove = (moveEvent: MouseEvent) => {
-      const currentClientPos = direction === 'horizontal' ? moveEvent.clientX : moveEvent.clientY;
-      const deltaPx = currentClientPos - lastClientPos;
-      lastClientPos = currentClientPos;
-      onDragDeltaMm(pxToMm(deltaPx, previewZoom));
-    };
-    const handleMouseUp = () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-      onDragEnd();
-    };
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
+  const handlePointerMove = (event: React.PointerEvent) => {
+    if (event.pointerId !== activePointerId.current) {
+      return;
+    }
+
+    const currentClientPos = direction === 'horizontal' ? event.clientX : event.clientY;
+    const deltaPx = currentClientPos - lastClientPosRef.current;
+    lastClientPosRef.current = currentClientPos;
+    onDragDeltaMm(pxToMm(deltaPx, previewZoom));
+  };
+
+  const handlePointerEnd = (event: React.PointerEvent) => {
+    if (event.pointerId !== activePointerId.current) {
+      return;
+    }
+    activePointerId.current = null;
+    onDragEnd();
   };
 
   return (
     <div
       role="separator"
       aria-orientation={direction === 'horizontal' ? 'vertical' : 'horizontal'}
-      onMouseDown={handleMouseDown}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerEnd}
+      onPointerCancel={handlePointerEnd}
       title={locked ? 'Locked: an adjacent node has a fixed size on this axis' : undefined}
-      className={`group absolute z-20 flex items-center justify-center ${
+      className={`group absolute z-20 flex touch-none items-center justify-center ${
         locked ? 'cursor-not-allowed' : direction === 'horizontal' ? 'cursor-col-resize' : 'cursor-row-resize'
       }`}
       style={

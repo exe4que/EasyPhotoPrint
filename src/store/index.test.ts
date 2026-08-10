@@ -158,15 +158,17 @@ describe('addPage', () => {
 
   it('appends a page using the app default config and a blank rootNode, and activates it', () => {
     const before = useEPPStore.getState().document.pages;
+    const sheetSizeBefore = useEPPStore.getState().document.sheetSize;
 
     useEPPStore.getState().addPage();
 
     const state = useEPPStore.getState();
     expect(state.document.pages).toHaveLength(before.length + 1);
     expect(state.document.pages[0]).toEqual(before[0]);
+    expect(state.document.sheetSize).toEqual(sheetSizeBefore);
 
     const newPage = state.document.pages[1];
-    expect(newPage.pageConfig).toEqual({ sizePreset: 'A4', orientation: 'portrait', dpi: 300 });
+    expect(newPage.pageConfig).toEqual({ orientation: 'portrait', dpi: 300 });
     expect(newPage.rootNode.type).toBe('imageSlot');
     expect(newPage.assignments).toEqual({});
     expect(state.ui.activePageId).toBe(newPage.id);
@@ -371,10 +373,11 @@ describe('openProject', () => {
       schemaVersion: '1.0.0',
       id: 'opened-project',
       name: 'Opened Album',
+      sheetSize: { sizePreset: 'Letter' },
       pages: [
         {
           id: 'opened-page',
-          pageConfig: { sizePreset: 'A4', orientation: 'portrait', dpi: 300 },
+          pageConfig: { orientation: 'portrait', dpi: 300 },
           rootNode: { id: 'opened-root', type: 'imageSlot' },
           assignments: {},
         },
@@ -388,6 +391,7 @@ describe('openProject', () => {
     expect(didLoad).toBe(true);
     const next = useEPPStore.getState();
     expect(next.document.pages).toEqual(openedProject.pages);
+    expect(next.document.sheetSize).toEqual(openedProject.sheetSize);
     expect(next.imagePool).toEqual(openedProject.imagePool);
     expect(next.project).toEqual({ id: 'opened-project', name: 'Opened Album', filePath: '/home/user/Opened.eppproj' });
     expect(useEPPStore.temporal.getState().pastStates).toHaveLength(0);

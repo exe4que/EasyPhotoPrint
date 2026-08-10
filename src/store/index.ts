@@ -24,6 +24,7 @@ function buildEppProject(state: Pick<EPPStore, 'project' | 'document' | 'imagePo
     schemaVersion: '1.0.0',
     id: state.project.id,
     name: state.project.name,
+    sheetSize: state.document.sheetSize,
     pages: state.document.pages,
     imagePool: state.imagePool,
   };
@@ -130,7 +131,7 @@ export const useEPPStore = create<EPPStore>()(
 
           const { project, filePath } = result;
           set({
-            document: { pages: project.pages },
+            document: { sheetSize: project.sheetSize, pages: project.pages },
             imagePool: project.imagePool,
             project: { id: project.id, name: project.name, filePath },
           });
@@ -156,7 +157,7 @@ export const useEPPStore = create<EPPStore>()(
           // steps instead of one.
           const newPage = createDefaultPage();
           set((s) => ({
-            document: { pages: [...s.document.pages, newPage] },
+            document: { ...s.document, pages: [...s.document.pages, newPage] },
             ui: computeActivePageUi(s.ui, newPage.id, newPage),
           }));
         },
@@ -174,13 +175,13 @@ export const useEPPStore = create<EPPStore>()(
           const remainingPages = state.document.pages.filter((page) => page.id !== pageId);
 
           if (state.ui.activePageId !== pageId) {
-            set({ document: { pages: remainingPages } });
+            set({ document: { ...state.document, pages: remainingPages } });
             return;
           }
 
           const neighbor = remainingPages[Math.min(removedIndex, remainingPages.length - 1)];
           set((s) => ({
-            document: { pages: remainingPages },
+            document: { ...s.document, pages: remainingPages },
             ui: computeActivePageUi(s.ui, neighbor.id, neighbor),
           }));
         },

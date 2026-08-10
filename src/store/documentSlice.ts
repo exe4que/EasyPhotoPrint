@@ -15,15 +15,19 @@ import {
   type ImageAsset,
   type ImageRotationDeg,
   type LayoutNode,
-  type PageConfig,
+  type ProjectPageConfig,
+  type SheetSize,
   type Sides,
   type SpecificSizeMm,
 } from '@epp/layout-engine';
 
 import { createPageBoxMm } from '../lib/page.js';
 
-const DEFAULT_PAGE_CONFIG: PageConfig = {
+const DEFAULT_SHEET_SIZE: SheetSize = {
   sizePreset: 'A4',
+};
+
+const DEFAULT_PAGE_CONFIG: ProjectPageConfig = {
   orientation: 'portrait',
   dpi: 300,
 };
@@ -583,17 +587,22 @@ export function clearImageFromPage(page: EPPProjectPage, nodeId: string): Record
   return nextAssignments;
 }
 
-function createTemplateFromPage(page: EPPProjectPage): EPPTemplate {
+function createTemplateFromPage(sheetSize: SheetSize, page: EPPProjectPage): EPPTemplate {
   return {
     schemaVersion: '1.0.0',
     id: crypto.randomUUID(),
     name: `Template ${page.id}`,
-    page: { ...page.pageConfig },
+    page: {
+      sizePreset: sheetSize.sizePreset,
+      customSizeMm: sheetSize.customSizeMm,
+      orientation: page.pageConfig.orientation,
+      dpi: page.pageConfig.dpi,
+    },
     rootNode: cloneLayoutNode(page.rootNode),
   };
 }
 
-function computeAvailableMainSize(page: EPPProjectPage, parentNode: LayoutNode): {
+function computeAvailableMainSize(sheetSize: SheetSize, page: EPPProjectPage, parentNode: LayoutNode): {
   availableMain: number;
   mainAxisKey: 'widthMm' | 'heightMm';
   axis: 'w' | 'h';
@@ -602,7 +611,7 @@ function computeAvailableMainSize(page: EPPProjectPage, parentNode: LayoutNode):
     throw new Error(`resizeSiblingsByDrag only supports horizontal or vertical parent nodes. Received ${parentNode.type}.`);
   }
 
-  const pageBox = createPageBoxMm(page.pageConfig);
+  const pageBox = createPageBoxMm(sheetSize, page.pageConfig.orientation);
   const layout = resolveLayout(page.rootNode, pageBox);
   const parentBox = layout.get(parentNode.id);
   if (!parentBox) {
@@ -705,7 +714,7 @@ function findParentAndIndex(node: LayoutNode, targetId: string): { parent: Layou
  * inside a horizontal/vertical parent, is already big enough, or the divider is locked/maxed —
  * any leftover deficit is left for the caller to flag (can't be satisfied by the template).
  */
-function growSlotToMinimum(page: EPPProjectPage, slotNodeId: string): LayoutNode {
+function growSlotToMinimum(sheetSize: SheetSize, page: EPPProjectPage, slotNodeId: string): LayoutNode {
   const parentInfo = findParentAndIndex(page.rootNode, slotNodeId);
   if (!parentInfo) {
     return page.rootNode;
@@ -722,8 +731,8 @@ function growSlotToMinimum(page: EPPProjectPage, slotNodeId: string): LayoutNode
     return page.rootNode;
   }
 
-  const { availableMain, mainAxisKey, axis } = computeAvailableMainSize(page, parent);
-  const pageBox = createPageBoxMm(page.pageConfig);
+  const { availableMain, mainAxisKey, axis } = computeAvailableMainSize(sheetSize, page, parent);
+  const pageBox = createPageBoxMm(sheetSize, page.pageConfig.orientation);
   const slotBox = resolveLayout(page.rootNode, pageBox).get(slotNodeId);
   if (!slotBox) {
     return page.rootNode;
@@ -745,18 +754,21 @@ function growSlotToMinimum(page: EPPProjectPage, slotNodeId: string): LayoutNode
 }
 
 export interface DocumentState {
+  sheetSize: SheetSize;
   pages: EPPProjectPage[];
 }
 
 export function createInitialDocumentState(): DocumentState {
   return {
+    sheetSize: { ...DEFAULT_SHEET_SIZE },
     pages: [createDefaultPage('page-1')],
   };
 }
 
 export interface DocumentSlice {
   document: DocumentState;
-  updatePageConfig: (pageId: string, patch: Partial<PageConfig>) => void;
+  updateSheetSize: (patch: Partial<SheetSize>) => void;
+  updatePageConfig: (pageId: string, patch: Partial<ProjectPageConfig>) => void;
   updateLayoutNode: (pageId: string, nodeId: string, patch: Partial<LayoutNode>) => void;
   updateGridNodeConfig: (
     pageId: string,
@@ -808,9 +820,22 @@ export function createDocumentSlice(
 ): DocumentSlice {
   return {
     document: createInitialDocumentState(),
+    updateSheetSize: (patch) => {
+      set((state) => ({
+        document: {
+          ...state.document,
+          sheetSize: {
+            ...state.document.sheetSize,
+            ...patch,
+            customSizeMm: patch.customSizeMm ?? state.document.sheetSize.customSizeMm,
+          },
+        },
+      }));
+    },
     updatePageConfig: (pageId, patch) => {
       set((state) => ({
         document: {
+          ...state.document,
           pages: state.document.pages.map((page) =>
             page.id === pageId
               ? {
@@ -818,7 +843,6 @@ export function createDocumentSlice(
                   pageConfig: {
                     ...page.pageConfig,
                     ...patch,
-                    customSizeMm: patch.customSizeMm ?? page.pageConfig.customSizeMm,
                   },
                 }
               : page,
@@ -829,6 +853,7 @@ export function createDocumentSlice(
     updateLayoutNode: (pageId, nodeId, patch) => {
       set((state) => ({
         document: {
+          ...state.document,
           pages: state.document.pages.map((page) =>
             page.id === pageId
               ? {
@@ -843,6 +868,7 @@ export function createDocumentSlice(
     updateGridNodeConfig: (pageId, nodeId, patch) => {
       set((state) => ({
         document: {
+          ...state.document,
           pages: state.document.pages.map((page) => {
             if (page.id !== pageId) {
               return page;
@@ -861,6 +887,7 @@ export function createDocumentSlice(
     setContainerChildCount: (pageId, nodeId, count) => {
       set((state) => ({
         document: {
+          ...state.document,
           pages: state.document.pages.map((page) => {
             if (page.id !== pageId) {
               return page;
@@ -884,6 +911,7 @@ export function createDocumentSlice(
 
       set((state) => ({
         document: {
+          ...state.document,
           pages: state.document.pages.map((entry) =>
             entry.id === pageId
               ? (() => {
@@ -909,6 +937,7 @@ export function createDocumentSlice(
       const nextSlotId = createSlotIdGenerator(page.rootNode);
       set((state) => ({
         document: {
+          ...state.document,
           pages: state.document.pages.map((entry) => {
             if (entry.id !== pageId) {
               return entry;
@@ -933,6 +962,7 @@ export function createDocumentSlice(
       const nextSlotId = createSlotIdGenerator(page.rootNode);
       set((state) => ({
         document: {
+          ...state.document,
           pages: state.document.pages.map((entry) =>
             entry.id === pageId
               ? {
@@ -947,6 +977,7 @@ export function createDocumentSlice(
     removeLayoutNode: (pageId, nodeId) => {
       set((state) => ({
         document: {
+          ...state.document,
           pages: state.document.pages.map((entry) => {
             if (entry.id !== pageId || entry.rootNode.id === nodeId) {
               return entry;
@@ -969,6 +1000,7 @@ export function createDocumentSlice(
 
       set((state) => ({
         document: {
+          ...state.document,
           pages: state.document.pages.map((entry) => {
             if (entry.id !== pageId) {
               return entry;
@@ -1007,6 +1039,7 @@ export function createDocumentSlice(
     clearImageFromSlot: (pageId, nodeId) => {
       set((state) => ({
         document: {
+          ...state.document,
           pages: state.document.pages.map((page) =>
             page.id === pageId
               ? {
@@ -1039,6 +1072,7 @@ export function createDocumentSlice(
 
       set((state) => ({
         document: {
+          ...state.document,
           pages: state.document.pages.map((entry) =>
             entry.id === pageId
               ? {
@@ -1062,10 +1096,11 @@ export function createDocumentSlice(
       if (!updatedPage) {
         return;
       }
-      const grownRootNode = growSlotToMinimum(updatedPage, nodeId);
+      const grownRootNode = growSlotToMinimum(get().document.sheetSize, updatedPage, nodeId);
       if (grownRootNode !== updatedPage.rootNode) {
         set((state) => ({
           document: {
+            ...state.document,
             pages: state.document.pages.map((entry) => (entry.id === pageId ? { ...entry, rootNode: grownRootNode } : entry)),
           },
         }));
@@ -1086,6 +1121,7 @@ export function createDocumentSlice(
 
       set((state) => ({
         document: {
+          ...state.document,
           pages: state.document.pages.map((entry) =>
             entry.id === pageId
               ? {
@@ -1113,9 +1149,10 @@ export function createDocumentSlice(
         throw new Error(`Parent node ${parentNodeId} does not exist.`);
       }
 
-      const { availableMain, mainAxisKey, axis } = computeAvailableMainSize(page, parentNode);
+      const { availableMain, mainAxisKey, axis } = computeAvailableMainSize(get().document.sheetSize, page, parentNode);
       set((state) => ({
         document: {
+          ...state.document,
           pages: state.document.pages.map((entry) =>
             entry.id === pageId
               ? {
@@ -1140,7 +1177,7 @@ export function createDocumentSlice(
         throw new Error(`Node ${freeformCanvasNodeId} is not a freeformCanvas node.`);
       }
 
-      const pageBox = createPageBoxMm(page.pageConfig);
+      const pageBox = createPageBoxMm(get().document.sheetSize, page.pageConfig.orientation);
       const nodeBox = resolveLayout(page.rootNode, pageBox).get(freeformCanvasNodeId);
       if (!nodeBox) {
         throw new Error(`Could not resolve layout for freeformCanvas node ${freeformCanvasNodeId}.`);
@@ -1171,6 +1208,7 @@ export function createDocumentSlice(
 
       set((state) => ({
         document: {
+          ...state.document,
           pages: state.document.pages.map((entry) => {
             if (entry.id !== pageId) {
               return entry;
@@ -1188,6 +1226,7 @@ export function createDocumentSlice(
     removeFreeformElement: (pageId, freeformCanvasNodeId, freeformElementId) => {
       set((state) => ({
         document: {
+          ...state.document,
           pages: state.document.pages.map((page) => {
             if (page.id !== pageId) {
               return page;
@@ -1219,7 +1258,7 @@ export function createDocumentSlice(
         throw new Error(`Freeform element ${freeformElementId} does not exist.`);
       }
 
-      const pageBox = createPageBoxMm(page.pageConfig);
+      const pageBox = createPageBoxMm(get().document.sheetSize, page.pageConfig.orientation);
       const nodeBox = resolveLayout(page.rootNode, pageBox).get(freeformCanvasNodeId);
       if (!nodeBox) {
         throw new Error(`Could not resolve layout for freeformCanvas node ${freeformCanvasNodeId}.`);
@@ -1236,6 +1275,7 @@ export function createDocumentSlice(
 
       set((state) => ({
         document: {
+          ...state.document,
           pages: state.document.pages.map((entry) =>
             entry.id === pageId
               ? { ...entry, rootNode: setFreeformElementTransformById(entry.rootNode, freeformCanvasNodeId, freeformElementId, nextTransform) }
@@ -1247,6 +1287,7 @@ export function createDocumentSlice(
     applyTemplate: (pageId, template) => {
       set((state) => ({
         document: {
+          ...state.document,
           pages: state.document.pages.map((page) => {
             if (page.id !== pageId) {
               return page;
@@ -1255,7 +1296,7 @@ export function createDocumentSlice(
             const reconciled = reconcileTemplateUpdate(page.rootNode, template.rootNode, page.assignments);
             return {
               ...page,
-              pageConfig: { ...template.page },
+              pageConfig: { orientation: template.page.orientation, dpi: template.page.dpi },
               templateRef: template.id,
               rootNode: reconciled.rootNode,
               assignments: reconciled.assignments,
@@ -1267,6 +1308,7 @@ export function createDocumentSlice(
     linkPageToTemplate: (pageId, templateId) => {
       set((state) => ({
         document: {
+          ...state.document,
           pages: state.document.pages.map((page) =>
             page.id === pageId ? { ...page, templateRef: templateId } : page,
           ),
@@ -1279,7 +1321,7 @@ export function createDocumentSlice(
         throw new Error(`Page ${pageId} does not exist.`);
       }
 
-      return createTemplateFromPage(page);
+      return createTemplateFromPage(get().document.sheetSize, page);
     },
   };
 }

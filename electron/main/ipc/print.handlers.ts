@@ -11,16 +11,18 @@ import { printPdfFile, type PrintPageSizeMicrons } from '../print-render/pdfPrin
 
 const PRINT_DOCUMENT_CHANNEL = 'print:document';
 
-/** A print job carries a single paper size, but pages may each have their own configured size --
- * the first page's decides the job's paper, which is the documented best-effort behaviour for a
- * mixed-size project (see the `printing` capability). Export PDF has no such limitation. */
+/** A print job carries a single paper size, and every page in a project now always shares the
+ * same `sheetSize` -- but pages may each have their own orientation, so the first page's
+ * orientation decides the job's paper orientation, which is the documented best-effort behaviour
+ * for a mixed-orientation project (see the `printing` capability). Export PDF has no such
+ * limitation. */
 function resolveJobPageSize(project: EPPProject): PrintPageSizeMicrons {
   const firstPage = project.pages[0];
   if (!firstPage) {
     throw new Error('The project has no pages to print.');
   }
 
-  const sizeMm = resolvePageSizeMm(firstPage.pageConfig);
+  const sizeMm = resolvePageSizeMm(project.sheetSize, firstPage.pageConfig.orientation);
   return { width: mmToMicrons(sizeMm.widthMm), height: mmToMicrons(sizeMm.heightMm) };
 }
 

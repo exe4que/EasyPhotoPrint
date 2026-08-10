@@ -6,6 +6,7 @@ import type {
   ImageRotationDeg,
   LayoutNode,
   ScalingRule,
+  SheetSize,
   SpecificSizeMm,
 } from '@epp/layout-engine';
 
@@ -64,8 +65,12 @@ export interface PagePlacements {
  * pool assets, and skips anything that wouldn't actually render (no assignment, a missing asset).
  * Deliberately has no `nativeImage`/`pdf-lib` dependency so it can run in a plain Node test
  * environment; actually decoding/embedding/drawing each spec is `composeProjectPdf.ts`'s job. */
-export function computePagePlacements(page: EPPProjectPage, imageAssetMap: Map<string, ImageAsset>): PagePlacements {
-  const pageBoxMm = createPageBoxMm(page.pageConfig);
+export function computePagePlacements(
+  sheetSize: SheetSize,
+  page: EPPProjectPage,
+  imageAssetMap: Map<string, ImageAsset>,
+): PagePlacements {
+  const pageBoxMm = createPageBoxMm(sheetSize, page.pageConfig.orientation);
   const layout = resolveLayout(page.rootNode, pageBoxMm);
   const dpi = page.pageConfig.dpi;
 

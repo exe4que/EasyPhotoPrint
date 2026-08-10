@@ -121,6 +121,19 @@ export interface PageConfig {
   dpi: number;
 }
 
+export interface SheetSize {
+  sizePreset: PageSizePreset;
+  customSizeMm?: {
+    widthMm: number;
+    heightMm: number;
+  };
+}
+
+export interface ProjectPageConfig {
+  orientation: 'portrait' | 'landscape';
+  dpi: number;
+}
+
 export interface EPPTemplate {
   schemaVersion: '1.0.0';
   id: string;
@@ -133,7 +146,7 @@ export interface EPPTemplate {
 
 export interface EPPProjectPage {
   id: string;
-  pageConfig: PageConfig;
+  pageConfig: ProjectPageConfig;
   templateRef?: string;
   rootNode: LayoutNode;
   assignments: Record<string, string>;
@@ -143,6 +156,7 @@ export interface EPPProject {
   schemaVersion: '1.0.0';
   id: string;
   name: string;
+  sheetSize: SheetSize;
   pages: EPPProjectPage[];
   imagePool: ImageAsset[];
 }

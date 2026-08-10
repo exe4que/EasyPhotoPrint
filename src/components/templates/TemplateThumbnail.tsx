@@ -16,7 +16,7 @@ function collectImageSlotIds(node: EPPTemplate['rootNode'], into: string[] = [])
 }
 
 export function TemplateThumbnail({ template }: { template: EPPTemplate }) {
-  const pageBox = createPageBoxMm(template.page);
+  const pageBox = createPageBoxMm(template.page, template.page.orientation);
   const layout = resolveLayout(template.rootNode, pageBox);
   const imageSlotIds = new Set(collectImageSlotIds(template.rootNode));
 

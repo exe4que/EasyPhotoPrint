@@ -147,8 +147,9 @@ describe('document slice helpers', () => {
     });
   });
 
-  it('applies pageConfig per page when a template is applied', () => {
+  it('applies orientation/dpi per page when a template is applied, leaving the document sheet size untouched', () => {
     const state = createTestStore();
+    const sheetSizeBefore = state.document.sheetSize;
 
     const template: EPPTemplate = {
       schemaVersion: '1.0.0',
@@ -166,8 +167,9 @@ describe('document slice helpers', () => {
     };
 
     state.applyTemplate('page-1', template);
-    expect(state.document.pages[0].pageConfig).toEqual(template.page);
+    expect(state.document.pages[0].pageConfig).toEqual({ orientation: 'landscape', dpi: 240 });
     expect(state.document.pages[0].templateRef).toBe('template-1');
+    expect(state.document.sheetSize).toEqual(sheetSizeBefore);
   });
 
   it('links a page to a newly saved template so "Save" can overwrite it afterwards', () => {
@@ -176,6 +178,26 @@ describe('document slice helpers', () => {
     expect(state.document.pages[0].templateRef).toBeUndefined();
     state.linkPageToTemplate('page-1', 'template-42');
     expect(state.document.pages[0].templateRef).toBe('template-42');
+  });
+
+  it('exportTemplate snapshots the document sheet size and the exporting page orientation/dpi', () => {
+    const state = createTestStore();
+
+    state.updateSheetSize({ sizePreset: 'A3' });
+    state.updatePageConfig('page-1', { orientation: 'landscape', dpi: 150 });
+
+    const exported = state.exportTemplate('page-1');
+    expect(exported.page).toEqual({ sizePreset: 'A3', customSizeMm: undefined, orientation: 'landscape', dpi: 150 });
+  });
+
+  it('updateSheetSize changes the single document-level sheet size', () => {
+    const state = createTestStore();
+
+    state.updateSheetSize({ sizePreset: 'Letter' });
+    expect(state.document.sheetSize).toEqual({ sizePreset: 'Letter' });
+
+    state.updateSheetSize({ sizePreset: 'Custom', customSizeMm: { widthMm: 100, heightMm: 150 } });
+    expect(state.document.sheetSize).toEqual({ sizePreset: 'Custom', customSizeMm: { widthMm: 100, heightMm: 150 } });
   });
 
   it('reconciles grid children while preserving existing slot ids first', () => {

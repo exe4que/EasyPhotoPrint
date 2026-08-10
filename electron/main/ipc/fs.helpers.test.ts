@@ -28,10 +28,11 @@ describe('normalizeProjectDocument', () => {
       schemaVersion: '1.0.0',
       id: 'project-1',
       name: 'My Album',
+      sheetSize: { sizePreset: 'A4' },
       pages: [
         {
           id: 'page-1',
-          pageConfig: { sizePreset: 'A4', orientation: 'portrait', dpi: 300 },
+          pageConfig: { orientation: 'portrait', dpi: 300 },
           rootNode: { id: 'root', type: 'imageSlot' },
           assignments: { root: 'asset-1' },
         },
@@ -41,11 +42,38 @@ describe('normalizeProjectDocument', () => {
       ],
     });
 
-    expect(project).toMatchObject({ id: 'project-1', name: 'My Album' });
+    expect(project).toMatchObject({ id: 'project-1', name: 'My Album', sheetSize: { sizePreset: 'A4' } });
     expect(project.pages).toHaveLength(1);
     expect(imagePool).toEqual([
       { id: 'asset-1', originalPath: '/tmp/a.jpg', storedPath: '/tmp/a.jpg', fileName: 'a.jpg', widthPx: 800, heightPx: 600, dpiOriginal: undefined },
     ]);
+  });
+
+  it('derives sheetSize from the first page for a legacy document with no top-level sheetSize', () => {
+    const { project } = normalizeProjectDocument({
+      schemaVersion: '1.0.0',
+      id: 'project-1',
+      name: 'My Album',
+      pages: [
+        {
+          id: 'page-1',
+          pageConfig: { sizePreset: 'Letter', orientation: 'portrait', dpi: 300 },
+          rootNode: { id: 'root', type: 'imageSlot' },
+          assignments: {},
+        },
+        {
+          id: 'page-2',
+          pageConfig: { sizePreset: 'A3', orientation: 'landscape', dpi: 300 },
+          rootNode: { id: 'root', type: 'imageSlot' },
+          assignments: {},
+        },
+      ],
+      imagePool: [],
+    });
+
+    expect(project.sheetSize).toEqual({ sizePreset: 'Letter', customSizeMm: undefined });
+    expect(project.pages[0].pageConfig).toEqual({ orientation: 'portrait', dpi: 300 });
+    expect(project.pages[1].pageConfig).toEqual({ orientation: 'landscape', dpi: 300 });
   });
 
   it('rejects a document with an invalid image pool entry', () => {
@@ -54,6 +82,7 @@ describe('normalizeProjectDocument', () => {
         schemaVersion: '1.0.0',
         id: 'project-1',
         name: 'My Album',
+        sheetSize: { sizePreset: 'A4' },
         pages: [],
         imagePool: [{ id: 'asset-1', originalPath: '/tmp/a.jpg' }],
       }),
@@ -67,6 +96,7 @@ describe('prepareProjectForSave', () => {
       schemaVersion: '1.0.0',
       id: 'project-1',
       name: 'My Album',
+      sheetSize: { sizePreset: 'A4' },
       pages: [],
       imagePool: [
         { ...persistedAsset(), thumbnailDataUrl: 'data:image/png;base64,AA==', missing: true },

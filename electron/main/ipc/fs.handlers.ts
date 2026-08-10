@@ -1,9 +1,11 @@
 import { dialog, ipcMain, nativeImage } from 'electron';
-import { readFile, writeFile } from 'node:fs/promises';
-import { basename } from 'node:path';
+import { copyFile, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { basename, extname, join } from 'node:path';
 
 import type { EPPProject, ImageAsset } from '@epp/layout-engine';
 
+import { buildProjectBundle, extractProjectBundle, type BundleImageSource } from '../projectBundle.js';
+import { getWorkingImagesDir, resetWorkingDirectory } from '../workingDirectory.js';
 import {
   applyRegeneratedImage,
   computeCoverDecodeSize,
@@ -16,6 +18,7 @@ const OPEN_IMAGES_CHANNEL = 'dialog:open-images';
 const RELINK_IMAGE_CHANNEL = 'dialog:relink-image';
 const OPEN_PROJECT_CHANNEL = 'fs:open-project';
 const SAVE_PROJECT_CHANNEL = 'fs:save-project';
+const RESET_WORKING_STORAGE_CHANNEL = 'fs:reset-working-storage';
 const DECODE_IMAGE_AT_SIZE_CHANNEL = 'images:decode-at-size';
 const MAX_THUMBNAIL_EDGE_PX = 240;
 const IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'tiff'];
@@ -77,12 +80,28 @@ function decodeImageAtSize(filePath: string, minWidthPx: number, minHeightPx: nu
   return image.resize({ width: targetSize.width, height: targetSize.height, quality: 'good' }).toDataURL();
 }
 
-function createImageAssetFromPath(filePath: string): ImageAsset {
-  const { widthPx, heightPx, thumbnailDataUrl } = decodeAndThumbnail(filePath);
+/** Copies `sourcePath`'s bytes into the current session's working directory, named by `assetId`
+ * plus `sourcePath`'s own extension -- see the `project-persistence` capability's "Project
+ * Working Storage Is Session-Scoped, Not Persisted" requirement. */
+async function copyIntoWorkingDir(sourcePath: string, assetId: string): Promise<string> {
+  const imagesDir = await getWorkingImagesDir();
+  const destPath = join(imagesDir, `${assetId}${extname(sourcePath)}`);
+  await copyFile(sourcePath, destPath);
+  return destPath;
+}
+
+/** Ingests a picked file: copies it into the working directory first, then decodes/thumbnails
+ * from that copy (not the original) -- so `storedPath` is always a working-directory file from
+ * the instant an asset exists, per "Native Image Ingestion Dialog". Shared by the open-images and
+ * relink-image handlers below. */
+async function createImageAssetFromPath(filePath: string): Promise<ImageAsset> {
+  const id = crypto.randomUUID();
+  const storedPath = await copyIntoWorkingDir(filePath, id);
+  const { widthPx, heightPx, thumbnailDataUrl } = decodeAndThumbnail(storedPath);
   return {
-    id: crypto.randomUUID(),
+    id,
     originalPath: filePath,
-    storedPath: filePath,
+    storedPath,
     fileName: basename(filePath),
     widthPx,
     heightPx,
@@ -90,15 +109,21 @@ function createImageAssetFromPath(filePath: string): ImageAsset {
   };
 }
 
-/** Regenerates a persisted ImageAsset's thumbnail from its saved originalPath. If the file can no
- * longer be read/decoded, the entry is kept (with its persisted widthPx/heightPx, since those don't
- * require the file to exist) and flagged missing instead of failing the whole project load. */
-function regenerateImageAsset(persisted: PersistedImageAsset): ImageAsset {
+/** Regenerates a persisted ImageAsset's thumbnail from its just-extracted working-directory copy.
+ * If that copy can't be read/decoded (a corrupted or missing bundle entry), the entry is kept
+ * (with its persisted widthPx/heightPx, since those don't require the bytes to be readable) and
+ * flagged missing instead of failing the whole project load. */
+function regenerateImageAsset(persisted: PersistedImageAsset, imagesDir: string): ImageAsset {
+  const extractedPath = join(imagesDir, `${persisted.id}${extname(persisted.fileName)}`);
+
+  let regenerated: { widthPx: number; heightPx: number; thumbnailDataUrl: string } | null;
   try {
-    return applyRegeneratedImage(persisted, decodeAndThumbnail(persisted.originalPath), MISSING_IMAGE_PLACEHOLDER_DATA_URL);
+    regenerated = decodeAndThumbnail(extractedPath);
   } catch {
-    return applyRegeneratedImage(persisted, null, MISSING_IMAGE_PLACEHOLDER_DATA_URL);
+    regenerated = null;
   }
+
+  return { ...applyRegeneratedImage(persisted, regenerated, MISSING_IMAGE_PLACEHOLDER_DATA_URL), storedPath: extractedPath };
 }
 
 export function registerFsHandlers(): void {
@@ -106,6 +131,7 @@ export function registerFsHandlers(): void {
   ipcMain.removeHandler(RELINK_IMAGE_CHANNEL);
   ipcMain.removeHandler(OPEN_PROJECT_CHANNEL);
   ipcMain.removeHandler(SAVE_PROJECT_CHANNEL);
+  ipcMain.removeHandler(RESET_WORKING_STORAGE_CHANNEL);
   ipcMain.removeHandler(DECODE_IMAGE_AT_SIZE_CHANNEL);
 
   ipcMain.handle(OPEN_IMAGES_CHANNEL, async () => {
@@ -115,7 +141,7 @@ export function registerFsHandlers(): void {
       filters: [{ name: 'Images', extensions: IMAGE_EXTENSIONS }],
     });
 
-    return result.canceled ? [] : result.filePaths.map(createImageAssetFromPath);
+    return result.canceled ? [] : Promise.all(result.filePaths.map(createImageAssetFromPath));
   });
 
   ipcMain.handle(RELINK_IMAGE_CHANNEL, async (): Promise<Omit<ImageAsset, 'id'> | null> => {
@@ -132,7 +158,7 @@ export function registerFsHandlers(): void {
     const filePath = result.filePaths[0];
     // id is intentionally omitted: the renderer already knows which existing ImageAsset this
     // relink applies to and keeps that asset's id -- Main's freshly-minted id here is unused.
-    const { id: _id, ...asset } = createImageAssetFromPath(filePath);
+    const { id: _id, ...asset } = await createImageAssetFromPath(filePath);
     return asset;
   });
 
@@ -148,18 +174,20 @@ export function registerFsHandlers(): void {
     }
 
     const filePath = result.filePaths[0];
-    const raw = await readFile(filePath, 'utf8');
+    const zipBytes = await readFile(filePath);
+    const imagesDir = await resetWorkingDirectory();
 
     let parsed: unknown;
     try {
-      parsed = JSON.parse(raw);
-    } catch {
-      throw new Error(`"${basename(filePath)}" is not a valid project file (invalid JSON).`);
+      parsed = await extractProjectBundle(zipBytes, imagesDir);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      throw new Error(`"${basename(filePath)}" is not a valid Easy Photo Print project: ${reason}`);
     }
 
     const { project, imagePool } = normalizeProjectDocument(parsed);
     return {
-      project: { ...project, imagePool: imagePool.map(regenerateImageAsset) },
+      project: { ...project, imagePool: imagePool.map((asset) => regenerateImageAsset(asset, imagesDir)) },
       filePath,
     };
   });
@@ -181,8 +209,36 @@ export function registerFsHandlers(): void {
       targetPath = result.filePath;
     }
 
-    await writeFile(targetPath, JSON.stringify(prepareProjectForSave(project), null, 2), 'utf8');
+    const images: BundleImageSource[] = project.imagePool.map((asset) => ({
+      assetId: asset.id,
+      ext: extname(asset.fileName),
+      filePath: asset.storedPath,
+    }));
+
+    let bundleBytes: Uint8Array;
+    try {
+      bundleBytes = await buildProjectBundle(prepareProjectForSave(project), images);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      throw new Error(`Could not save the project: ${reason}`);
+    }
+
+    // Write to a temp file in the same directory (same volume, so the rename is atomic) and
+    // rename over the target -- a failed write can't corrupt a previously saved file.
+    const tempPath = `${targetPath}.tmp-${crypto.randomUUID()}`;
+    try {
+      await writeFile(tempPath, bundleBytes);
+      await rename(tempPath, targetPath);
+    } catch (error) {
+      await rm(tempPath, { force: true }).catch(() => {});
+      throw error;
+    }
+
     return targetPath;
+  });
+
+  ipcMain.handle(RESET_WORKING_STORAGE_CHANNEL, async (): Promise<void> => {
+    await resetWorkingDirectory();
   });
 
   ipcMain.handle(

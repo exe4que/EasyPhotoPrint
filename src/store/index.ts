@@ -104,6 +104,10 @@ export const useEPPStore = create<EPPStore>()(
             project: createInitialProjectState(),
           });
           useEPPStore.temporal.getState().clear();
+          // Fire-and-forget: discards the outgoing document's working-directory image copies so
+          // they don't accumulate for the rest of the running session. Doesn't block the
+          // (synchronous) state reset above on it.
+          void getEppApi().fs.resetWorkingStorage();
         },
         saveProject: async (forceDialog) => {
           const state = get();

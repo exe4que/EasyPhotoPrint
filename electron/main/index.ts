@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 import { registerIpcHandlers } from './ipc/index.js';
 import { buildApplicationMenu } from './menu.js';
+import { cleanupWorkingDirectoryOnQuit } from './workingDirectory.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const isDevelopment = Boolean(process.env.ELECTRON_RENDERER_URL);
@@ -54,4 +55,10 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
+});
+
+app.on('before-quit', () => {
+  // Best-effort, fire-and-forget: doesn't delay quitting for cleanup that may not finish anyway
+  // (see workingDirectory.ts's cleanup-philosophy note).
+  void cleanupWorkingDirectoryOnQuit();
 });

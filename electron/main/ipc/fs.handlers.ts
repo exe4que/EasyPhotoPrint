@@ -1,9 +1,10 @@
-import { dialog, ipcMain, nativeImage } from 'electron';
+import { dialog, ipcMain } from 'electron';
 import { copyFile, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { basename, extname, join } from 'node:path';
 
 import type { EPPProject, ImageAsset } from '@epp/layout-engine';
 
+import { createElectronImageDecoder } from '../imageDecoder.js';
 import { buildProjectBundle, extractProjectBundle, type BundleImageSource } from '../projectBundle.js';
 import { getWorkingImagesDir, resetWorkingDirectory } from '../workingDirectory.js';
 import {
@@ -30,6 +31,8 @@ const MISSING_IMAGE_PLACEHOLDER_DATA_URL = `data:image/svg+xml;utf8,${encodeURIC
     '</svg>',
 )}`;
 
+const decoder = createElectronImageDecoder();
+
 interface SaveProjectOptions {
   /** The project's currently remembered file path, if any (null for a never-saved project). */
   existingPath: string | null;
@@ -49,8 +52,8 @@ function computeThumbnailSize(widthPx: number, heightPx: number): { width: numbe
   };
 }
 
-function decodeAndThumbnail(filePath: string): { widthPx: number; heightPx: number; thumbnailDataUrl: string } {
-  const image = nativeImage.createFromPath(filePath);
+async function decodeAndThumbnail(filePath: string): Promise<{ widthPx: number; heightPx: number; thumbnailDataUrl: string }> {
+  const image = await decoder.decodeFromPath(filePath);
   const size = image.getSize();
   if (size.width <= 0 || size.height <= 0) {
     throw new Error(`Could not decode image metadata for ${filePath}.`);
@@ -69,8 +72,8 @@ function decodeAndThumbnail(filePath: string): { widthPx: number; heightPx: numb
 /** Decodes filePath at (up to) native resolution, only as small as still covers the requested
  * minimum size in both dimensions -- see computeCoverDecodeSize. Used for print-preview, where
  * the bounded-edge thumbnailDataUrl every ImageAsset already carries isn't enough resolution. */
-function decodeImageAtSize(filePath: string, minWidthPx: number, minHeightPx: number): string {
-  const image = nativeImage.createFromPath(filePath);
+async function decodeImageAtSize(filePath: string, minWidthPx: number, minHeightPx: number): Promise<string> {
+  const image = await decoder.decodeFromPath(filePath);
   const size = image.getSize();
   if (size.width <= 0 || size.height <= 0) {
     throw new Error(`Could not decode image metadata for ${filePath}.`);
@@ -97,7 +100,7 @@ async function copyIntoWorkingDir(sourcePath: string, assetId: string): Promise<
 async function createImageAssetFromPath(filePath: string): Promise<ImageAsset> {
   const id = crypto.randomUUID();
   const storedPath = await copyIntoWorkingDir(filePath, id);
-  const { widthPx, heightPx, thumbnailDataUrl } = decodeAndThumbnail(storedPath);
+  const { widthPx, heightPx, thumbnailDataUrl } = await decodeAndThumbnail(storedPath);
   return {
     id,
     originalPath: filePath,
@@ -113,12 +116,12 @@ async function createImageAssetFromPath(filePath: string): Promise<ImageAsset> {
  * If that copy can't be read/decoded (a corrupted or missing bundle entry), the entry is kept
  * (with its persisted widthPx/heightPx, since those don't require the bytes to be readable) and
  * flagged missing instead of failing the whole project load. */
-function regenerateImageAsset(persisted: PersistedImageAsset, imagesDir: string): ImageAsset {
+async function regenerateImageAsset(persisted: PersistedImageAsset, imagesDir: string): Promise<ImageAsset> {
   const extractedPath = join(imagesDir, `${persisted.id}${extname(persisted.fileName)}`);
 
   let regenerated: { widthPx: number; heightPx: number; thumbnailDataUrl: string } | null;
   try {
-    regenerated = decodeAndThumbnail(extractedPath);
+    regenerated = await decodeAndThumbnail(extractedPath);
   } catch {
     regenerated = null;
   }
@@ -187,7 +190,7 @@ export function registerFsHandlers(): void {
 
     const { project, imagePool } = normalizeProjectDocument(parsed);
     return {
-      project: { ...project, imagePool: imagePool.map((asset) => regenerateImageAsset(asset, imagesDir)) },
+      project: { ...project, imagePool: await Promise.all(imagePool.map((asset) => regenerateImageAsset(asset, imagesDir))) },
       filePath,
     };
   });
@@ -244,6 +247,6 @@ export function registerFsHandlers(): void {
   ipcMain.handle(
     DECODE_IMAGE_AT_SIZE_CHANNEL,
     async (_event, filePath: string, minWidthPx: number, minHeightPx: number): Promise<string> =>
-      decodeImageAtSize(filePath, minWidthPx, minHeightPx),
+      await decodeImageAtSize(filePath, minWidthPx, minHeightPx),
   );
 }

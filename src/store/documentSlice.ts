@@ -20,7 +20,6 @@ import {
   type SpecificSizeMm,
 } from '@epp/layout-engine';
 
-import { getEppApi } from '../lib/ipc-client.js';
 import { createPageBoxMm } from '../lib/page.js';
 
 const DEFAULT_PAGE_CONFIG: PageConfig = {
@@ -794,7 +793,6 @@ export interface DocumentSlice {
   applyTemplate: (pageId: string, template: EPPTemplate) => void;
   linkPageToTemplate: (pageId: string, templateId: string) => void;
   exportTemplate: (pageId: string) => EPPTemplate;
-  exportPdf: () => Promise<Uint8Array>;
 }
 
 interface DocumentSliceDependencies {
@@ -1282,16 +1280,6 @@ export function createDocumentSlice(
       }
 
       return createTemplateFromPage(page);
-    },
-    exportPdf: async () => {
-      const project = {
-        schemaVersion: '1.0.0' as const,
-        id: 'unsaved-project',
-        name: 'Unsaved project',
-        pages: get().document.pages,
-        imagePool: [],
-      };
-      return getEppApi().pdf.export(project);
     },
   };
 }

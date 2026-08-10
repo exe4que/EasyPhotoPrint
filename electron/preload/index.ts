@@ -36,10 +36,10 @@ const eppAPI = {
     onSaveTemplateAs: (callback: () => void) => onMenuEvent('menu:save-template-as', callback),
   },
   pdf: {
-    export: (project: unknown) => ipcRenderer.invoke('pdf:export', project) as Promise<Uint8Array>,
+    export: (project: EPPProject) => ipcRenderer.invoke('pdf:export', project) as Promise<string | null>,
   },
   print: {
-    document: (project: unknown) => ipcRenderer.invoke('print:document', project),
+    document: (project: EPPProject) => ipcRenderer.invoke('print:document', project) as Promise<void>,
   },
   settings: {
     get: () => ipcRenderer.invoke('settings:get') as Promise<AppSettings>,

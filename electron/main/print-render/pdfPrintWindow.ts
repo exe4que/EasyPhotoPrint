@@ -53,16 +53,31 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: s
   }
 }
 
+/** Physical size of the paper to request for the print job, in microns (Electron's unit for
+ * `pageSize`), already resolved for orientation -- a landscape A4 is `{ width: 297000, height: 210000 }`. */
+export interface PrintPageSizeMicrons {
+  width: number;
+  height: number;
+}
+
 /** Loads `pdfFilePath` into the hidden window and opens the native print dialog against it once
  * loaded. Resolves whether the user prints or cancels the dialog -- both are non-error outcomes
- * per the `printing` spec; only a load failure/timeout or an actual print-pipeline error rejects. */
-export async function printPdfFile(pdfFilePath: string): Promise<void> {
+ * per the `printing` spec; only a load failure/timeout or an actual print-pipeline error rejects.
+ *
+ * `pageSize` must be passed explicitly: with no `pageSize`, Chromium falls back to a portrait
+ * default (measured: a 297x210mm landscape document printed onto a 210x297mm portrait sheet), which
+ * silently scales the whole document down to fit. Note that Electron's `landscape` flag does NOT
+ * achieve this -- passing portrait dimensions plus `landscape: true` was measured to still produce a
+ * portrait sheet; the already-oriented width/height is what actually decides the paper. `marginType:
+ * 'none'` and `scaleFactor: 100` keep the composed PDF at 1:1 instead of being shrunk to fit a
+ * margined content area. */
+export async function printPdfFile(pdfFilePath: string, pageSize: PrintPageSizeMicrons): Promise<void> {
   const window = getPrintWindow();
 
   await withTimeout(window.loadURL(pathToFileURL(pdfFilePath).toString()), LOAD_TIMEOUT_MS, 'Timed out preparing the document for printing.');
 
   await new Promise<void>((resolve, reject) => {
-    window.webContents.print({}, (success, failureReason) => {
+    window.webContents.print({ pageSize, margins: { marginType: 'none' }, scaleFactor: 100 }, (success, failureReason) => {
       if (!success && failureReason !== 'cancelled') {
         reject(new Error(`Printing failed: ${failureReason}`));
         return;

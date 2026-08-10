@@ -17,6 +17,10 @@ export interface EppAPI {
     /** existingPath is the project's currently remembered file path (null if never saved); forceDialog is true for "Save As". Returns the resolved path, or null if canceled. */
     saveProject: (project: EPPProject, options: { existingPath: string | null; forceDialog: boolean }) => Promise<string | null>;
   };
+  images: {
+    /** Decodes filePath at (up to) native resolution, only as small as still covers (minWidthPx, minHeightPx) -- used for print-resolution preview rendering, distinct from an ImageAsset's bounded-edge thumbnailDataUrl. */
+    decodeAtSize: (filePath: string, minWidthPx: number, minHeightPx: number) => Promise<string>;
+  };
   menu: {
     /** Subscribes to the native "File > New" menu click; returns an unsubscribe function. */
     onNewProject: (callback: () => void) => () => void;

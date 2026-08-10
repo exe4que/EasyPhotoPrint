@@ -18,6 +18,12 @@ interface SlotImageProps {
    * pass true; the print-preview screen passes false so it stays free of every editing gizmo,
    * rendering a missing image's slot the same blank way an unassigned slot renders. */
   showDiagnostics: boolean;
+  /** A higher-resolution data URL to display instead of `asset.thumbnailDataUrl` (which is always
+   * bounded to a small edge -- see project-persistence's thumbnail contract). Editor callers omit
+   * this and keep using the thumbnail; print-preview passes a print-resolution decode once one is
+   * available, falling back to the thumbnail while it loads. Purely which bitmap is displayed --
+   * every geometry/aspect-ratio calculation below is unaffected, since it's derived from `asset`. */
+  srcOverride?: string;
 }
 
 /**
@@ -36,6 +42,7 @@ export function SlotImage({
   zoom,
   unsatisfiedSizeContext,
   showDiagnostics,
+  srcOverride,
 }: SlotImageProps) {
   if (asset.missing) {
     if (!showDiagnostics) {
@@ -62,11 +69,12 @@ export function SlotImage({
   const renderTopMm = heightMm / 2 - renderRect.heightMm / 2;
   const rotationTransform = rotationDeg ? `rotate(${rotationDeg}deg)` : undefined;
   const unsatisfiedNoun = unsatisfiedSizeContext === 'slot' ? 'slot' : 'elemento';
+  const src = srcOverride ?? asset.thumbnailDataUrl;
 
   if (scalingRule === 'specificSize' && specificSizeMm) {
     return (
       <img
-        src={asset.thumbnailDataUrl}
+        src={src}
         alt={asset.fileName}
         title={unsatisfied ? `El tamaño específico no entra en el espacio disponible del ${unsatisfiedNoun}` : undefined}
         className={`pointer-events-none absolute object-fill ${
@@ -88,7 +96,7 @@ export function SlotImage({
 
   return (
     <img
-      src={asset.thumbnailDataUrl}
+      src={src}
       alt={asset.fileName}
       className="pointer-events-none absolute"
       style={{

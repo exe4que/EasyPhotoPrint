@@ -4,12 +4,19 @@ import { basename } from 'node:path';
 
 import type { EPPProject, ImageAsset } from '@epp/layout-engine';
 
-import { applyRegeneratedImage, normalizeProjectDocument, prepareProjectForSave, type PersistedImageAsset } from './fs.helpers.js';
+import {
+  applyRegeneratedImage,
+  computeCoverDecodeSize,
+  normalizeProjectDocument,
+  prepareProjectForSave,
+  type PersistedImageAsset,
+} from './fs.helpers.js';
 
 const OPEN_IMAGES_CHANNEL = 'dialog:open-images';
 const RELINK_IMAGE_CHANNEL = 'dialog:relink-image';
 const OPEN_PROJECT_CHANNEL = 'fs:open-project';
 const SAVE_PROJECT_CHANNEL = 'fs:save-project';
+const DECODE_IMAGE_AT_SIZE_CHANNEL = 'images:decode-at-size';
 const MAX_THUMBNAIL_EDGE_PX = 240;
 const IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'tiff'];
 
@@ -56,6 +63,20 @@ function decodeAndThumbnail(filePath: string): { widthPx: number; heightPx: numb
   return { widthPx: size.width, heightPx: size.height, thumbnailDataUrl: thumbnail.toDataURL() };
 }
 
+/** Decodes filePath at (up to) native resolution, only as small as still covers the requested
+ * minimum size in both dimensions -- see computeCoverDecodeSize. Used for print-preview, where
+ * the bounded-edge thumbnailDataUrl every ImageAsset already carries isn't enough resolution. */
+function decodeImageAtSize(filePath: string, minWidthPx: number, minHeightPx: number): string {
+  const image = nativeImage.createFromPath(filePath);
+  const size = image.getSize();
+  if (size.width <= 0 || size.height <= 0) {
+    throw new Error(`Could not decode image metadata for ${filePath}.`);
+  }
+
+  const targetSize = computeCoverDecodeSize(size.width, size.height, minWidthPx, minHeightPx);
+  return image.resize({ width: targetSize.width, height: targetSize.height, quality: 'good' }).toDataURL();
+}
+
 function createImageAssetFromPath(filePath: string): ImageAsset {
   const { widthPx, heightPx, thumbnailDataUrl } = decodeAndThumbnail(filePath);
   return {
@@ -85,6 +106,7 @@ export function registerFsHandlers(): void {
   ipcMain.removeHandler(RELINK_IMAGE_CHANNEL);
   ipcMain.removeHandler(OPEN_PROJECT_CHANNEL);
   ipcMain.removeHandler(SAVE_PROJECT_CHANNEL);
+  ipcMain.removeHandler(DECODE_IMAGE_AT_SIZE_CHANNEL);
 
   ipcMain.handle(OPEN_IMAGES_CHANNEL, async () => {
     const result = await dialog.showOpenDialog({
@@ -162,4 +184,10 @@ export function registerFsHandlers(): void {
     await writeFile(targetPath, JSON.stringify(prepareProjectForSave(project), null, 2), 'utf8');
     return targetPath;
   });
+
+  ipcMain.handle(
+    DECODE_IMAGE_AT_SIZE_CHANNEL,
+    async (_event, filePath: string, minWidthPx: number, minHeightPx: number): Promise<string> =>
+      decodeImageAtSize(filePath, minWidthPx, minHeightPx),
+  );
 }

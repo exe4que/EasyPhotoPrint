@@ -103,3 +103,24 @@ export function prepareProjectForSave(project: EPPProject): unknown {
     imagePool: project.imagePool.map(({ thumbnailDataUrl: _thumbnailDataUrl, missing: _missing, ...persisted }) => persisted),
   };
 }
+
+/** The smallest size, preserving the source's own aspect ratio, whose width and height are both
+ * at least (minWidthPx, minHeightPx) -- the inverse of a "fit under a max edge" thumbnail size:
+ * this finds the smallest size that still *covers* a minimum in both axes, never upscaling past
+ * the source's native resolution. */
+export function computeCoverDecodeSize(
+  nativeWidthPx: number,
+  nativeHeightPx: number,
+  minWidthPx: number,
+  minHeightPx: number,
+): { width: number; height: number } {
+  if (nativeWidthPx <= 0 || nativeHeightPx <= 0) {
+    throw new Error('Native image dimensions must be positive.');
+  }
+
+  const scale = Math.min(1, Math.max(minWidthPx / nativeWidthPx, minHeightPx / nativeHeightPx));
+  return {
+    width: Math.max(1, Math.round(nativeWidthPx * scale)),
+    height: Math.max(1, Math.round(nativeHeightPx * scale)),
+  };
+}

@@ -22,18 +22,19 @@
 
 ## 4. Custom SAF-backed Capacitor plugin (file access)
 
-- [ ] 4.1 Scaffold a custom Capacitor plugin project (Kotlin) under `android/app/src/main/` for SAF-backed file access — e.g. `SafFilePlugin`.
-- [ ] 4.2 Implement an `openImages` plugin method: launches `ACTION_OPEN_DOCUMENT` with multi-select and an image MIME filter, returns the list of picked `content://` URIs (as strings) plus each file's bytes (base64) to the TS side.
-- [ ] 4.3 Implement an `openDocument` plugin method (single-select, MIME/extension filtered) for `fs.openProject` and `dialog.relinkImage`'s picker.
-- [ ] 4.4 Implement a `createDocument` plugin method wrapping `ACTION_CREATE_DOCUMENT` for `fs.saveProject`'s first-save/"Save As" path, and a `writeDocument` method that writes bytes to an already-known `content://` URI via `ContentResolver.openOutputStream` for subsequent plain saves.
-- [ ] 4.5 Register the plugin in the Android project (`MainActivity`'s plugin list) and confirm it's callable from TS via `registerPlugin`/the generated TS binding.
+- [x] 4.1 Scaffold a custom Capacitor plugin project (Kotlin) under `android/app/src/main/` for SAF-backed file access — e.g. `SafFilePlugin`.
+- [x] 4.2 Implement an `openImages` plugin method: launches `ACTION_OPEN_DOCUMENT` with multi-select and an image MIME filter, returns the list of picked `content://` URIs (as strings) plus each file's bytes (base64) to the TS side.
+- [x] 4.3 Implement an `openDocument` plugin method (single-select, MIME/extension filtered) for `fs.openProject` and `dialog.relinkImage`'s picker.
+- [x] 4.4 Implement a `createDocument` plugin method wrapping `ACTION_CREATE_DOCUMENT` for `fs.saveProject`'s first-save/"Save As" path, and a `writeDocument` method that writes bytes to an already-known `content://` URI via `ContentResolver.openOutputStream` for subsequent plain saves.
+- [x] 4.5 Register the plugin in the Android project (`MainActivity`'s plugin list) and confirm it's callable from TS via `registerPlugin`/the generated TS binding.
 
-## 5. In-WebView image decode and PDF composition
+## 5. In-WebView working storage, image decode, and PDF composition
 
-- [ ] 5.1 Add a renderer-side module (e.g. `src/lib/android/imageDecode.ts`) that decodes an image (from bytes or a cached local file) via `createImageBitmap`, and exposes resize/crop/encode operations via `OffscreenCanvas`, shaped closely enough to `electron/main/imageDecoder.ts`'s `DecodedImage` to keep the two implementations easy to compare even though they aren't shared (see design.md, Decision 4 / Non-Goals).
-- [ ] 5.2 Port `fs.helpers.ts`'s pure `computeThumbnailSize`/`computeCoverDecodeSize` logic into a renderer-side module (new file — not a cross-boundary import from `electron/main/`) for use by ingest thumbnailing and `images.decodeAtSize` on Android.
-- [ ] 5.3 Add a renderer-side PDF composition module (e.g. `src/lib/android/composeProjectPdf.ts`) that calls `composeProjectPdf.helpers.ts`'s `computePagePlacements` and `pdfPlacement.ts`'s placement math, using `pdf-lib` and the new image-decode module from 5.1 in place of `nativeImage`.
-- [ ] 5.4 Unit test the new pure ports from 5.2 against the same cases `fs.helpers.test.ts` already covers, confirming identical output to the Electron originals.
+- [x] 5.1 Add a renderer-side working-storage module (e.g. `src/lib/android/workingStorage.ts`) backed by IndexedDB: put/get/remove/clear a `Blob` keyed by `assetId` — the Android counterpart to Electron's working directory (see design.md, Decision 3a).
+- [x] 5.2 Add a renderer-side module (e.g. `src/lib/android/imageDecode.ts`) that decodes an image (from a `Blob`) via `createImageBitmap`, and exposes resize/crop/encode operations via `OffscreenCanvas`, shaped closely enough to `electron/main/imageDecoder.ts`'s `DecodedImage` to keep the two implementations easy to compare even though they aren't shared (see design.md, Decision 4 / Non-Goals).
+- [x] 5.3 Port `fs.handlers.ts`/`fs.helpers.ts`'s pure `computeThumbnailSize`/`computeCoverDecodeSize` logic into a renderer-side module (new file — not a cross-boundary import from `electron/main/`) for use by ingest thumbnailing and `images.decodeAtSize` on Android.
+- [x] 5.4 Add a renderer-side PDF composition module (e.g. `src/lib/android/composeProjectPdf.ts`) that calls `composeProjectPdf.helpers.ts`'s `computePagePlacements` and `pdfPlacement.ts`'s placement math, using `pdf-lib` and the new image-decode module from 5.2 in place of `nativeImage`.
+- [x] 5.5 Unit test the new pure ports from 5.3 against the same cases `fs.helpers.test.ts` already covers, confirming identical output to the Electron originals.
 
 ## 6. Custom print plugin
 
@@ -43,14 +44,14 @@
 
 ## 7. Wire the remaining adapter members
 
-- [ ] 7.1 Implement `dialog.openImages`: call the SAF plugin's `openImages`, then for each picked file, copy its bytes into the app's private cache directory, decode dimensions and generate a thumbnail via the module from 5.1/5.2, and return a fully-formed `ImageAsset[]` — the Android counterpart to `fs.handlers.ts`'s `createImageAssetFromPath`.
-- [ ] 7.2 Implement `dialog.relinkImage` using the SAF plugin's `openDocument`, following the same copy/decode/thumbnail sequence as 7.1 for a single file.
-- [ ] 7.3 Implement `fs.openProject`: use the SAF plugin's `openDocument` filtered to `.eppproj`, unzip via `fflate` (already a portable dependency), copy each bundled image's bytes into the cache directory, decode/thumbnail each via 5.1/5.2, and return `{ project, filePath }` with `filePath` set to the opaque `content://` URI string.
-- [ ] 7.4 Implement `fs.saveProject`: zip the project JSON plus every pool image's current cached bytes via `fflate`, and write it via the SAF plugin's `createDocument` (first save / Save As) or `writeDocument` (subsequent saves to an already-known URI), returning the URI string.
-- [ ] 7.5 Implement `fs.resetWorkingStorage`: clear the app's private cache directory used for working copies.
-- [ ] 7.6 Implement `images.decodeAtSize` using the modules from 5.1/5.2 against the cached local copy of the requested file.
-- [ ] 7.7 Implement `pdf.export`: run the composition module from 5.3, then hand the resulting bytes to the SAF plugin's `createDocument` to let the user choose a save location, returning the URI string or `null` if canceled.
-- [ ] 7.8 Implement `print.document`: run the same composition module from 5.3, then pass the resulting bytes to the print plugin's `printPdf`.
+- [ ] 7.1 Implement `dialog.openImages`: call the SAF plugin's `openImages`, then for each picked file, store its bytes in IndexedDB working storage (5.1) under a fresh `assetId`, decode dimensions and generate a thumbnail via the modules from 5.2/5.3, and return a fully-formed `ImageAsset[]` with `storedPath` set to that `assetId` — the Android counterpart to `fs.handlers.ts`'s `createImageAssetFromPath`.
+- [ ] 7.2 Implement `dialog.relinkImage` using the SAF plugin's `openDocument`, following the same store/decode/thumbnail sequence as 7.1 for a single file.
+- [ ] 7.3 Implement `fs.openProject`: use the SAF plugin's `openDocument` filtered to `.eppproj`, unzip via `fflate` (already a portable dependency), store each bundled image's bytes in IndexedDB working storage under its persisted `assetId`, decode/thumbnail each via 5.2/5.3, and return `{ project, filePath }` with `filePath` set to the opaque `content://` URI string for the project file itself (each image's `storedPath` is set to its `assetId`, not a URI).
+- [ ] 7.4 Implement `fs.saveProject`: zip the project JSON plus every pool image's current bytes (read back from IndexedDB working storage via each asset's `storedPath`/`assetId`) via `fflate`, and write it via the SAF plugin's `createDocument` (first save / Save As) or `writeDocument` (subsequent saves to an already-known URI), returning the URI string.
+- [ ] 7.5 Implement `fs.resetWorkingStorage`: clear the IndexedDB working-storage object store.
+- [ ] 7.6 Implement `images.decodeAtSize` using the modules from 5.2/5.3 against the `Blob` read back from IndexedDB working storage for the requested asset.
+- [ ] 7.7 Implement `pdf.export`: run the composition module from 5.4, then hand the resulting bytes to the SAF plugin's `createDocument` to let the user choose a save location, returning the URI string or `null` if canceled.
+- [ ] 7.8 Implement `print.document`: run the same composition module from 5.4, then pass the resulting bytes to the print plugin's `printPdf`.
 - [ ] 7.9 Implement `templates.list`/`save`/`delete` using the app's private storage (e.g. `@capacitor/preferences` or a private-directory JSON file per template) — templates carry no image references (per `packaged-project-files`'s proposal), so no SAF/content-URI involvement is needed here.
 
 ## 8. Build, install, and run

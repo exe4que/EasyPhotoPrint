@@ -268,18 +268,18 @@ describe('document slice helpers', () => {
     expect(state.document.pages[0].assignments).toEqual({});
   });
 
-  it('switches the Simple root type to freeformCanvas and clears slot assignments', () => {
+  it('retypes the root to freeformCanvas and clears slot assignments', () => {
     const state = createTestStore();
 
     state.assignImageToSlot('page-1', 'root-grid', 'image-a');
-    state.setSimpleRootType('page-1', 'freeformCanvas');
+    state.retypeLayoutNode('page-1', 'root-grid', 'freeformCanvas');
 
     const page = state.document.pages[0];
     expect(page.rootNode.type).toBe('freeformCanvas');
     expect(page.rootNode.freeformElements).toEqual([]);
     expect(page.assignments).toEqual({});
 
-    state.setSimpleRootType('page-1', 'imageSlot');
+    state.retypeLayoutNode('page-1', 'root-grid', 'imageSlot');
     expect(state.document.pages[0].rootNode.type).toBe('imageSlot');
   });
 
@@ -292,7 +292,7 @@ describe('document slice helpers', () => {
   it('adds a freeform element centered in the node, referencing a new imageSlot child', () => {
     const state = createTestStore();
 
-    state.setSimpleRootType('page-1', 'freeformCanvas');
+    state.retypeLayoutNode('page-1', 'root-grid', 'freeformCanvas');
     state.addFreeformElement('page-1', 'root-grid', 'image-a');
 
     const page = state.document.pages[0];
@@ -332,7 +332,7 @@ describe('document slice helpers', () => {
   it('removes a freeform element along with its imageSlot child and assignment', () => {
     const state = createTestStore();
 
-    state.setSimpleRootType('page-1', 'freeformCanvas');
+    state.retypeLayoutNode('page-1', 'root-grid', 'freeformCanvas');
     state.addFreeformElement('page-1', 'root-grid', 'image-a');
     const elementId = state.document.pages[0].rootNode.freeformElements![0].id;
 
@@ -347,7 +347,7 @@ describe('document slice helpers', () => {
   it('clamps updateFreeformElementTransform so the element cannot be dragged fully outside the node', () => {
     const state = createTestStore();
 
-    state.setSimpleRootType('page-1', 'freeformCanvas');
+    state.retypeLayoutNode('page-1', 'root-grid', 'freeformCanvas');
     state.addFreeformElement('page-1', 'root-grid', 'image-a');
     const elementId = state.document.pages[0].rootNode.freeformElements![0].id;
 

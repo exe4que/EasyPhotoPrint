@@ -208,7 +208,8 @@ function renderPaddingInputs({
 export function PropertiesPanel() {
   const activePageId = useEPPStore((state) => state.ui.activePageId);
   const layoutMode = useEPPStore((state) => state.ui.layoutMode);
-  const selectedSlotId = useEPPStore((state) => state.ui.selectedElementIds[0] ?? null);
+  const selection = useEPPStore((state) => state.ui.selection);
+  const setSelection = useEPPStore((state) => state.setSelection);
   const unitSystem = useEPPStore((state) => state.settings.unitSystem);
   const activePage = useEPPStore(
     (state) => state.document.pages.find((page) => page.id === activePageId) ?? state.document.pages[0],
@@ -217,14 +218,37 @@ export function PropertiesPanel() {
   const updateLayoutNode = useEPPStore((state) => state.updateLayoutNode);
   const setSlotSpecificSize = useEPPStore((state) => state.setSlotSpecificSize);
   const rotateSlotImage = useEPPStore((state) => state.rotateSlotImage);
-  const setSimpleRootType = useEPPStore((state) => state.setSimpleRootType);
+  const retypeLayoutNode = useEPPStore((state) => state.retypeLayoutNode);
   const setContainerChildCount = useEPPStore((state) => state.setContainerChildCount);
   const imagePool = useEPPStore((state) => state.imagePool);
   const { layout } = useLayoutResolution();
 
+  if (selection?.kind === 'image') {
+    const selectedAsset = imagePool.find((asset) => asset.id === selection.id) ?? null;
+    return (
+      <CollapsiblePanel title="Selected image" defaultCollapsed={false}>
+        <div className="rounded-lg border border-slate-800 bg-slate-950/70 p-3 text-sm">
+          <div className="text-xs uppercase tracking-wide text-slate-500">Selected library image</div>
+          <div className="mt-1 font-medium text-white">{selectedAsset?.fileName ?? 'None'}</div>
+          <div className="mt-1 text-xs text-slate-400">
+            {selectedAsset ? `${selectedAsset.widthPx}×${selectedAsset.heightPx}` : 'Click a thumbnail to see its details, or drag it to a slot to assign it.'}
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setSelection(null)}
+          className="mt-4 w-full rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-200 hover:border-slate-600"
+        >
+          Clear selected image
+        </button>
+      </CollapsiblePanel>
+    );
+  }
+
+  const selectedSlotId = selection?.kind === 'node' ? selection.id : null;
   const selectedNode = selectedSlotId ? findNodeById(activePage.rootNode, selectedSlotId) : null;
-  const contextNode =
-    selectedNode ?? (layoutMode === 'simple' ? activePage.rootNode : activePage.rootNode.type === 'grid' ? activePage.rootNode : null);
+  const contextNode = selectedNode ?? activePage.rootNode;
   const slotPropertyNode =
     contextNode?.type === 'imageSlot'
       ? contextNode
@@ -235,28 +259,28 @@ export function PropertiesPanel() {
     : null;
   const selectedBox = slotPropertyNodeId ? layout.get(slotPropertyNodeId) : undefined;
 
-  const rootTypeSelector =
-    layoutMode === 'simple' && contextNode?.id === activePage.rootNode.id ? (
-      <div>
-        <FieldLabel>Root type</FieldLabel>
-        <select
-          className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
-          value={activePage.rootNode.type}
-          onChange={(event) =>
-            setSimpleRootType(
-              activePage.id,
-              event.target.value as 'grid' | 'horizontal' | 'vertical' | 'imageSlot' | 'freeformCanvas',
-            )
-          }
-        >
-          <option value="imageSlot">imageSlot</option>
-          <option value="grid">grid</option>
-          <option value="horizontal">horizontal</option>
-          <option value="vertical">vertical</option>
-          <option value="freeformCanvas">freeformCanvas</option>
-        </select>
-      </div>
-    ) : null;
+  const nodeTypeSelector = (
+    <div>
+      <FieldLabel>{contextNode.id === activePage.rootNode.id ? 'Root type' : 'Node type'}</FieldLabel>
+      <select
+        className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
+        value={contextNode.type}
+        onChange={(event) =>
+          retypeLayoutNode(
+            activePage.id,
+            contextNode.id,
+            event.target.value as 'grid' | 'horizontal' | 'vertical' | 'imageSlot' | 'freeformCanvas',
+          )
+        }
+      >
+        <option value="imageSlot">imageSlot</option>
+        <option value="grid">grid</option>
+        <option value="horizontal">horizontal</option>
+        <option value="vertical">vertical</option>
+        <option value="freeformCanvas">freeformCanvas</option>
+      </select>
+    </div>
+  );
 
   if (slotPropertyNode) {
     const scalingRule = slotPropertyNode.imageSlotConfig?.scalingRule ?? 'fitInParent';
@@ -284,7 +308,7 @@ export function PropertiesPanel() {
         defaultCollapsed={false}
       >
         <div className="grid gap-4">
-          {rootTypeSelector}
+          {nodeTypeSelector}
           <div>
             <FieldLabel>Scaling rule</FieldLabel>
             <select
@@ -402,20 +426,6 @@ export function PropertiesPanel() {
     );
   }
 
-  if (!contextNode) {
-    return (
-      <CollapsiblePanel
-        title="Slot properties"
-        description="Configure the selected slot or layout node."
-        defaultCollapsed={false}
-      >
-        <div className="rounded-lg border border-dashed border-slate-700 bg-slate-950/50 px-4 py-5 text-sm text-slate-400">
-          Select an <code>imageSlot</code> from the preview or the layout tree. In nested mode, selecting a container node will show its layout controls here too.
-        </div>
-      </CollapsiblePanel>
-    );
-  }
-
   if (contextNode.type === 'grid') {
     const gridConfig = contextNode.gridConfig ?? { rows: 1, columns: 1 };
     const padding = contextNode.paddingMm ?? {};
@@ -426,7 +436,7 @@ export function PropertiesPanel() {
         defaultCollapsed={false}
       >
         <div className="grid gap-4">
-          {rootTypeSelector}
+          {nodeTypeSelector}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <FieldLabel>Rows</FieldLabel>
@@ -495,7 +505,7 @@ export function PropertiesPanel() {
       defaultCollapsed={false}
     >
       <div className="grid gap-4">
-      {rootTypeSelector}
+      {nodeTypeSelector}
       <div className="rounded-lg border border-slate-800 bg-slate-950/70 p-3 text-sm text-slate-300">
           <div className="text-xs uppercase tracking-wide text-slate-500">Selected node</div>
           <div className="mt-1 font-medium text-white">{contextNode.id}</div>

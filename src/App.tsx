@@ -6,7 +6,6 @@ import { ImageLibraryPanel } from './components/panels/ImageLibraryPanel.js';
 import { LayoutTreePanel } from './components/panels/LayoutTreePanel.js';
 import { PageSetupPanel } from './components/panels/PageSetupPanel.js';
 import { PropertiesPanel } from './components/panels/PropertiesPanel.js';
-import { SelectionPanel } from './components/panels/SelectionPanel.js';
 import { PreviewScreen } from './components/preview/PreviewScreen.js';
 import { UnitToggle } from './components/settings/UnitToggle.js';
 import { SaveTemplateDialog } from './components/templates/SaveTemplateDialog.js';
@@ -21,7 +20,6 @@ import { formatLength } from './lib/units.js';
 import { useEPPStore } from './store/index.js';
 
 export function App() {
-  const [selectedImageAssetId, setSelectedImageAssetId] = useState<string | null>(null);
   const [isNewProjectConfirmOpen, setIsNewProjectConfirmOpen] = useState(false);
   const [isOpenProjectConfirmOpen, setIsOpenProjectConfirmOpen] = useState(false);
   const [isMissingImagesDialogOpen, setIsMissingImagesDialogOpen] = useState(false);
@@ -212,17 +210,10 @@ export function App() {
                 <div className="min-h-0 flex-1">
                   <PageStage />
                 </div>
-                <ImageLibraryPanel
-                  selectedImageAssetId={selectedImageAssetId}
-                  onSelectImageAssetId={setSelectedImageAssetId}
-                />
+                <ImageLibraryPanel />
               </div>
 
               <aside className="min-h-0 space-y-4 overflow-y-auto pr-1">
-                <SelectionPanel
-                  selectedImageAssetId={selectedImageAssetId}
-                  onClearSelectedImage={() => setSelectedImageAssetId(null)}
-                />
                 <PropertiesPanel />
               </aside>
             </div>

@@ -218,113 +218,6 @@ function normalizeRootForSimpleMode(rootNode: LayoutNode, nextSlotId: () => stri
   };
 }
 
-function firstAssignedImageAssetId(page: EPPProjectPage): string | undefined {
-  if (page.assignments[page.rootNode.id]) {
-    return page.assignments[page.rootNode.id];
-  }
-  const slotIds = collectImageSlotNodes(page.rootNode).map((node) => node.id);
-  for (const slotId of slotIds) {
-    const assigned = page.assignments[slotId];
-    if (assigned) {
-      return assigned;
-    }
-  }
-  return undefined;
-}
-
-function setSimpleRootTypeForPage(
-  page: EPPProjectPage,
-  nextType: Extract<NestedNodeType, 'grid' | 'horizontal' | 'vertical' | 'imageSlot' | 'freeformCanvas'>,
-): { rootNode: LayoutNode; assignments: Record<string, string> } {
-  const nextSlotId = createSlotIdGenerator(page.rootNode);
-  const currentRoot = normalizeRootForSimpleMode(page.rootNode, nextSlotId);
-
-  if (nextType === 'imageSlot') {
-    const assignedImageAssetId = firstAssignedImageAssetId(page);
-    return {
-      rootNode: {
-        ...createImageSlot(currentRoot.id),
-        paddingMm: currentRoot.paddingMm ?? { top: 5, right: 5, bottom: 5, left: 5 },
-        imageSlotConfig:
-          currentRoot.type === 'imageSlot'
-            ? currentRoot.imageSlotConfig
-            : { scalingRule: 'fitInParent' },
-      },
-      assignments: assignedImageAssetId ? { [currentRoot.id]: assignedImageAssetId } : {},
-    };
-  }
-
-  if (nextType === 'freeformCanvas') {
-    return {
-      rootNode: {
-        id: currentRoot.id,
-        type: 'freeformCanvas',
-        paddingMm: currentRoot.paddingMm ?? { top: 5, right: 5, bottom: 5, left: 5 },
-        freeformElements: currentRoot.type === 'freeformCanvas' ? currentRoot.freeformElements ?? [] : [],
-      },
-      assignments: {},
-    };
-  }
-
-  const currentSlots = currentRoot.type === 'imageSlot' ? [] : (currentRoot.children ?? []).map(cloneAsSimpleImageSlot);
-  const children = currentSlots.length > 0 ? currentSlots : createDefaultChildren(nextSlotId);
-  const assignments: Record<string, string> = {};
-  if (currentRoot.type === 'imageSlot') {
-    const assignedImageAssetId = page.assignments[currentRoot.id];
-    if (assignedImageAssetId) {
-      assignments[children[0].id] = assignedImageAssetId;
-    }
-  } else {
-    Object.assign(assignments, filterAssignmentsForRootNode({ ...currentRoot, children }, page.assignments));
-  }
-
-  if (nextType === 'grid') {
-    const gridConfig =
-      currentRoot.type === 'grid'
-        ? normalizeGridConfig(currentRoot.gridConfig)
-        : {
-            rows: 1,
-            columns: Math.max(children.length, 2),
-            autoFit: false,
-            rowGapMm: undefined,
-            columnGapMm: undefined,
-          };
-    const normalizedChildren = reconcileGridChildren(children, Math.max(1, gridConfig.rows * gridConfig.columns));
-    return {
-      rootNode: {
-        id: currentRoot.id,
-        type: 'grid',
-        gapMm: currentRoot.gapMm ?? 3,
-        paddingMm: currentRoot.paddingMm ?? { top: 5, right: 5, bottom: 5, left: 5 },
-        gridConfig,
-        children: normalizedChildren,
-      },
-      assignments: filterAssignmentsForRootNode(
-        {
-          id: currentRoot.id,
-          type: 'grid',
-          gapMm: currentRoot.gapMm ?? 3,
-          paddingMm: currentRoot.paddingMm ?? { top: 5, right: 5, bottom: 5, left: 5 },
-          gridConfig,
-          children: normalizedChildren,
-        },
-        assignments,
-      ),
-    };
-  }
-
-  return {
-    rootNode: {
-      id: currentRoot.id,
-      type: nextType,
-      gapMm: currentRoot.gapMm ?? 3,
-      paddingMm: currentRoot.paddingMm ?? { top: 5, right: 5, bottom: 5, left: 5 },
-      children,
-    },
-    assignments,
-  };
-}
-
 function createNodeForType(type: NestedNodeType, nextSlotId: () => string, existingId?: string): LayoutNode {
   switch (type) {
     case 'imageSlot':
@@ -877,7 +770,6 @@ export interface DocumentSlice {
   ) => void;
   setContainerChildCount: (pageId: string, nodeId: string, count: number) => void;
   normalizePageForSimpleMode: (pageId: string) => void;
-  setSimpleRootType: (pageId: string, nextType: 'grid' | 'horizontal' | 'vertical' | 'imageSlot' | 'freeformCanvas') => void;
   retypeLayoutNode: (pageId: string, nodeId: string, nextType: NestedNodeType) => void;
   addNestedChildNode: (pageId: string, parentNodeId: string, childType: 'imageSlot' | 'horizontal' | 'vertical' | 'grid' | 'freeformCanvas') => void;
   removeLayoutNode: (pageId: string, nodeId: string) => void;
@@ -1007,28 +899,6 @@ export function createDocumentSlice(
                 })()
               : entry,
           ),
-        },
-      }));
-    },
-    setSimpleRootType: (pageId, nextType) => {
-      const page = get().document.pages.find((entry) => entry.id === pageId);
-      if (!page) {
-        throw new Error(`Page ${pageId} does not exist.`);
-      }
-
-      set((state) => ({
-        document: {
-          pages: state.document.pages.map((entry) => {
-            if (entry.id !== pageId) {
-              return entry;
-            }
-            const nextState = setSimpleRootTypeForPage(entry, nextType);
-            return {
-              ...entry,
-              rootNode: nextState.rootNode,
-              assignments: nextState.assignments,
-            };
-          }),
         },
       }));
     },

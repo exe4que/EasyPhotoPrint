@@ -56,7 +56,7 @@ describe('startNewProject', () => {
     expect(next.imagePool).toEqual([]);
     expect(next.ui).toEqual({
       activePageId: 'page-1',
-      selectedElementIds: [],
+      selection: null,
       activeTool: 'select',
       layoutMode: 'simple',
       viewMode: 'editor',
@@ -83,12 +83,12 @@ describe('UI-only actions do not pollute undo/redo history', () => {
     expect(useEPPStore.temporal.getState().pastStates.length).toBe(pastBefore);
   });
 
-  it('setSelectedElementIds does not push a history entry', () => {
+  it('setSelection does not push a history entry', () => {
     const pastBefore = useEPPStore.temporal.getState().pastStates.length;
 
-    useEPPStore.getState().setSelectedElementIds(['some-node']);
+    useEPPStore.getState().setSelection({ kind: 'node', id: 'some-node' });
 
-    expect(useEPPStore.getState().ui.selectedElementIds).toEqual(['some-node']);
+    expect(useEPPStore.getState().ui.selection).toEqual({ kind: 'node', id: 'some-node' });
     expect(useEPPStore.temporal.getState().pastStates.length).toBe(pastBefore);
   });
 
@@ -102,7 +102,7 @@ describe('UI-only actions do not pollute undo/redo history', () => {
   });
 
   it('clearSelection does not push a history entry', () => {
-    useEPPStore.getState().setSelectedElementIds(['some-node']);
+    useEPPStore.getState().setSelection({ kind: 'node', id: 'some-node' });
     const pastBefore = useEPPStore.temporal.getState().pastStates.length;
 
     useEPPStore.getState().clearSelection();
@@ -133,7 +133,7 @@ describe('UI-only actions do not pollute undo/redo history', () => {
     expect(useEPPStore.temporal.getState().futureStates.length).toBeGreaterThan(0);
     const futureBefore = useEPPStore.temporal.getState().futureStates.length;
 
-    useEPPStore.getState().setSelectedElementIds(['some-node']);
+    useEPPStore.getState().setSelection({ kind: 'node', id: 'some-node' });
     useEPPStore.getState().setActiveTool('pan');
     useEPPStore.getState().clearSelection();
     expect(useEPPStore.temporal.getState().futureStates.length).toBe(futureBefore);

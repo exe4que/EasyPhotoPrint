@@ -390,6 +390,15 @@ export function PropertiesPanel() {
             </div>
           ) : null}
 
+          {renderPaddingInputs({
+            padding: slotPropertyNode.paddingMm ?? {},
+            unitSystem,
+            onCommit: (side, valueMm) =>
+              updateLayoutNode(activePage.id, slotPropertyNode.id, {
+                paddingMm: { [side]: valueMm },
+              }),
+          })}
+
           <div className="rounded-lg border border-slate-800 bg-slate-950/70 p-3 text-sm text-slate-300">
             <div className="text-xs uppercase tracking-wide text-slate-500">Assigned image</div>
             <div className="mt-1 font-medium text-white">{selectedAsset?.fileName ?? 'No image assigned'}</div>

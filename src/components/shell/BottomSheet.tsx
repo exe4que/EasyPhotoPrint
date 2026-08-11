@@ -1,10 +1,14 @@
-import type { ReactNode } from 'react';
+import type { ReactNode, Ref } from 'react';
 
 interface BottomSheetProps {
   open: boolean;
   title: string;
   onClose: () => void;
   children: ReactNode;
+  /** Ref to the sheet's own outer (positioned) element -- used by the Photos sheet's swipe-drag
+   * gesture (see useLibraryImageDragGesture) to know the sheet's on-screen bounds, so it can tell
+   * when a touch has moved outside the panel. Optional; every other sheet omits it. */
+  panelRef?: Ref<HTMLDivElement>;
 }
 
 /** Shared chrome for every mobile sheet (tab-bar destinations and the Properties auto-sheet) --
@@ -13,7 +17,7 @@ interface BottomSheetProps {
  * while closed so the slide-down transition can play; `BottomTabBar` renders above this in z-index,
  * so it stays reachable while a sheet is open -- tapping the open destination again is a second way
  * to close it, alongside this backdrop tap and the close button. */
-export function BottomSheet({ open, title, onClose, children }: BottomSheetProps) {
+export function BottomSheet({ open, title, onClose, children, panelRef }: BottomSheetProps) {
   return (
     <>
       <div
@@ -24,6 +28,7 @@ export function BottomSheet({ open, title, onClose, children }: BottomSheetProps
         aria-hidden="true"
       />
       <div
+        ref={panelRef}
         role="dialog"
         aria-label={title}
         aria-hidden={!open}

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 import { PageStage } from '../canvas/PageStage.js';
 import { ImageLibraryPanel } from '../panels/ImageLibraryPanel.js';
@@ -43,12 +43,22 @@ export function MobileShell({ onRequestNew, onRequestOpen, onSaveTemplate, onSav
   const { page, layout } = useLayoutResolution();
   const { undo, redo } = useUndoRedo();
   const [openTab, setOpenTab] = useState<MobileTabId | null>(null);
+  const photosPanelRef = useRef<HTMLDivElement>(null);
 
-  // Swipe-drag on a Photos-sheet ImageCard (see useLibraryImageDragGesture): arming closes this
-  // sheet so the canvas underneath is reachable as a drop target; the drop (hit or miss) always
-  // reopens it, without ever touching selection -- that's what keeps this reopen from being
-  // pre-empted by the Properties auto-sheet below, per the mobile-shell delta spec.
+  // Swipe-drag on a Photos-sheet ImageCard (see useLibraryImageDragGesture): a press only arms once
+  // it moves outside the Photos sheet's own bounds, so the card strip's native horizontal scroll
+  // keeps working normally for a press that never leaves the sheet. Arming closes the sheet so the
+  // canvas underneath is reachable as a drop target; the drop (hit or miss) always reopens it,
+  // without ever touching selection -- that's what keeps this reopen from being pre-empted by the
+  // Properties auto-sheet below, per the mobile-shell delta spec.
   const { armedDrag, createCardDragProps } = useLibraryImageDragGesture({
+    isInsidePanel: (clientX, clientY) => {
+      const rect = photosPanelRef.current?.getBoundingClientRect();
+      if (!rect) {
+        return false;
+      }
+      return clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom;
+    },
     onArm: () => setOpenTab(null),
     onDrop: (imageAssetId, clientX, clientY) => {
       const dropElement = document.elementFromPoint(clientX, clientY)?.closest<HTMLElement>('[data-drop-target]');
@@ -163,7 +173,12 @@ export function MobileShell({ onRequestNew, onRequestOpen, onSaveTemplate, onSav
         ) : null}
       </BottomSheet>
 
-      <BottomSheet open={!isPropertiesOpen && openTab === 'photos'} title={TAB_LABELS.photos} onClose={() => setOpenTab(null)}>
+      <BottomSheet
+        open={!isPropertiesOpen && openTab === 'photos'}
+        title={TAB_LABELS.photos}
+        onClose={() => setOpenTab(null)}
+        panelRef={photosPanelRef}
+      >
         <ImageLibraryPanel bare dragGesture={{ createCardDragProps }} />
       </BottomSheet>
 

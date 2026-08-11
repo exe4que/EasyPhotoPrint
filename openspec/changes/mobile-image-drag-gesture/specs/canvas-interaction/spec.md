@@ -3,13 +3,13 @@
 ### Requirement: Library Image Drag Assigns or Places Via a Pointer Gesture
 A pointer-driven drag gesture on an Image Library card — using the Pointer Events API with pointer capture, the same mechanism this capability already uses for divider resize and freeform move/resize/rotate, not HTML5 drag-and-drop — SHALL let the user assign that image to an `imageSlot` or place it as a new freeform element on a `freeformCanvas` by dragging it there and releasing over the target. This is a distinct mechanism from the existing HTML5 drag-and-drop path, which SHALL continue to work unchanged.
 
-#### Scenario: Moving past a threshold arms the drag
-- **WHEN** the user presses down on a library image card with any pointer type and moves the pointer past a small distance threshold before releasing
+#### Scenario: Moving outside the Image Library panel arms the drag
+- **WHEN** the user presses down on a library image card with any pointer type and moves the pointer to a position outside the Image Library panel before releasing
 - **THEN** a drag SHALL arm for that image, and a floating preview of the image SHALL track the pointer for the remainder of the gesture
 
-#### Scenario: Releasing without crossing the threshold is an ordinary tap
-- **WHEN** the user presses down on a library image card and releases without moving the pointer past the arming threshold
-- **THEN** no drag SHALL arm — the existing select/toggle behavior for that card SHALL occur, unchanged
+#### Scenario: A press that never leaves the panel is left as an ordinary tap or scroll
+- **WHEN** the user presses down on a library image card and moves the pointer, but its position never leaves the Image Library panel before releasing
+- **THEN** no drag SHALL arm — the press SHALL be left to behave as an ordinary tap (the existing select/toggle behavior for that card) or as the panel's own native scroll, unaffected by this gesture
 
 #### Scenario: Releasing an armed drag over an imageSlot assigns the image
 - **WHEN** a drag is armed for a library image and the user releases the pointer over an `imageSlot`

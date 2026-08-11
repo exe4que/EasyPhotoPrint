@@ -1,38 +1,38 @@
 import { useCallback, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 
-const ARM_THRESHOLD_PX = 8;
-
 export interface ArmedLibraryImageDrag {
   imageAssetId: string;
   clientX: number;
   clientY: number;
 }
 
-interface PointerStart {
-  imageAssetId: string;
-  pointerId: number;
-  startX: number;
-  startY: number;
-}
-
 export interface LibraryImageDragCardProps {
   onPointerDown: (event: ReactPointerEvent<HTMLElement>) => void;
-  onPointerMove: (event: ReactPointerEvent<HTMLElement>) => void;
-  onPointerUp: (event: ReactPointerEvent<HTMLElement>) => void;
-  onPointerCancel: (event: ReactPointerEvent<HTMLElement>) => void;
 }
 
 export interface LibraryImageDragGesture {
   createCardDragProps: (imageAssetId: string) => LibraryImageDragCardProps;
 }
 
+interface Session {
+  imageAssetId: string;
+  pointerId: number;
+  armed: boolean;
+  cleanup: () => void;
+}
+
 interface UseLibraryImageDragGestureOptions {
-  /** Fires once, the moment a press crosses the arming threshold. */
+  /** Whether (clientX, clientY) is still inside the Image Library panel. While it is, the press is
+   * left alone entirely -- no `preventDefault`, no pointer capture -- so the panel's own native
+   * touch handling (its horizontal scroll) keeps working exactly as it would without this gesture.
+   * Only once a point falls outside the panel does the press arm as a drag. */
+  isInsidePanel: (clientX: number, clientY: number) => boolean;
+  /** Fires once, the moment a press arms (its position has left the panel). */
   onArm?: () => void;
   /** Fires when an armed drag ends (pointerup or pointercancel), with the release position. Does
-   * not fire for a plain tap (released without crossing the threshold) -- the browser's own click
-   * still fires for that, unsuppressed, so the caller's ordinary click/select handling applies. */
+   * not fire for a plain tap or an in-panel scroll (never armed) -- the browser's own click still
+   * fires for a tap, unsuppressed, so the caller's ordinary click/select handling applies. */
   onDrop: (imageAssetId: string, clientX: number, clientY: number) => void;
 }
 
@@ -40,14 +40,30 @@ interface UseLibraryImageDragGestureOptions {
  * Pointer Events-based drag gesture for an Image Library card, following the same
  * `setPointerCapture` pattern `pointer-based-gestures` already established for divider resize and
  * freeform move/resize/rotate -- used in place of HTML5 drag-and-drop, which touch input can't
- * reliably start. A press followed by movement past `ARM_THRESHOLD_PX` arms the drag (capturing
- * the pointer so it keeps receiving events regardless of what's underneath); releasing below that
- * threshold is left as an ordinary tap.
+ * reliably start.
+ *
+ * Calling `setPointerCapture` up front (on `pointerdown`, before knowing whether this press wants
+ * to leave the panel) was tried and rejected: on-device testing showed it suppresses the browser's
+ * native touch scrolling entirely, breaking the panel's own horizontal scroll for a press that
+ * never intended to drag anything. Movement is tracked instead via `window`-level pointer
+ * listeners registered for the life of the press -- these keep receiving events regardless of
+ * which element the browser is currently hit-testing to -- and pointer capture is only engaged
+ * once a move's position falls outside the Image Library panel (per `isInsidePanel`), at which
+ * point the press commits to being a drag.
+ *
+ * That alone isn't quite enough on-device: the browser decides whether *any* touch counts as a
+ * native pan/scroll gesture independently of pointer capture, purely from `touch-action` and the
+ * gesture's direction -- and once it decides a vertical touch might be one (even one with nowhere
+ * to scroll, since the panel doesn't overflow vertically), it cancels the pointer sequence
+ * outright, so no further events reach any listener at all, window-level or not. The caller must
+ * set `touch-action: pan-x` on each card (not `none`, and not the default `auto`) so horizontal
+ * movement stays native (the panel's own scroll) while vertical movement is never eligible to be
+ * claimed as a native pan in the first place, keeping this hook's move stream unbroken for the
+ * upward swipe that leaves the panel.
  */
-export function useLibraryImageDragGesture({ onArm, onDrop }: UseLibraryImageDragGestureOptions) {
+export function useLibraryImageDragGesture({ isInsidePanel, onArm, onDrop }: UseLibraryImageDragGestureOptions) {
   const [armedDrag, setArmedDrag] = useState<ArmedLibraryImageDrag | null>(null);
-  const startRef = useRef<PointerStart | null>(null);
-  const armedDragRef = useRef<ArmedLibraryImageDrag | null>(null);
+  const sessionRef = useRef<Session | null>(null);
   // Pointer capture only covers pointer events, not the "click" that follows pointerup -- capture
   // is released before click fires, so click still undergoes ordinary hit-testing and can land on
   // whatever's visually at the release point (a tab bar button, another card, anything). A
@@ -68,64 +84,69 @@ export function useLibraryImageDragGesture({ onArm, onDrop }: UseLibraryImageDra
     setTimeout(() => window.removeEventListener('click', suppressor, { capture: true }), 0);
   }, []);
 
-  const endGesture = useCallback(
-    (event: ReactPointerEvent<HTMLElement>) => {
-      const start = startRef.current;
-      if (!start || start.pointerId !== event.pointerId) {
-        return;
-      }
-      startRef.current = null;
-      const wasArmed = armedDragRef.current !== null;
-      armedDragRef.current = null;
-      setArmedDrag(null);
-      stopSuppressingClicks();
-      if (wasArmed) {
-        onDrop(start.imageAssetId, event.clientX, event.clientY);
-      }
-    },
-    [onDrop, stopSuppressingClicks],
-  );
-
   const createCardDragProps = useCallback(
     (imageAssetId: string): LibraryImageDragCardProps => ({
       onPointerDown: (event: ReactPointerEvent<HTMLElement>) => {
-        startRef.current = {
-          imageAssetId,
-          pointerId: event.pointerId,
-          startX: event.clientX,
-          startY: event.clientY,
-        };
-      },
-      onPointerMove: (event: ReactPointerEvent<HTMLElement>) => {
-        const start = startRef.current;
-        if (!start || start.pointerId !== event.pointerId) {
-          return;
-        }
+        const pointerId = event.pointerId;
+        const element = event.currentTarget;
 
-        if (!armedDragRef.current) {
-          const dx = event.clientX - start.startX;
-          const dy = event.clientY - start.startY;
-          if (Math.hypot(dx, dy) < ARM_THRESHOLD_PX) {
+        const handleMove = (moveEvent: PointerEvent) => {
+          if (moveEvent.pointerId !== pointerId) {
             return;
           }
-          event.currentTarget.setPointerCapture(event.pointerId);
-          const suppressor = (clickEvent: MouseEvent) => {
-            clickEvent.preventDefault();
-            clickEvent.stopPropagation();
-          };
-          clickSuppressorRef.current = suppressor;
-          window.addEventListener('click', suppressor, { capture: true });
-          onArm?.();
-        }
+          const session = sessionRef.current;
+          if (!session) {
+            return;
+          }
 
-        const next: ArmedLibraryImageDrag = { imageAssetId, clientX: event.clientX, clientY: event.clientY };
-        armedDragRef.current = next;
-        setArmedDrag(next);
+          if (!session.armed) {
+            if (isInsidePanel(moveEvent.clientX, moveEvent.clientY)) {
+              // Still inside the panel -- leave this move as an ordinary scroll/tap gesture.
+              return;
+            }
+            session.armed = true;
+            element.setPointerCapture(pointerId);
+            const suppressor = (clickEvent: MouseEvent) => {
+              clickEvent.preventDefault();
+              clickEvent.stopPropagation();
+            };
+            clickSuppressorRef.current = suppressor;
+            window.addEventListener('click', suppressor, { capture: true });
+            onArm?.();
+          }
+
+          // Armed: suppress whatever default touch handling this move would otherwise trigger.
+          moveEvent.preventDefault();
+          setArmedDrag({ imageAssetId, clientX: moveEvent.clientX, clientY: moveEvent.clientY });
+        };
+
+        const handleEnd = (endEvent: PointerEvent) => {
+          if (endEvent.pointerId !== pointerId) {
+            return;
+          }
+          const session = sessionRef.current;
+          sessionRef.current = null;
+          setArmedDrag(null);
+          stopSuppressingClicks();
+          session?.cleanup();
+          if (session?.armed) {
+            onDrop(imageAssetId, endEvent.clientX, endEvent.clientY);
+          }
+        };
+
+        const cleanup = () => {
+          window.removeEventListener('pointermove', handleMove);
+          window.removeEventListener('pointerup', handleEnd);
+          window.removeEventListener('pointercancel', handleEnd);
+        };
+
+        sessionRef.current = { imageAssetId, pointerId, armed: false, cleanup };
+        window.addEventListener('pointermove', handleMove);
+        window.addEventListener('pointerup', handleEnd);
+        window.addEventListener('pointercancel', handleEnd);
       },
-      onPointerUp: endGesture,
-      onPointerCancel: endGesture,
     }),
-    [endGesture, onArm],
+    [isInsidePanel, onArm, onDrop, stopSuppressingClicks],
   );
 
   return { armedDrag, createCardDragProps };

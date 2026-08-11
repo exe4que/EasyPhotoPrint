@@ -49,7 +49,13 @@ function ImageCard({
           ? 'border-cyan-500 ring-2 ring-cyan-500/30'
           : 'border-slate-800 hover:border-slate-600'
       }`}
-      style={dragGesture ? { touchAction: 'none' } : undefined}
+      // pan-x (not none, not the default auto): lets the panel's own native horizontal scroll keep
+      // working, but keeps the browser from ever claiming a vertical swipe as a native pan/scroll
+      // gesture -- without that, the browser cancels the whole pointer sequence (no more events
+      // reach any listener, window-level or not) the moment it decides a vertical touch might be a
+      // scroll attempt, even one that immediately has nowhere to go, well before our own
+      // isInsidePanel check ever gets a chance to see the pointer leave the panel.
+      style={dragGesture ? { touchAction: 'pan-x' } : undefined}
       {...(dragGesture ? dragGesture.createCardDragProps(asset.id) : dragProps)}
     >
       <div className="aspect-square bg-slate-950">

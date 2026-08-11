@@ -37,10 +37,6 @@ const MISSING_IMAGE_PLACEHOLDER_DATA_URL = `data:image/svg+xml;utf8,${encodeURIC
     '</svg>',
 )}`;
 
-function noop(): void {
-  // intentionally empty: Android has no native menu bar to unsubscribe from
-}
-
 function extnameOf(fileName: string): string {
   const dotIndex = fileName.lastIndexOf('.');
   return dotIndex > 0 ? fileName.slice(dotIndex) : '';
@@ -152,8 +148,7 @@ async function writeTemplatesIndex(ids: string[]): Promise<void> {
  * and templates are backed by `@capacitor/preferences` (SharedPreferences); file access goes
  * through the `SafFile` Capacitor plugin (Storage Access Framework); image decode, thumbnailing,
  * and PDF composition run entirely in the WebView; printing goes through the `Print` Capacitor
- * plugin; menu subscriptions are no-ops, since Android has no native menu bar (see the
- * `platform-adapter` capability's totality requirement). See design.md for the full rationale. */
+ * plugin. See design.md for the full rationale. */
 export function createAndroidAdapter(): EppAPI {
   return {
     dialog: {
@@ -250,16 +245,6 @@ export function createAndroidAdapter(): EppAPI {
         const targetSize = computeCoverDecodeSize(size.width, size.height, minWidthPx, minHeightPx);
         return image.resize(targetSize).toDataURL();
       },
-    },
-    menu: {
-      onNewProject: () => noop,
-      onOpenProject: () => noop,
-      onSaveProject: () => noop,
-      onSaveProjectAs: () => noop,
-      onUndo: () => noop,
-      onRedo: () => noop,
-      onSaveTemplate: () => noop,
-      onSaveTemplateAs: () => noop,
     },
     pdf: {
       export: async (project) => {

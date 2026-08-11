@@ -6,10 +6,10 @@ export interface AppSettings {
 }
 
 /** The single contract shared renderer code uses to reach every host-provided capability --
- * file pickers, project storage, PDF export, printing, settings, templates, image decoding, and
- * host-initiated commands. Every adapter implements every member (see the `platform-adapter`
- * capability's "Platform Contract Is Total" requirement); a host that lacks a capability absorbs
- * that inside its own adapter rather than this contract growing optional members. */
+ * file pickers, project storage, PDF export, printing, settings, templates, and image decoding.
+ * Every adapter implements every member (see the `platform-adapter` capability's "Platform
+ * Contract Is Total" requirement); a host that lacks a capability absorbs that inside its own
+ * adapter rather than this contract growing optional members. */
 export interface EppAPI {
   dialog: {
     openImages: () => Promise<ImageAsset[]>;
@@ -27,19 +27,6 @@ export interface EppAPI {
   images: {
     /** Decodes filePath at (up to) native resolution, only as small as still covers (minWidthPx, minHeightPx) -- used for print-resolution preview rendering, distinct from an ImageAsset's bounded-edge thumbnailDataUrl. */
     decodeAtSize: (filePath: string, minWidthPx: number, minHeightPx: number) => Promise<string>;
-  };
-  menu: {
-    /** Subscribes to the host's "File > New" command; returns an unsubscribe function. A host with no native menu (e.g. no menu bar) implements this as a no-op subscription that still returns a working unsubscribe. */
-    onNewProject: (callback: () => void) => () => void;
-    onOpenProject: (callback: () => void) => () => void;
-    onSaveProject: (callback: () => void) => () => void;
-    onSaveProjectAs: (callback: () => void) => () => void;
-    /** Subscribes to the host's "Edit > Undo"/"Edit > Redo" commands (and their accelerators, where the host has any); returns an unsubscribe function. */
-    onUndo: (callback: () => void) => () => void;
-    onRedo: (callback: () => void) => () => void;
-    /** Subscribes to the host's "Edit > Save Template"/"Edit > Save Template As..." commands; returns an unsubscribe function. */
-    onSaveTemplate: (callback: () => void) => () => void;
-    onSaveTemplateAs: (callback: () => void) => () => void;
   };
   pdf: {
     /** Prompts a native save dialog and writes the exported PDF there; returns the saved path, or null if canceled. */

@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
+import { forwardRef, useImperativeHandle, useState } from 'react';
 
 import type { EPPTemplate } from '@epp/layout-engine';
 
@@ -8,9 +8,8 @@ import { ConfirmDialog } from '../ui/ConfirmDialog.js';
 
 type ConfirmMode = 'save' | 'saveAs' | null;
 
-/** Imperative handle so a toolbar button (rendered elsewhere in the tree, see `App.tsx`) can
- * trigger the exact same save/save-as flow the `Edit > Save Template` menu items already do,
- * without duplicating the `linkedTemplate`/overwrite-vs-prompt logic that lives here. */
+/** Imperative handle so the shared toolbar button (rendered in `App.tsx`) can trigger the
+ * save/save-as flow without duplicating the `linkedTemplate`/overwrite-vs-prompt logic here. */
 export interface SaveTemplateDialogHandle {
   openSave: () => void;
   openSaveAs: () => void;
@@ -53,14 +52,6 @@ export const SaveTemplateDialog = forwardRef<
   };
 
   useImperativeHandle(ref, () => ({ openSave: triggerSave, openSaveAs }));
-
-  useEffect(() => {
-    return getEppApi().menu.onSaveTemplateAs(openSaveAs);
-  }, []);
-
-  useEffect(() => {
-    return getEppApi().menu.onSaveTemplate(triggerSave);
-  }, [linkedTemplate]);
 
   const closeConfirm = () => {
     if (isSaving) {

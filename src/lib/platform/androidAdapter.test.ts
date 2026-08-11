@@ -42,29 +42,4 @@ describe('createAndroidAdapter', () => {
       });
     });
   });
-
-  describe('menu', () => {
-    it('every subscription returns a callable unsubscribe function and never invokes the callback', () => {
-      const adapter = createAndroidAdapter();
-      const subscriptions = [
-        adapter.menu.onNewProject,
-        adapter.menu.onOpenProject,
-        adapter.menu.onSaveProject,
-        adapter.menu.onSaveProjectAs,
-        adapter.menu.onUndo,
-        adapter.menu.onRedo,
-        adapter.menu.onSaveTemplate,
-        adapter.menu.onSaveTemplateAs,
-      ] as const;
-
-      for (const subscribe of subscriptions) {
-        const callback = vi.fn();
-        const unsubscribe = subscribe(callback);
-
-        expect(typeof unsubscribe).toBe('function');
-        expect(() => unsubscribe()).not.toThrow();
-        expect(callback).not.toHaveBeenCalled();
-      }
-    });
-  });
 });

@@ -22,7 +22,7 @@
 
 ## 4. Custom SAF-backed Capacitor plugin (file access)
 
-- [x] 4.1 Scaffold a custom Capacitor plugin project (Kotlin) under `android/app/src/main/` for SAF-backed file access — e.g. `SafFilePlugin`.
+- [x] 4.1 Scaffold a custom Capacitor plugin project (Java) under `android/app/src/main/` for SAF-backed file access — e.g. `SafFilePlugin`.
 - [x] 4.2 Implement an `openImages` plugin method: launches `ACTION_OPEN_DOCUMENT` with multi-select and an image MIME filter, returns the list of picked `content://` URIs (as strings) plus each file's bytes (base64) to the TS side.
 - [x] 4.3 Implement an `openDocument` plugin method (single-select, MIME/extension filtered) for `fs.openProject` and `dialog.relinkImage`'s picker.
 - [x] 4.4 Implement a `createDocument` plugin method wrapping `ACTION_CREATE_DOCUMENT` for `fs.saveProject`'s first-save/"Save As" path, and a `writeDocument` method that writes bytes to an already-known `content://` URI via `ContentResolver.openOutputStream` for subsequent plain saves.
@@ -38,7 +38,7 @@
 
 ## 6. Custom print plugin
 
-- [x] 6.1 Scaffold a second custom Capacitor plugin (Kotlin) — e.g. `PrintPlugin` — with a `printPdf` method taking base64 PDF bytes.
+- [x] 6.1 Scaffold a second custom Capacitor plugin (Java) — e.g. `PrintPlugin` — with a `printPdf` method taking base64 PDF bytes.
 - [x] 6.2 Implement `printPdf` to write the bytes to a temp file and invoke `PrintManager.print(...)` with a `PrintDocumentAdapter` that streams that file, opening Android's native print dialog.
 - [x] 6.3 Register the plugin and confirm it's callable from TS.
 
@@ -78,7 +78,20 @@
 - [x] 10.6 Using the new toolbar (section 9): save a project, fully close and relaunch the app, open that project via the toolbar's Open button, confirm all pages/images/layout restore correctly.
 - [x] 10.7 Confirm the toolbar from section 9 is the only shared-code (`src/components`/`src/App.tsx`) change this whole verification pass required, and that it's the exact same component/code path on both hosts — no `src/store`, `src/hooks`, or other shared logic needed changes beyond it.
 
-## 11. Spec closure
+## 11. Remove the native Electron menu, unify on the shared toolbar
 
-- [x] 11.1 Run the full test suite and typecheck (desktop build must remain unaffected).
-- [x] 11.2 Run `openspec validate --strict --changes android-shell` and confirm it passes.
+- [x] 11.1 Move the shared toolbar to the top of `App.tsx`'s header, above the title/subtitle row (previously below it), on every host.
+- [x] 11.2 Reduce `electron/main/menu.ts` to macOS-`appMenu`-or-`null` — no custom `File`/`Edit`/`Help` template, no `menu:*` channel constants, no `sendToFocusedWindow`.
+- [x] 11.3 Remove the `menu` block and `onMenuEvent` helper from `electron/preload/index.ts`'s exposed `window.eppAPI`.
+- [x] 11.4 Remove the `menu` namespace from `EppAPI` in `src/lib/platform/contract.ts`.
+- [x] 11.5 Remove the `menu` no-op block (and now-unused `noop` helper) from `src/lib/platform/androidAdapter.ts`; remove its test coverage in `androidAdapter.test.ts`.
+- [x] 11.6 Remove the six `getEppApi().menu.on*` `useEffect` subscriptions from `App.tsx` and the two from `SaveTemplateDialog.tsx` (keep the `forwardRef`/`useImperativeHandle` toolbar-trigger logic).
+- [x] 11.7 Add a renderer-side keyboard-shortcut handler in `App.tsx` (extending the existing `Escape` handler's `keydown` listener) for `CmdOrCtrl+N/O/S/Shift+S/Z/Shift+Z`, calling the same actions the toolbar buttons call — same shared code on every host.
+- [x] 11.8 Update the `electron-shell`, `undo-redo`, `editor-layout`, and `platform-adapter` delta specs (this change's `specs/*/spec.md`) to describe the toolbar-only, no-native-menu end state.
+- [x] 11.9 Verify on desktop (Electron): `Menu.getApplicationMenu()` is `null` (Linux/Windows), the toolbar renders above the title, all 8 toolbar buttons still work, and `CmdOrCtrl+N`/`CmdOrCtrl+Z` keyboard shortcuts work without a native menu.
+- [x] 11.10 Verify on Android: rebuild, reinstall, confirm the toolbar renders above the title with no errors, same as before the menu removal.
+
+## 12. Spec closure
+
+- [x] 12.1 Run the full test suite and typecheck (desktop build must remain unaffected).
+- [x] 12.2 Run `openspec validate --strict --changes android-shell` and confirm it passes.

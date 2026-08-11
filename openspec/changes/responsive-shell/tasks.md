@@ -16,8 +16,8 @@
 
 ## 4. `MobileShell` scaffold: compact header and canvas-first layout
 
-- [ ] 4.1 Create `src/components/shell/MobileShell.tsx` with a compact header (the existing `MenuBar` and `UnitToggle`/Preview button, rearranged for a narrow width — drop or shorten the subtitle text if needed) and a canvas area rendering `PageStage` at full remaining height, so the canvas is always visible per the `mobile-shell` capability's "Mobile Shell Is Canvas-First" requirement.
-- [ ] 4.2 Verify (resizing the Electron window below 1024px) that the canvas renders and is fully visible with no bottom sheet open yet.
+- [x] 4.1 Create `src/components/shell/MobileShell.tsx` with a compact header (the existing `MenuBar` and `UnitToggle`/Preview button, rearranged for a narrow width — dropped the subtitle text entirely at this width) and a canvas area rendering `PageStage` at full remaining height, so the canvas is always visible per the `mobile-shell` capability's "Mobile Shell Is Canvas-First" requirement. `App.tsx` was wired to `useIsMobileViewport()` ahead of task 8.1 (needed to test this and the following groups by resizing the real window, the same way task 3.2 verified `DesktopShell`); 8.1's own checkbox is left for when the full mobile shell — sheets, tab bar, Properties auto-sheet — is in place.
+- [x] 4.2 Verified (resizing the Electron window to 480x800 via Playwright/xvfb) that the canvas renders and is fully visible with no bottom sheet open yet; the compact File/Edit menu, unit toggle, Preview button, and page switcher are all present, the desktop-only Document panel is absent, and resizing back above 1024px restores `DesktopShell` cleanly.
 
 ## 5. Bottom sheet and tab bar chrome
 

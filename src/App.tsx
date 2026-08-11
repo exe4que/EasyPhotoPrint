@@ -2,8 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 
 import { PreviewScreen } from './components/preview/PreviewScreen.js';
 import { DesktopShell } from './components/shell/DesktopShell.js';
+import { MobileShell } from './components/shell/MobileShell.js';
 import { SaveTemplateDialog, type SaveTemplateDialogHandle } from './components/templates/SaveTemplateDialog.js';
 import { ConfirmDialog } from './components/ui/ConfirmDialog.js';
+import { useIsMobileViewport } from './hooks/useIsMobileViewport.js';
 import { useTemplateLibrary } from './hooks/useTemplateLibrary.js';
 import { useUndoRedo } from './hooks/useUndoRedo.js';
 import { useEPPStore } from './store/index.js';
@@ -14,6 +16,7 @@ export function App() {
   const [isOpenProjectConfirmOpen, setIsOpenProjectConfirmOpen] = useState(false);
   const [isMissingImagesDialogOpen, setIsMissingImagesDialogOpen] = useState(false);
   const templateLibrary = useTemplateLibrary();
+  const isMobileViewport = useIsMobileViewport();
   const hydrateSettings = useEPPStore((state) => state.hydrateSettings);
   const viewMode = useEPPStore((state) => state.ui.viewMode);
   const setViewMode = useEPPStore((state) => state.setViewMode);
@@ -108,7 +111,13 @@ export function App() {
 
   return (
     <>
-      {viewMode === 'preview' ? <PreviewScreen /> : <DesktopShell {...shellProps} />}
+      {viewMode === 'preview' ? (
+        <PreviewScreen />
+      ) : isMobileViewport ? (
+        <MobileShell {...shellProps} />
+      ) : (
+        <DesktopShell {...shellProps} />
+      )}
 
       <SaveTemplateDialog ref={saveTemplateDialogRef} templates={templateLibrary.templates} onSaved={templateLibrary.reload} />
 

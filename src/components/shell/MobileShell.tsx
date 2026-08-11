@@ -34,6 +34,7 @@ export function MobileShell({ onRequestNew, onRequestOpen, onSaveTemplate, onSav
   const layoutMode = useEPPStore((state) => state.ui.layoutMode);
   const selection = useEPPStore((state) => state.ui.selection);
   const clearSelection = useEPPStore((state) => state.clearSelection);
+  const activePageId = useEPPStore((state) => state.ui.activePageId);
   const { undo, redo } = useUndoRedo();
   const [openTab, setOpenTab] = useState<MobileTabId | null>(null);
 
@@ -47,6 +48,19 @@ export function MobileShell({ onRequestNew, onRequestOpen, onSaveTemplate, onSav
   // signal the store doesn't reliably provide.
   const selectionKey = selection ? `${selection.kind}:${selection.id}` : null;
   const [dismissedSelectionKey, setDismissedSelectionKey] = useState<string | null>(null);
+
+  // Switching pages (including Add Page) re-runs the same Simple-mode default-selection fallback,
+  // auto-selecting the newly active page's root -- confirmed this pops Properties open on every
+  // page switch, including a brand new session's very first "Add Page" tap, since it's a genuinely
+  // new selectionKey. That's navigation, not a deliberate selection, so it shouldn't surface a sheet;
+  // detecting the activePageId change during render (not an effect) and dismissing it immediately
+  // avoids a visible open-then-close flash. An explicit tap on a slot afterward still opens normally.
+  const [lastSeenActivePageId, setLastSeenActivePageId] = useState(activePageId);
+  if (activePageId !== lastSeenActivePageId) {
+    setLastSeenActivePageId(activePageId);
+    setDismissedSelectionKey(selectionKey);
+  }
+
   const isPropertiesOpen = selectionKey !== null && selectionKey !== dismissedSelectionKey;
 
   const dismissProperties = () => {

@@ -33,7 +33,7 @@
 
 ## 7. Persistent page navigation
 
-- [ ] 7.1 Confirm `PageStage`'s existing `PageSwitcher` (prev/next/add-page) remains visible and functional in `MobileShell` with no changes needed to `PageStage` itself — verify it isn't obscured by the bottom tab bar or an open sheet.
+- [x] 7.1 Confirmed `PageStage`'s existing `PageSwitcher` (prev/next/add-page) remains visible and functional in `MobileShell` with no changes needed to `PageStage` itself, per the `mobile-shell` capability's actual scenario scope ("Page navigation works with every bottom sheet closed" — an open sheet covering it, the same as it covers any other panel underneath, is expected and out of scope). Verified via Playwright/xvfb at 480x800: the Add Page button sits fully above the tab bar with no overlap, and Add Page / Previous page both work and update the page counter. Also found and fixed (see design.md's second addendum to Decision 5): switching pages auto-selects the new page's root node in Simple mode, which was popping the Properties sheet open on every page switch, including a fresh session's very first Add Page tap — suppressed locally in `MobileShell` by detecting the `activePageId` change during render and dismissing the accompanying selection before paint.
 
 ## 8. Wire `App.tsx`
 

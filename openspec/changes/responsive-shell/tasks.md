@@ -58,5 +58,5 @@
 
 ## 11. Spec closure
 
-- [ ] 11.1 Run the full test suite and typecheck (desktop build must remain unaffected).
-- [ ] 11.2 Run `openspec validate --strict --changes responsive-shell` and confirm it passes.
+- [x] 11.1 Full test suite (189/189), typecheck, the workspace `npm run build` (layout-engine + migrations packages), and a full `electron-vite build` production build all clean — desktop build unaffected.
+- [x] 11.2 `openspec validate --strict --changes responsive-shell` passes (1 passed, 0 failed).

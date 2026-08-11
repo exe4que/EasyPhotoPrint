@@ -110,7 +110,7 @@ function LayoutTreeNode({
   );
 }
 
-export function LayoutTreePanel() {
+export function LayoutTreePanel({ bare = false }: { bare?: boolean }) {
   const activePageId = useEPPStore((state) => state.ui.activePageId);
   const selection = useEPPStore((state) => state.ui.selection);
   const selectedNodeId = selection?.kind === 'node' ? selection.id : null;
@@ -123,6 +123,7 @@ export function LayoutTreePanel() {
       title="Layout tree"
       description="Edit the nested node hierarchy and switch between grid, horizontal, vertical, slot, and freeform-canvas nodes."
       defaultCollapsed={false}
+      bare={bare}
     >
       <LayoutTreeNode node={activePage.rootNode} depth={0} selectedNodeId={selectedNodeId} activePageId={activePageId} />
     </CollapsiblePanel>

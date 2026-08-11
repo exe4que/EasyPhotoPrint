@@ -17,7 +17,7 @@ function createTestPage(id: string): EPPProjectPage {
 type StoreState = UiSlice & { document: { pages: EPPProjectPage[] } };
 
 describe('ui slice', () => {
-  it('clearSelection falls back to the active page root in Simple mode instead of leaving it unselectable', () => {
+  it('clearSelection empties the selection in Simple mode too (not the active page root)', () => {
     let state: StoreState = {
       ...createUiSlice(
         (updater) => {
@@ -32,7 +32,7 @@ describe('ui slice', () => {
     expect(state.ui.selection).toEqual({ kind: 'node', id: 'root-of-page-1' });
 
     state.clearSelection();
-    expect(state.ui.selection).toEqual({ kind: 'node', id: 'root-of-page-1' });
+    expect(state.ui.selection).toBeNull();
   });
 
   it('clearSelection empties the selection in Nested mode (LayoutTree can reselect the root)', () => {

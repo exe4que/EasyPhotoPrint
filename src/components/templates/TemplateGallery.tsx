@@ -22,9 +22,10 @@ interface TemplateGalleryProps {
   isLoading: boolean;
   errorMessage: string | null;
   onReload: () => Promise<void> | void;
+  bare?: boolean;
 }
 
-export function TemplateGallery({ templates, isLoading, errorMessage, onReload }: TemplateGalleryProps) {
+export function TemplateGallery({ templates, isLoading, errorMessage, onReload, bare = false }: TemplateGalleryProps) {
   const [pendingDelete, setPendingDelete] = useState<EPPTemplate | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -62,6 +63,7 @@ export function TemplateGallery({ templates, isLoading, errorMessage, onReload }
       title="Template gallery"
       description="Browse saved layouts and apply one to the active page."
       defaultCollapsed={false}
+      bare={bare}
       actions={
         <button
           type="button"

@@ -10,7 +10,7 @@ function FieldLabel({ children }: { children: ReactNode }) {
   return <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{children}</label>;
 }
 
-export function PageSetupPanel() {
+export function PageSetupPanel({ bare = false }: { bare?: boolean }) {
   const activePageId = useEPPStore((state) => state.ui.activePageId);
   const unitSystem = useEPPStore((state) => state.settings.unitSystem);
   const sheetSize = useEPPStore((state) => state.document.sheetSize);
@@ -28,6 +28,7 @@ export function PageSetupPanel() {
       title="Page setup"
       description="Page size applies to the whole document (every page). Orientation and DPI are set per page."
       defaultCollapsed={false}
+      bare={bare}
     >
       <div className="grid gap-4">
         <div>

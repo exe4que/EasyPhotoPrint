@@ -1,0 +1,64 @@
+## Context
+
+`App.tsx` today is one component: local state for three confirm dialogs and the `SaveTemplateDialog` ref, a `keydown` effect (Escape + the `CmdOrCtrl+N/O/S/Shift+S/Z` shortcuts added when the native Electron menu was removed), and a single JSX tree — a sticky header (`MenuBar`, title, `UnitToggle`, Preview button) followed by a `grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)_360px]` three-column layout. Below `lg` (1024px), that Tailwind class stops applying and the grid falls back to its default single implicit column, stacking left sidebar → canvas → right sidebar vertically — the canvas lands mid-scroll, which is the problem this change fixes.
+
+Every panel component already wraps *itself* in `CollapsiblePanel` — `PageSetupPanel`, `ImageLibraryPanel`, `LayoutTreePanel`, and `TemplateGallery` each call `<CollapsiblePanel title="..." ...>{content}</CollapsiblePanel>` directly in their own `return`, and `PropertiesPanel` does the same across its three branches (image selected / slot selected / no meaningful selection). This matters because the original research plan (see proposal.md — Why) assumed `App.tsx` applied that wrapping externally, so a mobile shell could reuse "the same panels" by simply not wrapping them. That assumption doesn't hold against the code as it exists now; Decision 1 below resolves it.
+
+`PageStage` (the canvas) is already fully self-contained: it owns its own zoom controls and renders `PageSwitcher` (prev/next/add-page) directly beneath the sheet. Nothing about it needs to change for this shell — it's the one piece of "canvas-first" that already exists.
+
+The `ui.selection` store field (`{ kind: 'node' | 'image', id } | null`) already exists and is exactly what `PageStage` reads to know what's selected. No new store state is needed to drive the Properties auto-sheet.
+
+## Goals / Non-Goals
+
+**Goals:**
+- Below the `lg` breakpoint, the canvas is always visible and page navigation is always reachable — the two things the current single-column fallback breaks.
+- Zero behavior change to the desktop shell, at any width — `DesktopShell` is a mechanical extraction of today's JSX, not a rewrite.
+- Every panel's store logic is written once. The mobile shell renders the same components the desktop shell renders; it does not reimplement any panel's fields, validation, or handlers.
+- The whole thing is verifiable on desktop by resizing the Electron window across the breakpoint — no Android toolchain required to iterate.
+
+**Non-Goals:**
+- Not touching `PageStage`, `NodeDivider`, `FreeformElement`, or any gesture code — `pointer-based-gestures` already made all of it input-agnostic; this change only decides what wraps around the canvas, never what happens on it.
+- Not a drag-to-dismiss or physics-based bottom sheet. It opens and closes on a CSS transition (slide up/down), triggered by tab-bar taps, selection changes, an explicit close affordance, or a backdrop tap — no gesture-driven sheet interaction. A native-feeling swipe-to-dismiss is a reasonable future enhancement, not required for this change to be usable.
+- Not changing `MenuBar`, `UnitToggle`, or any dialog's (`ConfirmDialog`, `SaveTemplateDialog`) internal implementation — the mobile shell arranges the same components in a more compact header, it doesn't rebuild them.
+- Not an Android-specific change. `useIsMobileViewport` responds to viewport width, not host — the mobile shell shows on a narrow Electron window exactly as it does on a phone, and the desktop shell shows on a tablet or landscape Android device exactly as it does on a laptop.
+
+## Decisions
+
+### 1. `CollapsiblePanel` gains a `bare` prop; each panel forwards it
+
+Since every panel wraps itself in `CollapsiblePanel` internally, the only way to reuse a panel's content inside a mobile bottom sheet (which supplies its own title via the active tab, plus a grabber/close affordance — a second title-and-chevron header directly inside it would be redundant chrome-on-chrome) without duplicating that panel's JSX is to give `CollapsiblePanel` a mode that skips its own header entirely.
+
+`CollapsiblePanel` gains `bare?: boolean` (default `false`). When `true`, it renders `headerAction` and `actions` (if provided — these are functional content, like `ImageLibraryPanel`'s "Load images" button or `TemplateGallery`'s "Refresh" button, not title chrome) followed directly by `children`, skipping the title, description, and collapse/expand chevron entirely — there's nothing to collapse when there's no header to click, so `bare` mode is never collapsed.
+
+`PageSetupPanel`, `ImageLibraryPanel`, `LayoutTreePanel`, `PropertiesPanel`, and `TemplateGallery` each gain a `bare?: boolean` prop (default `false`) forwarded verbatim to their internal `CollapsiblePanel` call. Every existing call site (all inside the soon-to-exist `DesktopShell`) omits the prop, so `bare` defaults to `false` and desktop rendering is provably unchanged — this is what makes the extraction in Decision 2 safe.
+
+Alternative considered: extract each panel's content into an unexported inner component, with two thin exported wrappers per panel (one wrapping `CollapsiblePanel`, one bare). Rejected — five panels means ten new components for a distinction (`bare` on/off) that's identical in every case; a boolean prop on the existing five components is less code and less indirection for the same result.
+
+### 2. `DesktopShell` is a literal extraction, `MobileShell` is new, `App.tsx` picks one
+
+`App.tsx` keeps everything that's genuinely shared and shell-agnostic today: the `hydrateSettings` effect, the `keydown` shortcut handler, the three confirm-dialog `useState`s, the `SaveTemplateDialogHandle` ref, and the `SaveTemplateDialog`/`ConfirmDialog` renders themselves (all four already sit outside the `viewMode === 'preview' ? ... : (...)` conditional in the trailing fragment). What moves is only the desktop JSX between `<main>` and its closing tag — copied verbatim into `DesktopShell.tsx`, parameterized by the small set of things it can't read itself: the three dialog-open setters and a callback pair for triggering Save Template / Save Template As (backed by the ref, which stays private to `App.tsx`). Everything else — `unitSystem`, `layoutMode`, `viewMode`/`setViewMode`, `saveProject`, `undo`/`redo`, `templateLibrary`, `imagePool`, page state — `DesktopShell` (and `MobileShell`) read directly via `useEPPStore`/the existing hooks, the same way `PageStage` and every panel already does. This codebase has no prop-drilling convention for store data; introducing one here just to pass the same dozen values through `App.tsx` would be new, inconsistent surface for no benefit. Only the four dialog triggers cross the `App.tsx` boundary, because the dialogs themselves render at the `App.tsx` level, outside either shell.
+
+`App.tsx`'s return becomes: `viewMode === 'preview' ? <PreviewScreen /> : isMobileViewport ? <MobileShell ...4 props... /> : <DesktopShell ...same 4 props... />`, followed by the unchanged `SaveTemplateDialog`/`ConfirmDialog` block.
+
+### 3. `useIsMobileViewport` is a `matchMedia` hook, not a CSS-only solution
+
+Tailwind's `lg:` prefix can restyle a single DOM tree, but `DesktopShell` and `MobileShell` are structurally different trees (different tab bar, different sheet chrome, different panel arrangement) — CSS alone can't choose between them. `useIsMobileViewport()` wraps `window.matchMedia('(max-width: 1023.98px)')` (one pixel under Tailwind's `lg` breakpoint, so the two systems agree on exactly where the line is) with a `change` listener, returning a boolean that updates on resize without a remount of `App.tsx` itself — only the chosen shell subtree changes. This is what makes "resize the Electron window to test the mobile shell" actually work: a real reactive breakpoint, not a value read once at mount.
+
+### 4. Tab-bar destinations map to existing panels; Document summary and the Simple/Nested toggle move into the Layout tab
+
+`Page` → `PageSetupPanel` (bare). `Photos` → `ImageLibraryPanel` (bare). `Templates` → `TemplateGallery` (bare). `Layout` → the Simple/Nested mode toggle buttons (currently inline JSX inside `App.tsx`'s "Document" `CollapsiblePanel`, extracted into a small shared piece both shells render) plus, in Nested mode, `LayoutTreePanel` (bare) below it. The small read-only "Document" summary (page count, layout mode, image pool size, page size, orientation) that sits above the toggle in the desktop sidebar today moves into the `Layout` sheet too, above the toggle — it's dominated by layout-mode-adjacent facts (the field literally named "Current layout mode" is first), and DPI/page-count are already visible elsewhere in the mobile shell's own chrome (the canvas header, the page strip), so nothing is lost by not giving it a fifth destination.
+
+### 5. Properties is a selection-driven sheet, not a tab
+
+Encoding this as a fifth tab would let a user "navigate to Properties" with nothing selected, showing `PropertiesPanel`'s fallback branch (the root node's type selector) — technically fine, but it adds a tab that's usually not what anyone means to reach on its own; Properties is inherently about *something currently selected*. Driving it off `ui.selection` (already read by `PageStage` for the same purpose) instead means the sheet appears exactly when it's relevant and disappears exactly when it isn't, with no separate navigation action required — the same "select something, its properties show up" model the desktop right sidebar already has, just presented as a sheet instead of an always-visible column.
+
+## Risks / Trade-offs
+
+- [`bare` is a second rendering mode per panel, tested twice (desktop chrome, bare) instead of once] → Small, mechanical addition (one prop, one conditional early return in `CollapsiblePanel`); the panels' own logic — the part that could actually have a bug — is untouched and unduplicated, which is the property this decision exists to protect.
+- [Two shells means the mobile layout can silently drift out of sync with new panels or fields added to the desktop shell later, since nothing enforces "every desktop feature also has a mobile home"] → Accepted for this change; both shells reading the same store means a *new field* on an existing panel appears automatically in both (no drift there), but a wholesale *new panel* would need a deliberate decision about where it lives on mobile, same as any new feature needs a design decision. Not a regression this change introduces.
+- [No drag-to-dismiss on the bottom sheet is a rougher feel than Canva/Figma mobile, which the original plan named as the reference pattern] → Accepted per Non-Goals; tap-to-open/tap-to-close (same tab, backdrop, or deselect) covers full functionality. A physics-driven sheet is a pure polish pass that can follow once the structural shell is verified working.
+- [`useIsMobileViewport`'s breakpoint (1024px) matches Tailwind's `lg` today, but the two are two independent constants (a Tailwind class string and a `matchMedia` query string) that could drift if one is edited without the other] → Small and self-contained; both live in this change's diff, reviewable together, and nothing else in the codebase currently depends on `lg` meaning something other than 1024px.
+
+## Migration Plan
+
+None — additive UI surface (new components, new hook, new optional props with safe defaults). No store shape, IPC contract, or persisted-data change. Nothing to roll back beyond removing the new files and the `bare` prop if the approach needs revisiting.

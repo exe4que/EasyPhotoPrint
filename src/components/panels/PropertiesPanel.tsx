@@ -205,7 +205,7 @@ function renderPaddingInputs({
   );
 }
 
-export function PropertiesPanel() {
+export function PropertiesPanel({ bare = false }: { bare?: boolean }) {
   const activePageId = useEPPStore((state) => state.ui.activePageId);
   const layoutMode = useEPPStore((state) => state.ui.layoutMode);
   const selection = useEPPStore((state) => state.ui.selection);
@@ -225,7 +225,7 @@ export function PropertiesPanel() {
   if (selection?.kind === 'image') {
     const selectedAsset = imagePool.find((asset) => asset.id === selection.id) ?? null;
     return (
-      <CollapsiblePanel title="Selected image" defaultCollapsed={false}>
+      <CollapsiblePanel title="Selected image" defaultCollapsed={false} bare={bare}>
         <div className="rounded-lg border border-slate-800 bg-slate-950/70 p-3 text-sm">
           <div className="text-xs uppercase tracking-wide text-slate-500">Selected library image</div>
           <div className="mt-1 font-medium text-white">{selectedAsset?.fileName ?? 'None'}</div>
@@ -297,6 +297,7 @@ export function PropertiesPanel() {
         title="Slot properties"
         description="Configure how the selected image slot displays its assigned photo."
         defaultCollapsed={false}
+        bare={bare}
       >
         <div className="grid gap-4">
           {nodeTypeSelector}
@@ -425,6 +426,7 @@ export function PropertiesPanel() {
         title="Grid properties"
         description="Edit the selected grid structure, gap, and printable-area padding."
         defaultCollapsed={false}
+        bare={bare}
       >
         <div className="grid gap-4">
           {nodeTypeSelector}
@@ -494,6 +496,7 @@ export function PropertiesPanel() {
       title="Container properties"
       description="Edit the selected nested container spacing and padding."
       defaultCollapsed={false}
+      bare={bare}
     >
       <div className="grid gap-4">
       {nodeTypeSelector}

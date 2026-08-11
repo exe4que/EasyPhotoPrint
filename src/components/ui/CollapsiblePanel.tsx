@@ -7,6 +7,11 @@ interface CollapsiblePanelProps {
   headerAction?: ReactNode;
   actions?: ReactNode;
   defaultCollapsed?: boolean;
+  /** Skips the title/description/collapse-chevron header entirely -- used when an ancestor (a
+   * mobile bottom sheet) already supplies a title and its own chrome. `headerAction`/`actions`
+   * still render, since they're functional controls, not title chrome. Never collapsed: there's
+   * no header to click. */
+  bare?: boolean;
   children: ReactNode;
 }
 
@@ -16,6 +21,7 @@ export function CollapsiblePanel({
   headerAction,
   actions,
   defaultCollapsed = false,
+  bare = false,
   children,
 }: CollapsiblePanelProps) {
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
@@ -28,6 +34,16 @@ export function CollapsiblePanel({
     event.preventDefault();
     toggle();
   };
+
+  if (bare) {
+    return (
+      <div>
+        {headerAction ? <div className="mb-4 flex justify-end">{headerAction}</div> : null}
+        {actions ? <div className="mb-4 flex items-start justify-between gap-3">{actions}</div> : null}
+        {children}
+      </div>
+    );
+  }
 
   return (
     <section className="rounded-xl border border-slate-800 bg-slate-900/80">

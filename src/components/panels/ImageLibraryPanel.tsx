@@ -88,7 +88,7 @@ function ImageCard({
   );
 }
 
-export function ImageLibraryPanel() {
+export function ImageLibraryPanel({ bare = false }: { bare?: boolean }) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const imagePool = useEPPStore((state) => state.imagePool);
   const activePageId = useEPPStore((state) => state.ui.activePageId);
@@ -117,6 +117,7 @@ export function ImageLibraryPanel() {
       title="Image library"
       description="Load images from the native dialog, then drag them into the grid slots. Click an image to view its details in the Properties panel."
       defaultCollapsed={false}
+      bare={bare}
       headerAction={
         <button
           type="button"

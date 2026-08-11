@@ -4,6 +4,7 @@ import { PageStage } from '../canvas/PageStage.js';
 import { ImageLibraryPanel } from '../panels/ImageLibraryPanel.js';
 import { LayoutTreePanel } from '../panels/LayoutTreePanel.js';
 import { PageSetupPanel } from '../panels/PageSetupPanel.js';
+import { PropertiesPanel } from '../panels/PropertiesPanel.js';
 import { UnitToggle } from '../settings/UnitToggle.js';
 import { TemplateGallery } from '../templates/TemplateGallery.js';
 import { MenuBar } from '../ui/MenuBar.js';
@@ -25,15 +26,43 @@ const TAB_LABELS: Record<MobileTabId, string> = {
  * `DesktopShell`'s three-column grid, this is canvas-first: the page preview always fills the
  * remaining height so it's never scrolled off-screen, and every panel (Page/Layout/Photos/
  * Templates) lives in a `BottomSheet` reached from `BottomTabBar` instead of a sidebar. Properties
- * auto-rising as its own sheet on selection lands in task group 6, not yet in this scaffold. */
+ * rises as its own sheet automatically whenever something is selected -- driven by `ui.selection`,
+ * the same field `PageStage` reads, per design.md Decision 5 -- rather than being a fifth tab. */
 export function MobileShell({ onRequestNew, onRequestOpen, onSaveTemplate, onSaveTemplateAs, templateLibrary }: ShellProps) {
   const saveProject = useEPPStore((state) => state.saveProject);
   const setViewMode = useEPPStore((state) => state.setViewMode);
   const layoutMode = useEPPStore((state) => state.ui.layoutMode);
+  const selection = useEPPStore((state) => state.ui.selection);
+  const clearSelection = useEPPStore((state) => state.clearSelection);
   const { undo, redo } = useUndoRedo();
   const [openTab, setOpenTab] = useState<MobileTabId | null>(null);
 
+  // `ui.selection` can't be trusted as a plain open/closed signal: in Simple mode, `clearSelection`
+  // falls back to selecting the page's root node instead of nulling it (desktop's always-visible
+  // Properties sidebar needs something to show -- see `computeDefaultSelection` in uiSlice.ts), so
+  // the store's selection never actually becomes null once anything's been selected. Tracking which
+  // exact selection was last dismissed here (rather than changing the shared store) keeps desktop's
+  // behavior untouched: the sheet closes on a user dismissal and reopens only when the selection
+  // becomes something new, matching the mobile-shell capability's requirement without relying on a
+  // signal the store doesn't reliably provide.
+  const selectionKey = selection ? `${selection.kind}:${selection.id}` : null;
+  const [dismissedSelectionKey, setDismissedSelectionKey] = useState<string | null>(null);
+  const isPropertiesOpen = selectionKey !== null && selectionKey !== dismissedSelectionKey;
+
+  const dismissProperties = () => {
+    setDismissedSelectionKey(selectionKey);
+    clearSelection();
+  };
+
+  // A selection takes over the sheet slot from whichever tab was open, rather than stacking on top
+  // of it -- tapping a tab bar destination while Properties is showing dismisses the selection and
+  // opens that tab directly (not a toggle-close, since the tab wasn't the visible sheet).
   const handleSelectTab = (tab: MobileTabId) => {
+    if (isPropertiesOpen) {
+      dismissProperties();
+      setOpenTab(tab);
+      return;
+    }
     setOpenTab((current) => (current === tab ? null : tab));
   };
 
@@ -80,13 +109,13 @@ export function MobileShell({ onRequestNew, onRequestOpen, onSaveTemplate, onSav
         <PageStage />
       </div>
 
-      <BottomTabBar activeTab={openTab} onSelect={handleSelectTab} />
+      <BottomTabBar activeTab={isPropertiesOpen ? null : openTab} onSelect={handleSelectTab} />
 
-      <BottomSheet open={openTab === 'page'} title={TAB_LABELS.page} onClose={() => setOpenTab(null)}>
+      <BottomSheet open={!isPropertiesOpen && openTab === 'page'} title={TAB_LABELS.page} onClose={() => setOpenTab(null)}>
         <PageSetupPanel bare />
       </BottomSheet>
 
-      <BottomSheet open={openTab === 'layout'} title={TAB_LABELS.layout} onClose={() => setOpenTab(null)}>
+      <BottomSheet open={!isPropertiesOpen && openTab === 'layout'} title={TAB_LABELS.layout} onClose={() => setOpenTab(null)}>
         <DocumentSummary />
         {layoutMode === 'nested' ? (
           <div className="mt-4">
@@ -95,11 +124,11 @@ export function MobileShell({ onRequestNew, onRequestOpen, onSaveTemplate, onSav
         ) : null}
       </BottomSheet>
 
-      <BottomSheet open={openTab === 'photos'} title={TAB_LABELS.photos} onClose={() => setOpenTab(null)}>
+      <BottomSheet open={!isPropertiesOpen && openTab === 'photos'} title={TAB_LABELS.photos} onClose={() => setOpenTab(null)}>
         <ImageLibraryPanel bare />
       </BottomSheet>
 
-      <BottomSheet open={openTab === 'templates'} title={TAB_LABELS.templates} onClose={() => setOpenTab(null)}>
+      <BottomSheet open={!isPropertiesOpen && openTab === 'templates'} title={TAB_LABELS.templates} onClose={() => setOpenTab(null)}>
         <TemplateGallery
           bare
           templates={templateLibrary.templates}
@@ -107,6 +136,10 @@ export function MobileShell({ onRequestNew, onRequestOpen, onSaveTemplate, onSav
           errorMessage={templateLibrary.errorMessage}
           onReload={templateLibrary.reload}
         />
+      </BottomSheet>
+
+      <BottomSheet open={isPropertiesOpen} title="Properties" onClose={dismissProperties}>
+        <PropertiesPanel bare />
       </BottomSheet>
     </main>
   );

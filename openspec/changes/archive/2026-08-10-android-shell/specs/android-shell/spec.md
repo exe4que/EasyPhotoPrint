@@ -48,10 +48,9 @@ Activating "Export PDF" or "Print" on Android SHALL produce output equivalent in
 - **THEN** Android's native print dialog SHALL open
 - **AND** the document offered to it SHALL contain every page of the project, rendered the same way "Export PDF" renders them
 
-### Requirement: Android Has No Native Menu Commands
-Because Android has no native application menu bar, every menu-command subscription in the platform contract SHALL exist and return a working unsubscribe function on Android, but SHALL never be invoked — matching `platform-adapter`'s own totality requirement, applied concretely to this host.
+### Requirement: Android Has No Native Menu
+Android SHALL NOT have, or need, a native application menu bar. New/Open/Save/Save As/Undo/Redo/Save Template/Save Template As are reached exclusively through the shared in-app `File`/`Edit` menu bar (the same renderer-drawn component used on every host — see the `electron-shell` capability's "No Custom Application Menu" requirement), not through any Android-specific menu surface.
 
-#### Scenario: Subscribing to a menu command on Android is inert but safe
-- **WHEN** shared renderer code subscribes to any menu command (e.g. "new project") while running on Android
-- **THEN** the subscription SHALL succeed and return a callable unsubscribe function
-- **AND** the subscribed callback SHALL never be invoked, since Android never issues that command
+#### Scenario: The in-app menu bar is the only trigger for these actions on Android
+- **WHEN** the user wants to start a new project, open or save a project, undo/redo, or save a template, on Android
+- **THEN** they use the shared in-app `File`/`Edit` menu bar — the same component and same code path used on every host

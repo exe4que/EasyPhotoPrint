@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The platform-adapter capability defines the single contract through which the renderer reaches every capability its host provides — file pickers, project storage, PDF export, printing, settings, templates, image decoding, and host-initiated commands — and how a concrete implementation of that contract is selected at startup, so that one renderer codebase runs unmodified on every supported host (Electron desktop today, an Android WebView later) without platform branching leaking into shared code.
+The platform-adapter capability defines the single contract through which the renderer reaches every capability its host provides — file pickers, project storage, PDF export, printing, settings, templates, and image decoding — and how a concrete implementation of that contract is selected at startup, so that one renderer codebase runs unmodified on every supported host (Electron desktop, Android) without platform branching leaking into shared code.
 
 ## Requirements
 
@@ -10,7 +10,7 @@ The platform-adapter capability defines the single contract through which the re
 Shared renderer code SHALL reach every host-provided capability exclusively through one contract object, obtained by calling the contract accessor at the point of use. Shared renderer code SHALL NOT detect, name, or branch on the host platform, and SHALL NOT read host globals (such as an injected preload object) directly.
 
 #### Scenario: Renderer reaches a native capability through the contract
-- **WHEN** shared renderer code needs to open a file picker, read or write a project, list/save/delete templates, read or write settings, export a PDF, print a document, decode a known image at a given size, or subscribe to host-initiated commands
+- **WHEN** shared renderer code needs to open a file picker, read or write a project, list/save/delete templates, read or write settings, export a PDF, print a document, or decode a known image at a given size
 - **THEN** it SHALL obtain the contract from the accessor and call the corresponding method on it
 - **AND** it SHALL NOT reference any host-specific global to do so
 
@@ -38,12 +38,6 @@ Each supported host SHALL have its own entry point that registers a concrete ada
 
 ### Requirement: The Platform Contract Is Total
 Every registered adapter SHALL implement every member of the contract. A host that cannot provide a capability SHALL absorb that inside its own adapter with an implementation that still honors the member's shape and leaves application state unchanged — never by omitting the member, and never by requiring shared code to check whether it exists.
-
-#### Scenario: A host without host-initiated commands still satisfies the contract
-- **WHEN** a host has no native menu bar and therefore never issues menu commands
-- **THEN** its adapter SHALL still implement every command subscription in the contract
-- **AND** each subscription SHALL return a callable unsubscribe function, so shared code that subscribes on mount and unsubscribes on unmount works unchanged
-- **AND** the subscribed callback SHALL simply never be invoked on that host
 
 #### Scenario: Shared code never tests for a member's presence
 - **WHEN** shared renderer code uses any contract member

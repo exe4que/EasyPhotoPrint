@@ -63,6 +63,7 @@ function collectContainerNodes(node: LayoutNode): LayoutNode[] {
 export function PageStage() {
   const { page, pageBox, layout } = useLayoutResolution();
   const viewportRef = useRef<HTMLDivElement | null>(null);
+  const pageRectRef = useRef<HTMLDivElement | null>(null);
   const suppressNextClickRef = useRef(false);
   const [previewZoom, setPreviewZoom] = useState(PREVIEW_ZOOM_FALLBACK);
   const [isZoomFitted, setIsZoomFitted] = useState(true);
@@ -145,6 +146,17 @@ export function PageStage() {
     }
   };
 
+  // Activating the root's margin band or the viewport background outside the page bounds
+  // selects/toggles the root, the same convention an imageSlot already uses.
+  const toggleRootSelection = () => {
+    if (selectedSlotId === page.rootNode.id) {
+      clearSelection();
+      return;
+    }
+
+    setSelection({ kind: 'node', id: page.rootNode.id });
+  };
+
   return (
     <section className="flex h-full min-h-0 flex-col rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
       <div className="mb-4 flex flex-none items-center justify-between">
@@ -189,15 +201,72 @@ export function PageStage() {
         </div>
       </div>
 
-      <div ref={viewportRef} className="min-h-0 flex-1 overflow-auto rounded-xl border border-slate-800 bg-slate-950/80 p-6">
+      <div
+        ref={viewportRef}
+        className="min-h-0 flex-1 overflow-auto rounded-xl border border-slate-800 bg-slate-950/80 p-6"
+        onClick={(event) => {
+          // Tapping the gray background outside the page rectangle selects the root, the same as
+          // tapping the page's own margin band below -- unless this click is the trailing one from a
+          // divider/freeform drag (see suppressNextClickRef's other usages in this file), or it
+          // landed inside the page rectangle, where that element's own onClick already handled it.
+          if (suppressNextClickRef.current) {
+            suppressNextClickRef.current = false;
+            return;
+          }
+
+          const pageRect = pageRectRef.current?.getBoundingClientRect();
+          const insidePageBounds =
+            !!pageRect &&
+            event.clientX >= pageRect.left &&
+            event.clientX <= pageRect.right &&
+            event.clientY >= pageRect.top &&
+            event.clientY <= pageRect.bottom;
+          if (insidePageBounds) {
+            return;
+          }
+
+          toggleRootSelection();
+        }}
+      >
         <div className="flex min-h-full w-max min-w-full items-center justify-center">
           <div
+            ref={pageRectRef}
             className="relative shrink-0 bg-white shadow-2xl"
-          style={{
-            width: previewWidthPx,
-            height: previewHeightPx,
-          }}
-        >
+            style={{
+              width: previewWidthPx,
+              height: previewHeightPx,
+            }}
+            onClick={(event) => {
+              // Tapping the root's margin band (the area between the page edge and the root's
+              // padded content box, drawn below as a dashed outline) selects the root. Anything
+              // inside the content box -- a slot, a freeform canvas, a container gap -- already
+              // owns that space via its own onClick (or deliberately has none, for inter-slot
+              // gaps), so this no-ops there and lets that element's handler (which runs first,
+              // since it's nested inside this one) be the one that decided what happened.
+              if (suppressNextClickRef.current) {
+                suppressNextClickRef.current = false;
+                return;
+              }
+
+              const rect = event.currentTarget.getBoundingClientRect();
+              const localXPx = event.clientX - rect.left;
+              const localYPx = event.clientY - rect.top;
+              const paddingLeftPx = mmToPx(page.rootNode.paddingMm?.left ?? 0, previewZoom);
+              const paddingTopPx = mmToPx(page.rootNode.paddingMm?.top ?? 0, previewZoom);
+              const paddingRightPx = mmToPx(page.rootNode.paddingMm?.right ?? 0, previewZoom);
+              const paddingBottomPx = mmToPx(page.rootNode.paddingMm?.bottom ?? 0, previewZoom);
+              const insideContentBox =
+                localXPx >= paddingLeftPx &&
+                localXPx <= previewWidthPx - paddingRightPx &&
+                localYPx >= paddingTopPx &&
+                localYPx <= previewHeightPx - paddingBottomPx;
+              if (insideContentBox) {
+                return;
+              }
+
+              toggleRootSelection();
+            }}
+          >
           {page.rootNode.paddingMm ? (
             <div
               className="pointer-events-none absolute border border-dashed border-slate-400/70"

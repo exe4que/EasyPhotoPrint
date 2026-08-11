@@ -21,10 +21,10 @@
 
 ## 5. Bottom sheet and tab bar chrome
 
-- [ ] 5.1 Add `src/components/shell/BottomSheet.tsx`: shared sheet chrome (backdrop, grabber, title slot for the active destination's label, close on backdrop tap or an explicit close control), sliding open/closed via a CSS transition — no drag-to-dismiss gesture (see design.md Non-Goals).
-- [ ] 5.2 Add `src/components/shell/BottomTabBar.tsx`: a persistent bottom bar with four destinations (`Page`, `Layout`, `Photos`, `Templates`); activating the open destination again, or closing the sheet another way, closes it — per the `mobile-shell` capability's "Bottom Tab Bar With Four Destinations" requirement.
-- [ ] 5.3 Wire `MobileShell` to hold which tab (if any) is open, rendering `BottomSheet` with the corresponding panel component (`bare`) as its content: `Page` → `PageSetupPanel`, `Photos` → `ImageLibraryPanel`, `Templates` → `TemplateGallery`.
-- [ ] 5.4 Wire the `Layout` destination: the Simple/Nested toggle (extracted from its current inline `App.tsx` JSX into a small shared piece both shells can render) plus the read-only Document summary, plus — in Nested mode — `LayoutTreePanel` (bare) below the toggle, per design.md Decision 4.
+- [x] 5.1 Add `src/components/shell/BottomSheet.tsx`: shared sheet chrome (backdrop, grabber, title slot for the active destination's label, close on backdrop tap or an explicit close control), sliding open/closed via a CSS transition — no drag-to-dismiss gesture (see design.md Non-Goals).
+- [x] 5.2 Add `src/components/shell/BottomTabBar.tsx`: a persistent bottom bar with four destinations (`Page`, `Layout`, `Photos`, `Templates`); activating the open destination again, or closing the sheet another way, closes it — per the `mobile-shell` capability's "Bottom Tab Bar With Four Destinations" requirement.
+- [x] 5.3 Wire `MobileShell` to hold which tab (if any) is open, rendering `BottomSheet` with the corresponding panel component (`bare`) as its content: `Page` → `PageSetupPanel`, `Photos` → `ImageLibraryPanel`, `Templates` → `TemplateGallery`.
+- [x] 5.4 Wire the `Layout` destination: the Simple/Nested toggle (extracted, along with the read-only Document summary it sits beside, into a new shared `src/components/shell/DocumentSummary.tsx` both shells render — `DesktopShell` still wraps it in its own "Document" `CollapsiblePanel`, `MobileShell` renders it bare since the sheet chrome already supplies the "Layout" title) plus — in Nested mode — `LayoutTreePanel` (bare) below the toggle, per design.md Decision 4. Verified via Playwright/xvfb at 480x800: all four tabs open the correct panel content and read the same store, tapping an open tab again or tapping the backdrop closes it, opening a different tab switches directly without stacking, and switching to Nested mode in the Layout sheet reveals `LayoutTreePanel`'s content.
 
 ## 6. Properties auto-sheet on selection
 

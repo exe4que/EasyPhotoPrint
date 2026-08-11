@@ -8,6 +8,8 @@ import { PropertiesPanel } from '../panels/PropertiesPanel.js';
 import { UnitToggle } from '../settings/UnitToggle.js';
 import { TemplateGallery } from '../templates/TemplateGallery.js';
 import { MenuBar } from '../ui/MenuBar.js';
+import { useLayoutResolution } from '../../hooks/useLayoutResolution.js';
+import { useLibraryImageDragGesture } from '../../hooks/useLibraryImageDragGesture.js';
 import { useUndoRedo } from '../../hooks/useUndoRedo.js';
 import { useEPPStore } from '../../store/index.js';
 import { BottomSheet } from './BottomSheet.js';
@@ -35,8 +37,39 @@ export function MobileShell({ onRequestNew, onRequestOpen, onSaveTemplate, onSav
   const selection = useEPPStore((state) => state.ui.selection);
   const clearSelection = useEPPStore((state) => state.clearSelection);
   const activePageId = useEPPStore((state) => state.ui.activePageId);
+  const imagePool = useEPPStore((state) => state.imagePool);
+  const assignImageToSlot = useEPPStore((state) => state.assignImageToSlot);
+  const addFreeformElement = useEPPStore((state) => state.addFreeformElement);
+  const { page, layout } = useLayoutResolution();
   const { undo, redo } = useUndoRedo();
   const [openTab, setOpenTab] = useState<MobileTabId | null>(null);
+
+  // Swipe-drag on a Photos-sheet ImageCard (see useLibraryImageDragGesture): arming closes this
+  // sheet so the canvas underneath is reachable as a drop target; the drop (hit or miss) always
+  // reopens it, without ever touching selection -- that's what keeps this reopen from being
+  // pre-empted by the Properties auto-sheet below, per the mobile-shell delta spec.
+  const { armedDrag, createCardDragProps } = useLibraryImageDragGesture({
+    onArm: () => setOpenTab(null),
+    onDrop: (imageAssetId, clientX, clientY) => {
+      const dropElement = document.elementFromPoint(clientX, clientY)?.closest<HTMLElement>('[data-drop-target]');
+      const dropTarget = dropElement?.dataset.dropTarget;
+      if (dropTarget?.startsWith('slot:')) {
+        assignImageToSlot(page.id, dropTarget.slice('slot:'.length), imageAssetId, 'library');
+      } else if (dropTarget?.startsWith('freeform:')) {
+        const canvasNodeId = dropTarget.slice('freeform:'.length);
+        const box = layout.get(canvasNodeId);
+        const rect = dropElement!.getBoundingClientRect();
+        if (box && rect.width > 0 && rect.height > 0) {
+          addFreeformElement(page.id, canvasNodeId, imageAssetId, {
+            xMm: ((clientX - rect.left) / rect.width) * box.w,
+            yMm: ((clientY - rect.top) / rect.height) * box.h,
+          });
+        }
+      }
+      setOpenTab('photos');
+    },
+  });
+  const armedImageAsset = armedDrag ? imagePool.find((asset) => asset.id === armedDrag.imageAssetId) : null;
 
   const selectionKey = selection ? `${selection.kind}:${selection.id}` : null;
 
@@ -131,7 +164,7 @@ export function MobileShell({ onRequestNew, onRequestOpen, onSaveTemplate, onSav
       </BottomSheet>
 
       <BottomSheet open={!isPropertiesOpen && openTab === 'photos'} title={TAB_LABELS.photos} onClose={() => setOpenTab(null)}>
-        <ImageLibraryPanel bare />
+        <ImageLibraryPanel bare dragGesture={{ createCardDragProps }} />
       </BottomSheet>
 
       <BottomSheet open={!isPropertiesOpen && openTab === 'templates'} title={TAB_LABELS.templates} onClose={() => setOpenTab(null)}>
@@ -147,6 +180,16 @@ export function MobileShell({ onRequestNew, onRequestOpen, onSaveTemplate, onSav
       <BottomSheet open={isPropertiesOpen} title="Properties" onClose={clearSelection}>
         <PropertiesPanel bare />
       </BottomSheet>
+
+      {armedDrag && armedImageAsset ? (
+        <img
+          src={armedImageAsset.thumbnailDataUrl}
+          alt=""
+          aria-hidden="true"
+          className="pointer-events-none fixed z-50 h-20 w-20 -translate-x-1/2 -translate-y-1/2 rounded-lg border-2 border-cyan-400 bg-slate-900/90 object-contain shadow-xl"
+          style={{ left: armedDrag.clientX, top: armedDrag.clientY }}
+        />
+      ) : null}
     </main>
   );
 }

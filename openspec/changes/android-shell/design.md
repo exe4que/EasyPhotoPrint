@@ -102,6 +102,14 @@ What's replaced, not dropped: the `CmdOrCtrl+N/O/S/Shift+S/Z/Shift+Z` keyboard s
 
 **Consequence for `platform-adapter`:** with `menu` gone from `EppAPI` entirely, "The Platform Contract Is Total" requirement's one example scenario (illustrated using `menu` — "a host without host-initiated commands still satisfies the contract") no longer has a real member to illustrate. The requirement itself is untouched; only that one now-hypothetical example scenario is dropped (see this change's `platform-adapter` delta spec).
 
+### 10. The in-app menu bar mimics a native menu's appearance, instead of a flat row of buttons
+
+Decision 8's toolbar rendered all eight actions as always-visible, individually bordered buttons under `File`/`Edit` group labels. Real, but visually noisy — eight bordered boxes plus two labels compete for attention in a header that also has the app title and unit toggle. Feedback after using it: it reads as clutter, not as a toolbar.
+
+The fix replaces the flat button row with a small `MenuBar` component (`src/components/ui/MenuBar.tsx`): two plain text labels, `File` and `Edit`, each revealing a floating dropdown of its items on click — visually indistinguishable from a native application menu, deliberately, even though (per Decision 9) there is no real native menu behind it on any host. Closing behavior (outside click, `Escape`, or picking an item) matches what a native menu would do. This is the same shared component on both hosts — no new host branching — and it's what the eight `undo-redo`/`editor-layout`/`electron-shell` requirements above now describe: "an item in the `File`/`Edit` menu," not "a toolbar button."
+
+Alternative considered: keep the flat buttons but visually de-emphasize them (smaller, no borders). Rejected — a flat row of eight items is still eight things to visually parse at once regardless of styling; collapsing them into two menus is what actually reduces the count of always-visible elements from ten (eight buttons + two labels) to two.
+
 ## Risks / Trade-offs
 
 - [Two independent PDF compositors (Electron's `nativeImage`-backed, Android's Canvas-backed) can drift in behavior over time as each is modified independently] → Accepted per Non-Goals; both call the same pure placement math, so drift is limited to decode/resize/encode fidelity, not layout correctness. Revisit sharing a real abstraction only once a second real implementation's rough edges are known, not speculatively.

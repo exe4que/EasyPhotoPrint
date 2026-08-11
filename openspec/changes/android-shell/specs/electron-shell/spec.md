@@ -1,15 +1,15 @@
 ## REMOVED Requirements
 
 ### Requirement: Trimmed application menu
-**Reason**: The eight actions this menu exposed (New/Open/Save/Save As/Undo/Redo/Save Template/Save Template As) are now reachable through a single shared in-app toolbar component, used identically on every host. That toolbar was added by this same change once Android's lack of a native menu bar made "menu-only" access to these actions impossible on that host; keeping a redundant native menu alongside it on Electron would only maximize divergence between the two builds, the opposite of this change's goal.
-**Migration**: None needed for users — every action the menu exposed is still available via the toolbar (now always visible at the top of the app window) and the same keyboard shortcuts (`CmdOrCtrl+N/O/S/Shift+S/Z/Shift+Z`), now handled in the renderer instead of bound to native menu items.
+**Reason**: The eight actions this menu exposed (New/Open/Save/Save As/Undo/Redo/Save Template/Save Template As) are now reachable through a shared in-app `File`/`Edit` menu bar — a component that mimics a native menu's look (a label that reveals a floating dropdown) without being one, used identically on every host. That menu bar was added by this same change once Android's lack of a native menu made "menu-only" access to these actions impossible on that host; keeping a redundant *native* menu alongside it on Electron would only maximize divergence between the two builds, the opposite of this change's goal.
+**Migration**: None needed for users — every action the native menu exposed is still available via the in-app `File`/`Edit` menu bar (at the top of the app window) and the same keyboard shortcuts (`CmdOrCtrl+N/O/S/Shift+S/Z/Shift+Z`), now handled in the renderer instead of bound to native menu items.
 
 ### Requirement: File > New requests a renderer-side confirmation before resetting state
-**Reason**: Superseded by "New Requests a Confirmation Before Resetting State" — same required behavior, triggered by the toolbar instead of a menu click.
+**Reason**: Superseded by "New Requests a Confirmation Before Resetting State" — same required behavior, triggered by the in-app `File` menu instead of a native menu click.
 **Migration**: None — see the added requirement.
 
 ### Requirement: File > Open, Save, and Save As Round-Trip Through the Renderer
-**Reason**: The Main→Renderer round-trip existed only because a native menu item runs in the Main process, which has no access to the renderer's store. The toolbar that now triggers these actions already runs in the renderer, so the round-trip has nothing left to do. Superseded by "Open, Save, and Save As Are Triggered Directly From the Renderer."
+**Reason**: The Main→Renderer round-trip existed only because a native menu item runs in the Main process, which has no access to the renderer's store. The in-app `File` menu that now triggers these actions already runs in the renderer, so the round-trip has nothing left to do. Superseded by "Open, Save, and Save As Are Triggered Directly From the Renderer."
 **Migration**: None — see the added requirement.
 
 ### Requirement: Edit > Undo and Redo Round-Trip Through the Renderer
@@ -23,23 +23,23 @@
 ## ADDED Requirements
 
 ### Requirement: No Custom Application Menu
-The application SHALL NOT build a custom, app-specific application menu. On macOS, `Menu.setApplicationMenu` SHALL be called with only the OS-standard `appMenu` role (About/Hide/Services/Quit, etc. — platform convention, not an app-specific feature). On every other platform, the application SHALL run with no application menu bar at all (`Menu.setApplicationMenu(null)`). New/Open/Save/Save As/Undo/Redo/Save Template/Save Template As are reached exclusively through the in-app toolbar described by the `undo-redo` and `editor-layout` capabilities' toolbar requirements — the same toolbar component used on every host — not through any Electron-specific menu surface.
+The application SHALL NOT build a custom, app-specific *native* application menu. On macOS, `Menu.setApplicationMenu` SHALL be called with only the OS-standard `appMenu` role (About/Hide/Services/Quit, etc. — platform convention, not an app-specific feature). On every other platform, the application SHALL run with no native application menu bar at all (`Menu.setApplicationMenu(null)`). New/Open/Save/Save As/Undo/Redo/Save Template/Save Template As are reached exclusively through the in-app `File`/`Edit` menu bar described by the `undo-redo` and `editor-layout` capabilities' requirements — a renderer-drawn component that mimics a native menu's appearance without being one, the same on every host — not through any Electron-specific native menu surface.
 
-#### Scenario: No File/Edit/Help menu is built at startup
+#### Scenario: No native File/Edit/Help menu is built at startup
 - **WHEN** the app finishes starting on any platform
-- **THEN** it SHALL NOT construct a `File`, `Edit`, `View`, `Window`, or `Help` menu
-- **AND** on macOS, the only menu present SHALL be the OS-standard `appMenu`
-- **AND** on Windows/Linux, no application menu bar SHALL be present at all
+- **THEN** it SHALL NOT construct a native `File`, `Edit`, `View`, `Window`, or `Help` menu
+- **AND** on macOS, the only native menu present SHALL be the OS-standard `appMenu`
+- **AND** on Windows/Linux, no native application menu bar SHALL be present at all
 
-#### Scenario: The toolbar is the only trigger for these actions on Electron
+#### Scenario: The in-app menu bar is the only trigger for these actions on Electron
 - **WHEN** the user wants to start a new project, open or save a project, undo/redo, or save a template, on the Electron host
-- **THEN** they use the shared in-app toolbar — the same component and same code path used on every host
+- **THEN** they use the shared in-app `File`/`Edit` menu bar — the same component and same code path used on every host, not a native OS menu
 
 ### Requirement: New Requests a Confirmation Before Resetting State
-Activating the toolbar's `New` button SHALL NOT reset any application state immediately. The renderer SHALL require explicit user confirmation before discarding the current document.
+Activating `New` in the in-app `File` menu SHALL NOT reset any application state immediately. The renderer SHALL require explicit user confirmation before discarding the current document.
 
 #### Scenario: Activating New opens a confirmation dialog instead of resetting immediately
-- **WHEN** the user activates the toolbar's `New` button (or its `CmdOrCtrl+N` keyboard shortcut)
+- **WHEN** the user activates `New` in the `File` menu (or its `CmdOrCtrl+N` keyboard shortcut)
 - **THEN** it SHALL open a confirmation dialog describing that starting a new project discards the current document and undo/redo history
 - **AND** it SHALL NOT modify the document, UI, or image pool state until the user explicitly confirms
 
@@ -52,36 +52,36 @@ Activating the toolbar's `New` button SHALL NOT reset any application state imme
 
 #### Scenario: Cancelling the dialog leaves the current document untouched
 - **WHEN** the user dismisses or cancels the "start a new project" confirmation dialog
-- **THEN** the document, UI state, image pool, and undo/redo history SHALL remain exactly as they were before the toolbar button was activated
+- **THEN** the document, UI state, image pool, and undo/redo history SHALL remain exactly as they were before the menu item was activated
 
 ### Requirement: Open, Save, and Save As Are Triggered Directly From the Renderer
-Because the toolbar that triggers these actions already runs in the renderer (unlike a native menu item, which would run in the Main process), activating `Open`, `Save`, or `Save As` on the toolbar SHALL invoke the corresponding store action directly — gathering current document/image-pool state and invoking the corresponding `EppAPI.fs` method itself — with no Main-process round-trip involved.
+Because the in-app `File` menu that triggers these actions already runs in the renderer (unlike a native menu item, which would run in the Main process), activating `Open`, `Save`, or `Save As` SHALL invoke the corresponding store action directly — gathering current document/image-pool state and invoking the corresponding `EppAPI.fs` method itself — with no Main-process round-trip involved.
 
-#### Scenario: Activating a toolbar button invokes the corresponding action directly
-- **WHEN** the user activates the toolbar's `Open`, `Save`, or `Save As` button (or, on Electron, their `CmdOrCtrl+O`/`CmdOrCtrl+S`/`CmdOrCtrl+Shift+S` keyboard shortcuts)
+#### Scenario: Activating a File menu item invokes the corresponding action directly
+- **WHEN** the user activates `Open`, `Save`, or `Save As` in the `File` menu (or, on Electron, their `CmdOrCtrl+O`/`CmdOrCtrl+S`/`CmdOrCtrl+Shift+S` keyboard shortcuts)
 - **THEN** the renderer SHALL invoke the corresponding action (open/save/save-as) directly, without any Main-process event round-trip
 
 ### Requirement: Undo and Redo Are Triggered Directly From the Renderer
-Activating the toolbar's `Undo` or `Redo` button SHALL invoke the document undo/redo history directly from the renderer, with no Main-process round-trip involved.
+Activating `Undo` or `Redo` in the in-app `Edit` menu SHALL invoke the document undo/redo history directly from the renderer, with no Main-process round-trip involved.
 
-#### Scenario: Activating a toolbar button invokes undo/redo directly
-- **WHEN** the user activates the toolbar's `Undo` or `Redo` button (or, on Electron, its `CmdOrCtrl+Z`/`CmdOrCtrl+Shift+Z` keyboard shortcut)
+#### Scenario: Activating an Edit menu item invokes undo/redo directly
+- **WHEN** the user activates `Undo` or `Redo` in the `Edit` menu (or, on Electron, its `CmdOrCtrl+Z`/`CmdOrCtrl+Shift+Z` keyboard shortcut)
 - **THEN** the renderer SHALL invoke the same document undo/redo controls described by the `undo-redo` capability's "Undo and Redo Controls" requirement, directly, with no Main-process event round-trip
-- **AND** if there is nothing to undo or redo, invoking it SHALL have no effect (the underlying history's own no-op behavior applies; the toolbar button itself is not disabled based on history state)
+- **AND** if there is nothing to undo or redo, invoking it SHALL have no effect (the underlying history's own no-op behavior applies; the menu item itself is not disabled based on history state)
 
 ### Requirement: Save Template and Save Template As Are Triggered Directly From the Renderer
-Activating the toolbar's `Save Template` or `Save Template As` button SHALL invoke the corresponding save flow directly from the renderer — exporting the active page's current structure and invoking `EppAPI.templates.save` itself — with no Main-process round-trip involved.
+Activating `Save Template` or `Save Template As` in the in-app `Edit` menu SHALL invoke the corresponding save flow directly from the renderer — exporting the active page's current structure and invoking `EppAPI.templates.save` itself — with no Main-process round-trip involved.
 
 #### Scenario: Activating Save Template As always prompts for a name
-- **WHEN** the user activates the toolbar's `Save Template As` button
+- **WHEN** the user activates `Save Template As` in the `Edit` menu
 - **THEN** it SHALL prompt the user for a template name and save the active page's current structure as a new template under that name
 
 #### Scenario: Activating Save Template overwrites the linked template, or falls back to prompting for a name
-- **WHEN** the user activates the toolbar's `Save Template` button and the active page is already linked to a template
+- **WHEN** the user activates `Save Template` in the `Edit` menu and the active page is already linked to a template
 - **THEN** it SHALL prompt for confirmation and overwrite that linked template with the page's current structure
 
 #### Scenario: Save Template with no linked template behaves like Save Template As
-- **WHEN** the user activates the toolbar's `Save Template` button and the active page is not linked to any template
+- **WHEN** the user activates `Save Template` in the `Edit` menu and the active page is not linked to any template
 - **THEN** it SHALL behave the same as activating `Save Template As` (prompt for a name and save as a new template) instead of having no effect
 
 ## MODIFIED Requirements

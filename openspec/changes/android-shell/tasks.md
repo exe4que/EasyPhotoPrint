@@ -91,7 +91,15 @@
 - [x] 11.9 Verify on desktop (Electron): `Menu.getApplicationMenu()` is `null` (Linux/Windows), the toolbar renders above the title, all 8 toolbar buttons still work, and `CmdOrCtrl+N`/`CmdOrCtrl+Z` keyboard shortcuts work without a native menu.
 - [x] 11.10 Verify on Android: rebuild, reinstall, confirm the toolbar renders above the title with no errors, same as before the menu removal.
 
-## 12. Spec closure
+## 12. Replace the flat toolbar with a native-style File/Edit menu bar
 
-- [x] 12.1 Run the full test suite and typecheck (desktop build must remain unaffected).
-- [x] 12.2 Run `openspec validate --strict --changes android-shell` and confirm it passes.
+- [x] 12.1 Add `src/components/ui/MenuBar.tsx`: a `MenuBar` component rendering `File`/`Edit`-style dropdown labels (`MenuBarMenu`), each revealing a floating list of items on click; closes on an outside click, `Escape`, or picking an item.
+- [x] 12.2 Replace `App.tsx`'s flat row of 8 bordered buttons with `<MenuBar menus={[...]} />`, wiring the same click handlers (`setIsNewProjectConfirmOpen`, `saveProject`, `undo`, `redo`, `saveTemplateDialogRef.current?.openSave()/openSaveAs()`) as items under `File`/`Edit`.
+- [x] 12.3 Update the `electron-shell`, `undo-redo`, and `editor-layout` delta specs' "toolbar button" language to "item in the `File`/`Edit` menu," matching the new UI.
+- [x] 12.4 Verify on desktop (Electron, Playwright): only `File`/`Edit` labels are visible before clicking; clicking `File` reveals `New`/`Open`/`Save`/`Save As`; picking an item both triggers the action and closes the menu; an outside click and `Escape` both close an open menu without triggering anything.
+- [x] 12.5 Verify on Android: rebuild, reinstall, confirm the same closed/open menu behavior works via touch taps, with no console errors.
+
+## 13. Spec closure
+
+- [x] 13.1 Run the full test suite and typecheck (desktop build must remain unaffected).
+- [x] 13.2 Run `openspec validate --strict --changes android-shell` and confirm it passes.

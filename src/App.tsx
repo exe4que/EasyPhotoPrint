@@ -12,14 +12,12 @@ import { SaveTemplateDialog, type SaveTemplateDialogHandle } from './components/
 import { TemplateGallery } from './components/templates/TemplateGallery.js';
 import { CollapsiblePanel } from './components/ui/CollapsiblePanel.js';
 import { ConfirmDialog } from './components/ui/ConfirmDialog.js';
+import { MenuBar } from './components/ui/MenuBar.js';
 import { useLayoutResolution } from './hooks/useLayoutResolution.js';
 import { useTemplateLibrary } from './hooks/useTemplateLibrary.js';
 import { useUndoRedo } from './hooks/useUndoRedo.js';
 import { formatLength } from './lib/units.js';
 import { useEPPStore } from './store/index.js';
-
-const TOOLBAR_BUTTON_CLASS =
-  'whitespace-nowrap rounded-lg border border-slate-700 bg-slate-950 px-3 py-1.5 text-sm font-medium text-slate-200 hover:border-slate-600';
 
 export function App() {
   const saveTemplateDialogRef = useRef<SaveTemplateDialogHandle>(null);
@@ -127,36 +125,34 @@ export function App() {
       ) : (
         <main className="flex h-screen flex-col overflow-hidden bg-slate-950 text-slate-100">
           <div className="sticky top-0 z-30 flex-none border-b border-slate-800 bg-slate-900/80 backdrop-blur">
-            {/* Shared File/Edit toolbar -- the same component on every host, and the only way to
+            {/* Shared File/Edit menu bar -- the same component on every host, and the only way to
              * reach these eight actions now that there's no native application menu on any host
-             * (see design.md, Decision 8 and its follow-up removing the Electron menu). */}
-            <div className="mx-auto flex max-w-[1800px] items-center gap-2 overflow-x-auto px-6 pt-3">
-              <span className="mr-1 text-xs font-semibold uppercase tracking-wide text-slate-500">File</span>
-              <button type="button" onClick={() => setIsNewProjectConfirmOpen(true)} className={TOOLBAR_BUTTON_CLASS}>
-                New
-              </button>
-              <button type="button" onClick={() => setIsOpenProjectConfirmOpen(true)} className={TOOLBAR_BUTTON_CLASS}>
-                Open
-              </button>
-              <button type="button" onClick={() => void saveProject(false)} className={TOOLBAR_BUTTON_CLASS}>
-                Save
-              </button>
-              <button type="button" onClick={() => void saveProject(true)} className={TOOLBAR_BUTTON_CLASS}>
-                Save As
-              </button>
-              <span className="ml-3 mr-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Edit</span>
-              <button type="button" onClick={undo} className={TOOLBAR_BUTTON_CLASS}>
-                Undo
-              </button>
-              <button type="button" onClick={redo} className={TOOLBAR_BUTTON_CLASS}>
-                Redo
-              </button>
-              <button type="button" onClick={() => saveTemplateDialogRef.current?.openSave()} className={TOOLBAR_BUTTON_CLASS}>
-                Save Template
-              </button>
-              <button type="button" onClick={() => saveTemplateDialogRef.current?.openSaveAs()} className={TOOLBAR_BUTTON_CLASS}>
-                Save Template As
-              </button>
+             * (see design.md, Decision 8/9). Styled to mimic a native floating menu (a label that
+             * reveals a dropdown) instead of a row of always-visible buttons, to keep this from
+             * reading as visual noise. */}
+            <div className="mx-auto flex max-w-[1800px] items-center px-6 pt-2">
+              <MenuBar
+                menus={[
+                  {
+                    label: 'File',
+                    items: [
+                      { label: 'New', onClick: () => setIsNewProjectConfirmOpen(true) },
+                      { label: 'Open', onClick: () => setIsOpenProjectConfirmOpen(true) },
+                      { label: 'Save', onClick: () => void saveProject(false) },
+                      { label: 'Save As', onClick: () => void saveProject(true) },
+                    ],
+                  },
+                  {
+                    label: 'Edit',
+                    items: [
+                      { label: 'Undo', onClick: undo },
+                      { label: 'Redo', onClick: redo },
+                      { label: 'Save Template', onClick: () => saveTemplateDialogRef.current?.openSave() },
+                      { label: 'Save Template As', onClick: () => saveTemplateDialogRef.current?.openSaveAs() },
+                    ],
+                  },
+                ]}
+              />
             </div>
 
             <div className="mx-auto flex max-w-[1800px] items-center justify-between gap-4 px-6 py-4">

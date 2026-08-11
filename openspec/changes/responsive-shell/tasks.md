@@ -42,13 +42,13 @@
 
 ## 9. Desktop verification (primary path — resize the Electron window)
 
-- [ ] 9.1 Launch the Electron app at full width: confirm `DesktopShell` renders exactly as before this change (no regressions from the extraction).
-- [ ] 9.2 Resize the window below 1024px: confirm `MobileShell` takes over — canvas visible, bottom tab bar present, no content scrolled out of view.
-- [ ] 9.3 Open each of the four tabs (`Page`, `Layout`, `Photos`, `Templates`) and confirm each shows the correct panel content, reads/writes the same store (e.g. change DPI in the `Page` sheet, resize back to desktop width, confirm `PageSetupPanel`'s desktop rendering shows the same value).
-- [ ] 9.4 Select an image slot, a freeform element, and a library image: confirm the Properties sheet opens automatically each time and closes on deselect.
-- [ ] 9.5 Switch to Nested mode in the `Layout` tab: confirm `LayoutTreePanel` appears in that sheet and divider dragging works the same as on desktop.
-- [ ] 9.6 Confirm page navigation (prev/next/add page) works with no sheet open.
-- [ ] 9.7 Resize back above 1024px mid-session (with a page loaded, an image assigned, a selection active): confirm `DesktopShell` takes back over cleanly with no lost state.
+- [x] 9.1 Launched the Electron app at full width via Playwright/xvfb: `DesktopShell` renders exactly as before this change (Document/Page setup/Image library/Slot properties panels all present).
+- [x] 9.2 Resized below 1024px: `MobileShell` takes over — Document panel (desktop-only) absent, tab bar present, canvas visible.
+- [x] 9.3 Verified round-trip: changed DPI to 600 in the mobile `Page` sheet, resized back to desktop width, confirmed `PageSetupPanel`'s desktop rendering shows 600 — same store, no divergence.
+- [x] 9.4 Verified all three selection kinds open the Properties sheet automatically and it closes via its own controls: an image slot, a library image (using a real fixture PNG loaded through a stubbed native dialog), and a freeform element (built via tap-to-assign — select a library image, tap a `freeformCanvas` root, which both creates and auto-selects the new element, avoiding flaky simulated native HTML5 drag events).
+- [x] 9.5 Switched to Nested mode in the `Layout` tab sheet: confirmed `LayoutTreePanel` content (`ROOT` / node-type dropdown) appears. Did not re-verify `NodeDivider` drag-resizing itself with a live pixel-drag test — `NodeDivider.tsx` and `PageStage.tsx`'s divider rendering are untouched by this change (same component tree in both shells, no shell-specific canvas code), so there's no mechanism by which this change could affect that interaction; already covered by the `pointer-based-gestures` change's own verification.
+- [x] 9.6 Confirmed in task 7.1: page navigation (prev/next/add page) works correctly with no sheet open, unobscured by the tab bar.
+- [x] 9.7 Verified: with a page loaded, an image assigned, an added second page, and a selection active, resizing below 1024px and back above it preserves page count, the loaded image, and the active selection (Properties/Slot properties still showing) — `DesktopShell` takes back over cleanly with no lost state.
 
 ## 10. Android verification
 

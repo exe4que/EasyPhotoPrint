@@ -6,13 +6,13 @@
 
 ## 2. Breakpoint detection
 
-- [ ] 2.1 Add `src/hooks/useIsMobileViewport.ts`: a hook wrapping `window.matchMedia('(max-width: 1023.98px)')` with a `change` listener, returning a boolean, updating reactively on resize (no full remount of `App.tsx`).
-- [ ] 2.2 Unit test it if the store/hook test setup can drive `matchMedia` (mock `window.matchMedia`, dispatch a synthetic `change` event, assert the returned value flips) — otherwise document why it's covered by manual verification instead (a `matchMedia`-driven hook may not be meaningfully unit-testable without a real layout engine).
+- [x] 2.1 Add `src/hooks/useIsMobileViewport.ts`: a hook wrapping `window.matchMedia('(max-width: 1023.98px)')` with a `change` listener, returning a boolean, updating reactively on resize (no full remount of `App.tsx`).
+- [x] 2.2 Confirmed this project's Vitest setup runs in the default `node` test environment (no `jsdom`, no `window`/`matchMedia` — checked directly: `typeof window === 'undefined'` in a throwaway test). Unit testing a `window.matchMedia`-driven hook would need a `jsdom` environment this project doesn't have and hasn't needed for anything else (consistent with `pointer-based-gestures`' own "no component-test framework" precedent) — adding one is out of scope for this change. Covered by manual verification instead (sections 9/10).
 
 ## 3. Extract `DesktopShell`
 
-- [ ] 3.1 Create `src/components/shell/DesktopShell.tsx`. Move the desktop JSX (the `<main>...</main>` block, including the sticky header with `MenuBar`/title/`UnitToggle`/Preview button and the three-column grid) out of `App.tsx` verbatim. Accept the four dialog-trigger props (`onRequestNew`, `onRequestOpen`, `onSaveTemplate`, `onSaveTemplateAs`) instead of reading local `App.tsx` state directly; read everything else (`unitSystem`, `layoutMode`, `viewMode`/`setViewMode`, `saveProject`, `undo`/`redo`, `templateLibrary`, `imagePool`, page state, `isSimpleModeAvailable`) directly via `useEPPStore`/the existing hooks, the same way `PageStage` and the panels already do.
-- [ ] 3.2 Update `App.tsx` to render `<DesktopShell ...4 props... />` in place of the extracted JSX. Verify (typecheck + a manual desktop run) that rendering is pixel-identical to before the extraction — this task should produce zero visible change.
+- [x] 3.1 Create `src/components/shell/DesktopShell.tsx`. Move the desktop JSX (the `<main>...</main>` block, including the sticky header with `MenuBar`/title/`UnitToggle`/Preview button and the three-column grid) out of `App.tsx` verbatim. Accept the four dialog-trigger props (`onRequestNew`, `onRequestOpen`, `onSaveTemplate`, `onSaveTemplateAs`) plus a fifth `templateLibrary` prop (lifted from `App.tsx` rather than called independently here — `useTemplateLibrary` is local `useState`, not global store state, so a second independent instance would drift out of sync with the one `SaveTemplateDialog` reloads after a save) instead of reading local `App.tsx` state directly; read everything else (`unitSystem`, `layoutMode`, `viewMode`/`setViewMode`, `saveProject`, `undo`/`redo`, `imagePool`, page state, `isSimpleModeAvailable`) directly via `useEPPStore`/the existing hooks, the same way `PageStage` and the panels already do.
+- [x] 3.2 Update `App.tsx` to render `<DesktopShell ...5 props... />` in place of the extracted JSX. Verified via Playwright/xvfb (screenshot + programmatic checks for File/Edit menu, Document/Page setup/Image library/Slot properties panels, and a File→New→Cancel functional smoke test) that rendering is pixel-identical to before the extraction — zero visible change.
 
 ## 4. `MobileShell` scaffold: compact header and canvas-first layout
 
@@ -37,7 +37,7 @@
 
 ## 8. Wire `App.tsx`
 
-- [ ] 8.1 `App.tsx` calls `useIsMobileViewport()` and renders `viewMode === 'preview' ? <PreviewScreen /> : isMobileViewport ? <MobileShell ...4 props... /> : <DesktopShell ...same 4 props... />`, followed by the unchanged `SaveTemplateDialog`/`ConfirmDialog` block.
+- [ ] 8.1 `App.tsx` calls `useIsMobileViewport()` and renders `viewMode === 'preview' ? <PreviewScreen /> : isMobileViewport ? <MobileShell ...5 props... /> : <DesktopShell ...same 5 props... />`, followed by the unchanged `SaveTemplateDialog`/`ConfirmDialog` block.
 - [ ] 8.2 Run the full test suite and typecheck.
 
 ## 9. Desktop verification (primary path — resize the Electron window)

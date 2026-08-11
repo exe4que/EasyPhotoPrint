@@ -1,5 +1,5 @@
 import { isSimpleModeCompatible } from '@epp/layout-engine';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { PageStage } from './components/canvas/PageStage.js';
 import { ImageLibraryPanel } from './components/panels/ImageLibraryPanel.js';
@@ -8,18 +8,19 @@ import { PageSetupPanel } from './components/panels/PageSetupPanel.js';
 import { PropertiesPanel } from './components/panels/PropertiesPanel.js';
 import { PreviewScreen } from './components/preview/PreviewScreen.js';
 import { UnitToggle } from './components/settings/UnitToggle.js';
-import { SaveTemplateDialog } from './components/templates/SaveTemplateDialog.js';
+import { SaveTemplateDialog, type SaveTemplateDialogHandle } from './components/templates/SaveTemplateDialog.js';
 import { TemplateGallery } from './components/templates/TemplateGallery.js';
 import { CollapsiblePanel } from './components/ui/CollapsiblePanel.js';
 import { ConfirmDialog } from './components/ui/ConfirmDialog.js';
+import { MenuBar } from './components/ui/MenuBar.js';
 import { useLayoutResolution } from './hooks/useLayoutResolution.js';
 import { useTemplateLibrary } from './hooks/useTemplateLibrary.js';
 import { useUndoRedo } from './hooks/useUndoRedo.js';
-import { getEppApi } from './lib/platform/contract.js';
 import { formatLength } from './lib/units.js';
 import { useEPPStore } from './store/index.js';
 
 export function App() {
+  const saveTemplateDialogRef = useRef<SaveTemplateDialogHandle>(null);
   const [isNewProjectConfirmOpen, setIsNewProjectConfirmOpen] = useState(false);
   const [isOpenProjectConfirmOpen, setIsOpenProjectConfirmOpen] = useState(false);
   const [isMissingImagesDialogOpen, setIsMissingImagesDialogOpen] = useState(false);
@@ -50,61 +51,72 @@ export function App() {
   }, [hydrateSettings]);
 
   useEffect(() => {
-    return getEppApi().menu.onNewProject(() => {
-      setIsNewProjectConfirmOpen(true);
-    });
-  }, []);
-
-  useEffect(() => {
-    return getEppApi().menu.onOpenProject(() => {
-      setIsOpenProjectConfirmOpen(true);
-    });
-  }, []);
-
-  useEffect(() => {
-    return getEppApi().menu.onSaveProject(() => {
-      void saveProject(false);
-    });
-  }, [saveProject]);
-
-  useEffect(() => {
-    return getEppApi().menu.onSaveProjectAs(() => {
-      void saveProject(true);
-    });
-  }, [saveProject]);
-
-  useEffect(() => {
-    return getEppApi().menu.onUndo(undo);
-  }, [undo]);
-
-  useEffect(() => {
-    return getEppApi().menu.onRedo(redo);
-  }, [redo]);
-
-  useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') {
+      if (event.key === 'Escape') {
+        // A ConfirmDialog has its own Escape listener (dismiss the dialog) that fires
+        // independently of this one -- without this guard, Escape while a dialog is open in
+        // preview would both close the dialog and exit preview in the same keystroke, when the
+        // user only meant to dismiss the modal on top.
+        if (isNewProjectConfirmOpen || isOpenProjectConfirmOpen || isMissingImagesDialogOpen) {
+          return;
+        }
+        if (viewMode === 'preview') {
+          setViewMode('editor');
+          return;
+        }
+        clearSelection();
         return;
       }
-      // A ConfirmDialog has its own Escape listener (dismiss the dialog) that fires independently
-      // of this one -- without this guard, Escape while a dialog is open in preview would both
-      // close the dialog and exit preview in the same keystroke, when the user only meant to
-      // dismiss the modal on top.
-      if (isNewProjectConfirmOpen || isOpenProjectConfirmOpen || isMissingImagesDialogOpen) {
+
+      // Desktop keyboard shortcuts for the same eight actions the toolbar exposes -- there is no
+      // native application menu to bind accelerators to anymore (see design.md, Decision 8's
+      // follow-up), so this replicates CmdOrCtrl+N/O/S/Shift+S/Z/Shift+Z directly in shared code.
+      const modifier = event.metaKey || event.ctrlKey;
+      if (!modifier) {
         return;
       }
-      if (viewMode === 'preview') {
-        setViewMode('editor');
-        return;
+
+      switch (event.key.toLowerCase()) {
+        case 'n':
+          event.preventDefault();
+          setIsNewProjectConfirmOpen(true);
+          break;
+        case 'o':
+          event.preventDefault();
+          setIsOpenProjectConfirmOpen(true);
+          break;
+        case 's':
+          event.preventDefault();
+          void saveProject(event.shiftKey);
+          break;
+        case 'z':
+          event.preventDefault();
+          if (event.shiftKey) {
+            redo();
+          } else {
+            undo();
+          }
+          break;
+        default:
+          break;
       }
-      clearSelection();
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [clearSelection, viewMode, setViewMode, isNewProjectConfirmOpen, isOpenProjectConfirmOpen, isMissingImagesDialogOpen]);
+  }, [
+    clearSelection,
+    viewMode,
+    setViewMode,
+    isNewProjectConfirmOpen,
+    isOpenProjectConfirmOpen,
+    isMissingImagesDialogOpen,
+    saveProject,
+    undo,
+    redo,
+  ]);
 
   return (
     <>
@@ -113,6 +125,36 @@ export function App() {
       ) : (
         <main className="flex h-screen flex-col overflow-hidden bg-slate-950 text-slate-100">
           <div className="sticky top-0 z-30 flex-none border-b border-slate-800 bg-slate-900/80 backdrop-blur">
+            {/* Shared File/Edit menu bar -- the same component on every host, and the only way to
+             * reach these eight actions now that there's no native application menu on any host
+             * (see design.md, Decision 8/9). Styled to mimic a native floating menu (a label that
+             * reveals a dropdown) instead of a row of always-visible buttons, to keep this from
+             * reading as visual noise. */}
+            <div className="mx-auto flex max-w-[1800px] items-center px-6 pt-2">
+              <MenuBar
+                menus={[
+                  {
+                    label: 'File',
+                    items: [
+                      { label: 'New', onClick: () => setIsNewProjectConfirmOpen(true) },
+                      { label: 'Open', onClick: () => setIsOpenProjectConfirmOpen(true) },
+                      { label: 'Save', onClick: () => void saveProject(false) },
+                      { label: 'Save As', onClick: () => void saveProject(true) },
+                    ],
+                  },
+                  {
+                    label: 'Edit',
+                    items: [
+                      { label: 'Undo', onClick: undo },
+                      { label: 'Redo', onClick: redo },
+                      { label: 'Save Template', onClick: () => saveTemplateDialogRef.current?.openSave() },
+                      { label: 'Save Template As', onClick: () => saveTemplateDialogRef.current?.openSaveAs() },
+                    ],
+                  },
+                ]}
+              />
+            </div>
+
             <div className="mx-auto flex max-w-[1800px] items-center justify-between gap-4 px-6 py-4">
               <div>
                 <h1 className="text-lg font-semibold text-white">Easy Photo Print</h1>
@@ -220,7 +262,7 @@ export function App() {
         </main>
       )}
 
-      <SaveTemplateDialog templates={templateLibrary.templates} onSaved={templateLibrary.reload} />
+      <SaveTemplateDialog ref={saveTemplateDialogRef} templates={templateLibrary.templates} onSaved={templateLibrary.reload} />
 
       <ConfirmDialog
         open={isNewProjectConfirmOpen}

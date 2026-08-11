@@ -11,11 +11,13 @@
     "dev": "electron-vite dev",
     "build": "npm run build --workspace @epp/layout-engine && npm run build --workspace @epp/migrations",
     "build:desktop": "electron-vite build",
+    "build:android": "vite build --config vite.mobile.config.ts && cap sync android",
     "preview": "electron-vite preview",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.web.json && tsc --noEmit -p packages/layout-engine/tsconfig.json && tsc --noEmit -p packages/migrations/tsconfig.json"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.0",
     "@types/node": "^24.3.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
@@ -30,6 +32,9 @@
     "vitest": "^3.2.7"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.0",
+    "@capacitor/core": "^8.5.0",
+    "@capacitor/preferences": "^8.0.1",
     "fflate": "^0.8.3",
     "pdf-lib": "^1.17.1",
     "react": "^18.3.1",

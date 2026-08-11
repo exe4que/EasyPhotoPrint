@@ -1,77 +1,17 @@
-import { BrowserWindow, Menu, type MenuItemConstructorOptions } from 'electron';
+import { Menu } from 'electron';
 
-const NEW_PROJECT_CHANNEL = 'menu:new-project';
-const OPEN_PROJECT_CHANNEL = 'menu:open-project';
-const SAVE_PROJECT_CHANNEL = 'menu:save-project';
-const SAVE_PROJECT_AS_CHANNEL = 'menu:save-project-as';
-const UNDO_CHANNEL = 'menu:undo';
-const REDO_CHANNEL = 'menu:redo';
-const SAVE_TEMPLATE_CHANNEL = 'menu:save-template';
-const SAVE_TEMPLATE_AS_CHANNEL = 'menu:save-template-as';
-
-function sendToFocusedWindow(channel: string): void {
-  BrowserWindow.getFocusedWindow()?.webContents.send(channel);
-}
-
+/** The app has no custom application menu -- New/Open/Save/Save As/Undo/Redo/Save Template/Save
+ * Template As all live in the shared in-app toolbar (`App.tsx`), the same component used on
+ * every host, so there is nothing left for a native File/Edit menu to do. On macOS, the OS-level
+ * `appMenu` role (About/Hide/Quit, etc.) is kept -- that's platform convention independent of
+ * this app's own actions, not something the toolbar replaces. Elsewhere, no menu bar at all. */
 export function buildApplicationMenu(): void {
   const isMac = process.platform === 'darwin';
 
-  const template: MenuItemConstructorOptions[] = [
-    ...(isMac ? [{ role: 'appMenu' } as const] : []),
-    {
-      label: 'File',
-      submenu: [
-        {
-          label: 'New',
-          accelerator: 'CmdOrCtrl+N',
-          click: () => sendToFocusedWindow(NEW_PROJECT_CHANNEL),
-        },
-        {
-          label: 'Open...',
-          accelerator: 'CmdOrCtrl+O',
-          click: () => sendToFocusedWindow(OPEN_PROJECT_CHANNEL),
-        },
-        { type: 'separator' },
-        {
-          label: 'Save',
-          accelerator: 'CmdOrCtrl+S',
-          click: () => sendToFocusedWindow(SAVE_PROJECT_CHANNEL),
-        },
-        {
-          label: 'Save As...',
-          accelerator: 'CmdOrCtrl+Shift+S',
-          click: () => sendToFocusedWindow(SAVE_PROJECT_AS_CHANNEL),
-        },
-        { type: 'separator' },
-        isMac ? { role: 'close' } : { role: 'quit' },
-      ],
-    },
-    {
-      label: 'Edit',
-      submenu: [
-        {
-          label: 'Undo',
-          accelerator: 'CmdOrCtrl+Z',
-          click: () => sendToFocusedWindow(UNDO_CHANNEL),
-        },
-        {
-          label: 'Redo',
-          accelerator: 'CmdOrCtrl+Shift+Z',
-          click: () => sendToFocusedWindow(REDO_CHANNEL),
-        },
-        { type: 'separator' },
-        {
-          label: 'Save Template',
-          click: () => sendToFocusedWindow(SAVE_TEMPLATE_CHANNEL),
-        },
-        {
-          label: 'Save Template As...',
-          click: () => sendToFocusedWindow(SAVE_TEMPLATE_AS_CHANNEL),
-        },
-      ],
-    },
-    { role: 'help' },
-  ];
+  if (!isMac) {
+    Menu.setApplicationMenu(null);
+    return;
+  }
 
-  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+  Menu.setApplicationMenu(Menu.buildFromTemplate([{ role: 'appMenu' }]));
 }

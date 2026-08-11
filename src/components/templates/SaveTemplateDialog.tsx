@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { forwardRef, useImperativeHandle, useState } from 'react';
 
 import type { EPPTemplate } from '@epp/layout-engine';
 
@@ -8,13 +8,17 @@ import { ConfirmDialog } from '../ui/ConfirmDialog.js';
 
 type ConfirmMode = 'save' | 'saveAs' | null;
 
-export function SaveTemplateDialog({
-  templates,
-  onSaved,
-}: {
-  templates: EPPTemplate[];
-  onSaved: () => Promise<void> | void;
-}) {
+/** Imperative handle so the shared toolbar button (rendered in `App.tsx`) can trigger the
+ * save/save-as flow without duplicating the `linkedTemplate`/overwrite-vs-prompt logic here. */
+export interface SaveTemplateDialogHandle {
+  openSave: () => void;
+  openSaveAs: () => void;
+}
+
+export const SaveTemplateDialog = forwardRef<
+  SaveTemplateDialogHandle,
+  { templates: EPPTemplate[]; onSaved: () => Promise<void> | void }
+>(function SaveTemplateDialog({ templates, onSaved }, ref) {
   const [confirmMode, setConfirmMode] = useState<ConfirmMode>(null);
   const [saveAsName, setSaveAsName] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -36,22 +40,18 @@ export function SaveTemplateDialog({
     setConfirmMode('saveAs');
   };
 
-  useEffect(() => {
-    return getEppApi().menu.onSaveTemplateAs(openSaveAs);
-  }, []);
+  const triggerSave = () => {
+    // No linked template to overwrite -- the same fallback the old panel's UI achieved by
+    // simply not showing a "Save" button when there was nothing to overwrite.
+    if (!linkedTemplate) {
+      openSaveAs();
+      return;
+    }
+    setErrorMessage(null);
+    setConfirmMode('save');
+  };
 
-  useEffect(() => {
-    return getEppApi().menu.onSaveTemplate(() => {
-      // No linked template to overwrite -- the same fallback the old panel's UI achieved by
-      // simply not showing a "Save" button when there was nothing to overwrite.
-      if (!linkedTemplate) {
-        openSaveAs();
-        return;
-      }
-      setErrorMessage(null);
-      setConfirmMode('save');
-    });
-  }, [linkedTemplate]);
+  useImperativeHandle(ref, () => ({ openSave: triggerSave, openSaveAs }));
 
   const closeConfirm = () => {
     if (isSaving) {
@@ -152,4 +152,4 @@ export function SaveTemplateDialog({
       </ConfirmDialog>
     </>
   );
-}
+});

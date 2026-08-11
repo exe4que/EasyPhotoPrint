@@ -3,14 +3,6 @@ import { contextBridge, ipcRenderer } from 'electron';
 import type { EPPProject, EPPTemplate, ImageAsset } from '@epp/layout-engine';
 import type { AppSettings } from '../main/ipc/settings.handlers.js';
 
-function onMenuEvent(channel: string, callback: () => void) {
-  const listener = () => callback();
-  ipcRenderer.on(channel, listener);
-  return () => {
-    ipcRenderer.removeListener(channel, listener);
-  };
-}
-
 const eppAPI = {
   dialog: {
     openImages: () => ipcRenderer.invoke('dialog:open-images') as Promise<ImageAsset[]>,
@@ -25,16 +17,6 @@ const eppAPI = {
   images: {
     decodeAtSize: (filePath: string, minWidthPx: number, minHeightPx: number) =>
       ipcRenderer.invoke('images:decode-at-size', filePath, minWidthPx, minHeightPx) as Promise<string>,
-  },
-  menu: {
-    onNewProject: (callback: () => void) => onMenuEvent('menu:new-project', callback),
-    onOpenProject: (callback: () => void) => onMenuEvent('menu:open-project', callback),
-    onSaveProject: (callback: () => void) => onMenuEvent('menu:save-project', callback),
-    onSaveProjectAs: (callback: () => void) => onMenuEvent('menu:save-project-as', callback),
-    onUndo: (callback: () => void) => onMenuEvent('menu:undo', callback),
-    onRedo: (callback: () => void) => onMenuEvent('menu:redo', callback),
-    onSaveTemplate: (callback: () => void) => onMenuEvent('menu:save-template', callback),
-    onSaveTemplateAs: (callback: () => void) => onMenuEvent('menu:save-template-as', callback),
   },
   pdf: {
     export: (project: EPPProject) => ipcRenderer.invoke('pdf:export', project) as Promise<string | null>,

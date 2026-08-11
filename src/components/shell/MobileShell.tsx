@@ -38,42 +38,34 @@ export function MobileShell({ onRequestNew, onRequestOpen, onSaveTemplate, onSav
   const { undo, redo } = useUndoRedo();
   const [openTab, setOpenTab] = useState<MobileTabId | null>(null);
 
-  // `ui.selection` can't be trusted as a plain open/closed signal: in Simple mode, `clearSelection`
-  // falls back to selecting the page's root node instead of nulling it (desktop's always-visible
-  // Properties sidebar needs something to show -- see `computeDefaultSelection` in uiSlice.ts), so
-  // the store's selection never actually becomes null once anything's been selected. Tracking which
-  // exact selection was last dismissed here (rather than changing the shared store) keeps desktop's
-  // behavior untouched: the sheet closes on a user dismissal and reopens only when the selection
-  // becomes something new, matching the mobile-shell capability's requirement without relying on a
-  // signal the store doesn't reliably provide.
   const selectionKey = selection ? `${selection.kind}:${selection.id}` : null;
-  const [dismissedSelectionKey, setDismissedSelectionKey] = useState<string | null>(null);
 
-  // Switching pages (including Add Page) re-runs the same Simple-mode default-selection fallback,
-  // auto-selecting the newly active page's root -- confirmed this pops Properties open on every
-  // page switch, including a brand new session's very first "Add Page" tap, since it's a genuinely
-  // new selectionKey. That's navigation, not a deliberate selection, so it shouldn't surface a sheet;
-  // detecting the activePageId change during render (not an effect) and dismissing it immediately
-  // avoids a visible open-then-close flash. An explicit tap on a slot afterward still opens normally.
+  // Switching pages (including Add Page) auto-selects the newly active page's root in Simple mode
+  // -- a separate mechanism from `clearSelection` (see `computeActivePageUi` in uiSlice.ts) that's
+  // navigation, not a deliberate selection, so it shouldn't surface a sheet. Detecting the
+  // `activePageId` change during render (not an effect) and suppressing that one accompanying
+  // selectionKey immediately avoids a visible open-then-close flash. The suppression itself resets
+  // the moment the selection is genuinely cleared (a real deselect happened, however it happened),
+  // so a later explicit tap on that same slot -- even the one just suppressed -- opens normally:
+  // without this reset, re-selecting the exact page whose auto-selection was suppressed would stay
+  // suppressed forever, since nothing else would ever change the key back.
   const [lastSeenActivePageId, setLastSeenActivePageId] = useState(activePageId);
+  const [suppressedPageSwitchKey, setSuppressedPageSwitchKey] = useState<string | null>(null);
   if (activePageId !== lastSeenActivePageId) {
     setLastSeenActivePageId(activePageId);
-    setDismissedSelectionKey(selectionKey);
+    setSuppressedPageSwitchKey(selectionKey);
+  } else if (selectionKey === null && suppressedPageSwitchKey !== null) {
+    setSuppressedPageSwitchKey(null);
   }
 
-  const isPropertiesOpen = selectionKey !== null && selectionKey !== dismissedSelectionKey;
-
-  const dismissProperties = () => {
-    setDismissedSelectionKey(selectionKey);
-    clearSelection();
-  };
+  const isPropertiesOpen = selectionKey !== null && selectionKey !== suppressedPageSwitchKey;
 
   // A selection takes over the sheet slot from whichever tab was open, rather than stacking on top
   // of it -- tapping a tab bar destination while Properties is showing dismisses the selection and
   // opens that tab directly (not a toggle-close, since the tab wasn't the visible sheet).
   const handleSelectTab = (tab: MobileTabId) => {
     if (isPropertiesOpen) {
-      dismissProperties();
+      clearSelection();
       setOpenTab(tab);
       return;
     }
@@ -152,7 +144,7 @@ export function MobileShell({ onRequestNew, onRequestOpen, onSaveTemplate, onSav
         />
       </BottomSheet>
 
-      <BottomSheet open={isPropertiesOpen} title="Properties" onClose={dismissProperties}>
+      <BottomSheet open={isPropertiesOpen} title="Properties" onClose={clearSelection}>
         <PropertiesPanel bare />
       </BottomSheet>
     </main>

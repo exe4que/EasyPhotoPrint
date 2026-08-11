@@ -37,9 +37,11 @@ interface UiSliceDependencies {
 }
 
 /**
- * In Simple mode there is no LayoutTree to reselect the root from, so an empty selection
- * would leave the root's Container/Slot properties permanently unreachable (§2.3). Deselect
- * actions fall back to the active page's root instead of an empty selection.
+ * Entering Simple mode, or navigating to a page that's already in Simple mode, defaults the
+ * selection to that page's root -- there's no LayoutTree to reselect it from by hand the way
+ * Nested mode has, and this is also what puts the canvas's own selection ring on the root
+ * immediately instead of requiring a click first. `clearSelection` itself no longer uses this:
+ * see its own comment.
  */
 function computeDefaultSelection(layoutMode: UiState['layoutMode'], page: EPPProjectPage | undefined): Selection {
   return layoutMode === 'simple' && page ? { kind: 'node', id: page.rootNode.id } : null;
@@ -103,11 +105,16 @@ export function createUiSlice(
       }));
     },
     clearSelection: () => {
-      const state = get();
-      const activePage = state.document.pages.find((page) => page.id === state.ui.activePageId);
-      set((current) => ({
-        ui: { ...current.ui, selection: computeDefaultSelection(current.ui.layoutMode, activePage) },
-      }));
+      // Always nulls, in both modes -- previously fell back to the active page's root in Simple
+      // mode (matching computeDefaultSelection, above), which meant a deselect action on a page
+      // whose only slot is its own root produced the exact same non-null value that a fresh
+      // explicit selection would, making the two indistinguishable to anything reacting to
+      // `ui.selection` (e.g. a mobile bottom sheet driven by "selection went from null to
+      // something" -- see the mobile-shell capability). `PropertiesPanel` already has its own
+      // `selectedNode ?? activePage.rootNode` fallback for a null selection, so desktop's
+      // sidebar content is unaffected; only the canvas's selection ring on the root no longer
+      // persists through an explicit deselect click in Simple mode.
+      set((current) => ({ ui: { ...current.ui, selection: null } }));
     },
   };
 }

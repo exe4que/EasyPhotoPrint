@@ -37,8 +37,8 @@
 
 ## 8. Wire `App.tsx`
 
-- [ ] 8.1 `App.tsx` calls `useIsMobileViewport()` and renders `viewMode === 'preview' ? <PreviewScreen /> : isMobileViewport ? <MobileShell ...5 props... /> : <DesktopShell ...same 5 props... />`, followed by the unchanged `SaveTemplateDialog`/`ConfirmDialog` block.
-- [ ] 8.2 Run the full test suite and typecheck.
+- [x] 8.1 `App.tsx` calls `useIsMobileViewport()` and renders `viewMode === 'preview' ? <PreviewScreen /> : isMobileViewport ? <MobileShell ...5 props... /> : <DesktopShell ...same 5 props... />`, followed by the unchanged `SaveTemplateDialog`/`ConfirmDialog` block. Wired ahead of schedule in task group 4 (see 4.1's note) so groups 4-7 could be built and verified incrementally by resizing the real window; confirmed still accurate now that all of groups 4-7 are in place.
+- [x] 8.2 Full test suite (189/189) and typecheck both clean.
 
 ## 9. Desktop verification (primary path — resize the Electron window)
 

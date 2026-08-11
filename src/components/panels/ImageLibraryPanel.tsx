@@ -2,6 +2,7 @@ import type { ImageAsset } from '@epp/layout-engine';
 import { useMemo, useState } from 'react';
 
 import { useDragAndDrop } from '../../hooks/useDragAndDrop.js';
+import type { LibraryImageDragGesture } from '../../hooks/useLibraryImageDragGesture.js';
 import { useEPPStore } from '../../store/index.js';
 import { CollapsiblePanel } from '../ui/CollapsiblePanel.js';
 
@@ -20,6 +21,7 @@ function ImageCard({
   onSelect,
   onRelink,
   dragProps,
+  dragGesture,
 }: {
   asset: ImageAsset;
   isSelected: boolean;
@@ -27,6 +29,9 @@ function ImageCard({
   onSelect: () => void;
   onRelink: () => void;
   dragProps: ReturnType<ReturnType<typeof useDragAndDrop>['createImageDragProps']>;
+  /** Mobile-shell-only pointer drag gesture (see `useLibraryImageDragGesture`). Absent on desktop,
+   * where the existing HTML5 `dragProps` above is the only drag mechanism. */
+  dragGesture?: LibraryImageDragGesture;
 }) {
   return (
     <div
@@ -44,10 +49,26 @@ function ImageCard({
           ? 'border-cyan-500 ring-2 ring-cyan-500/30'
           : 'border-slate-800 hover:border-slate-600'
       }`}
-      {...dragProps}
+      // pan-x (not none, not the default auto): lets the panel's own native horizontal scroll keep
+      // working, but keeps the browser from ever claiming a vertical swipe as a native pan/scroll
+      // gesture -- without that, the browser cancels the whole pointer sequence (no more events
+      // reach any listener, window-level or not) the moment it decides a vertical touch might be a
+      // scroll attempt, even one that immediately has nowhere to go, well before our own
+      // isInsidePanel check ever gets a chance to see the pointer leave the panel.
+      style={dragGesture ? { touchAction: 'pan-x' } : undefined}
+      {...(dragGesture ? dragGesture.createCardDragProps(asset.id) : dragProps)}
     >
       <div className="aspect-square bg-slate-950">
-        <img src={asset.thumbnailDataUrl} alt={asset.fileName} className="h-full w-full object-contain" />
+        {/* draggable=false overrides the browser's default-draggable <img> behavior, which would
+         * otherwise start a native image drag on the very first pointermove and swallow the rest
+         * of the gesture -- desktop's own HTML5 drag is unaffected since it's driven by this
+         * card's outer div (dragProps above), not this element. */}
+        <img
+          src={asset.thumbnailDataUrl}
+          alt={asset.fileName}
+          draggable={false}
+          className="h-full w-full object-contain"
+        />
       </div>
 
       <div className="space-y-1 bg-slate-900/90 p-2">
@@ -88,7 +109,14 @@ function ImageCard({
   );
 }
 
-export function ImageLibraryPanel({ bare = false }: { bare?: boolean }) {
+export function ImageLibraryPanel({
+  bare = false,
+  dragGesture,
+}: {
+  bare?: boolean;
+  /** Passed by `MobileShell` only -- see `ImageCard`'s own `dragGesture` prop. */
+  dragGesture?: LibraryImageDragGesture;
+}) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const imagePool = useEPPStore((state) => state.imagePool);
   const activePageId = useEPPStore((state) => state.ui.activePageId);
@@ -150,6 +178,7 @@ export function ImageLibraryPanel({ bare = false }: { bare?: boolean }) {
                 isSelected={isSelected}
                 assignmentsOnPage={assignmentCounts.get(asset.id) ?? 0}
                 dragProps={createImageDragProps(asset.id)}
+                dragGesture={dragGesture}
                 onSelect={() => setSelection(isSelected ? null : { kind: 'image', id: asset.id })}
                 onRelink={() => void relinkImage(asset.id)}
               />

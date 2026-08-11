@@ -313,6 +313,7 @@ export function PageStage() {
                 key={id}
                 role="button"
                 tabIndex={0}
+                data-drop-target={`slot:${id}`}
                 className={`group absolute overflow-hidden border text-left transition ${
                   selectedSlotId === id
                     ? 'border-cyan-500 ring-2 ring-cyan-500/35'
@@ -330,15 +331,6 @@ export function PageStage() {
                   // resize gesture never also reassigns/selects the slot under the cursor.
                   if (suppressNextClickRef.current) {
                     suppressNextClickRef.current = false;
-                    return;
-                  }
-
-                  // Tap-to-assign: a selected library image is armed the same way a
-                  // library-source drag is, so activating a slot assigns it here instead of
-                  // the ordinary select/toggle behavior below.
-                  if (selection?.kind === 'image') {
-                    assignImageToSlot(page.id, id, selection.id, 'library');
-                    setSelection({ kind: 'node', id });
                     return;
                   }
 
@@ -506,6 +498,7 @@ export function PageStage() {
                 <div
                   key={`freeform-${id}`}
                   className="absolute"
+                  data-drop-target={`freeform:${id}`}
                   style={{
                     left: mmToPx(box.x, previewZoom),
                     top: mmToPx(box.y, previewZoom),
@@ -519,18 +512,6 @@ export function PageStage() {
                     // canvas out from under an element the user was just transforming.
                     if (suppressNextClickRef.current) {
                       suppressNextClickRef.current = false;
-                      return;
-                    }
-
-                    // Tap-to-assign: a selected library image is armed the same way a
-                    // library-source drag is, so activating the canvas places it (centered, per
-                    // addFreeformElement's own default when no position is given) instead of the
-                    // ordinary node-selection behavior below. Selecting the new element (not the
-                    // canvas) afterward is what makes the gesture single-shot -- it consumes the
-                    // armed image selection.
-                    if (selection?.kind === 'image') {
-                      const newElementNodeId = addFreeformElement(page.id, id, selection.id);
-                      setSelection({ kind: 'node', id: newElementNodeId });
                       return;
                     }
 

@@ -708,20 +708,23 @@ function findParentAndIndex(node: LayoutNode, targetId: string): { parent: Layou
   return null;
 }
 
-/** A snapshot of one imageSlot's image assignment, scaling rule, rotation, and padding -- the
- * exact set the `slot-clipboard` capability copies/pastes. Captured by value (not a node/id
- * reference) so it survives edits to, or deletion of, the slot it was copied from. */
+/** A snapshot of one imageSlot's image assignment, scaling rule, rotation, padding, and (when the
+ * scaling rule is `specificSize`) its specific-size dimensions -- the exact set the
+ * `slot-clipboard` capability copies/pastes. Captured by value (not a node/id reference) so it
+ * survives edits to, or deletion of, the slot it was copied from. */
 export interface CopiedSlotProperties {
   imageAssetId: string | null;
   scalingRule: ScalingRule;
   imageRotationDeg: ImageRotationDeg;
   paddingMm: Sides;
+  specificSizeMm: SpecificSizeMm | undefined;
 }
 
 export function captureSlotProperties(sourceNode: LayoutNode, imageAssetId: string | undefined): CopiedSlotProperties {
+  const scalingRule = sourceNode.imageSlotConfig?.scalingRule ?? 'fitInParent';
   return {
     imageAssetId: imageAssetId ?? null,
-    scalingRule: sourceNode.imageSlotConfig?.scalingRule ?? 'fitInParent',
+    scalingRule,
     imageRotationDeg: sourceNode.imageSlotConfig?.imageRotationDeg ?? 0,
     paddingMm: {
       top: sourceNode.paddingMm?.top ?? 0,
@@ -729,6 +732,7 @@ export function captureSlotProperties(sourceNode: LayoutNode, imageAssetId: stri
       bottom: sourceNode.paddingMm?.bottom ?? 0,
       left: sourceNode.paddingMm?.left ?? 0,
     },
+    specificSizeMm: scalingRule === 'specificSize' ? sourceNode.imageSlotConfig?.specificSizeMm : undefined,
   };
 }
 
@@ -747,6 +751,7 @@ function applySlotPropertiesToNode(node: LayoutNode, targetIds: Set<string>, pro
       ...nextNode.imageSlotConfig,
       scalingRule: properties.scalingRule,
       imageRotationDeg: properties.imageRotationDeg,
+      specificSizeMm: properties.specificSizeMm,
     },
   };
 }

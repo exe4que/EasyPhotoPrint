@@ -564,6 +564,36 @@ describe('captureSlotProperties', () => {
       paddingMm: { top: 1, right: 2, bottom: 3, left: 4 },
     });
   });
+
+  it('captures specificSizeMm when the scaling rule is specificSize', () => {
+    const node = {
+      ...createDefaultPage('page-1').rootNode,
+      imageSlotConfig: {
+        scalingRule: 'specificSize' as const,
+        imageRotationDeg: 0 as const,
+        specificSizeMm: { widthMm: 100, heightMm: 50, lockedAxis: 'width' as const },
+      },
+    };
+
+    expect(captureSlotProperties(node, 'image-a').specificSizeMm).toEqual({
+      widthMm: 100,
+      heightMm: 50,
+      lockedAxis: 'width',
+    });
+  });
+
+  it('omits specificSizeMm when the scaling rule is not specificSize, even if stale specificSizeMm data is present', () => {
+    const node = {
+      ...createDefaultPage('page-1').rootNode,
+      imageSlotConfig: {
+        scalingRule: 'stretch' as const,
+        imageRotationDeg: 0 as const,
+        specificSizeMm: { widthMm: 100, heightMm: 50, lockedAxis: 'width' as const },
+      },
+    };
+
+    expect(captureSlotProperties(node, 'image-a').specificSizeMm).toBeUndefined();
+  });
 });
 
 describe('applySlotProperties', () => {
@@ -572,6 +602,7 @@ describe('applySlotProperties', () => {
     scalingRule: 'stretch',
     imageRotationDeg: 180,
     paddingMm: { top: 9, right: 9, bottom: 9, left: 9 },
+    specificSizeMm: undefined,
   };
 
   it('overwrites every target imageSlot\'s image, scaling rule, rotation, and padding in one pass', () => {
@@ -607,6 +638,33 @@ describe('applySlotProperties', () => {
 
     expect(state.document.pages[0].rootNode).toBe(rootBefore);
   });
+
+  it('sets the target\'s specificSizeMm when the clipboard entry is specificSize-configured', () => {
+    const state = createTestStore();
+
+    state.applySlotProperties(
+      'page-1',
+      { ...properties, scalingRule: 'specificSize', specificSizeMm: { widthMm: 100, heightMm: 50, lockedAxis: 'width' } },
+      ['root-grid'],
+    );
+
+    expect(state.document.pages[0].rootNode.imageSlotConfig?.specificSizeMm).toEqual({
+      widthMm: 100,
+      heightMm: 50,
+      lockedAxis: 'width',
+    });
+  });
+
+  it('clears a stale specificSizeMm on the target when the clipboard entry is not specificSize', () => {
+    const state = createTestStore();
+    state.updateLayoutNode('page-1', 'root-grid', {
+      imageSlotConfig: { scalingRule: 'specificSize', specificSizeMm: { widthMm: 100, heightMm: 50, lockedAxis: 'width' } },
+    });
+
+    state.applySlotProperties('page-1', properties, ['root-grid']);
+
+    expect(state.document.pages[0].rootNode.imageSlotConfig?.specificSizeMm).toBeUndefined();
+  });
 });
 
 describe('copySlotPropertiesToSiblings', () => {
@@ -637,6 +695,21 @@ describe('copySlotPropertiesToSiblings', () => {
     state.copySlotPropertiesToSiblings('page-1', 'root-grid'); // root has no parent, so no siblings
 
     expect(state.document.pages[0].rootNode).toBe(rootBefore);
+  });
+
+  it('carries specificSizeMm to imageSlot siblings when the source is specificSize-configured', () => {
+    const state = createTestStore([createTestAsset('image-a', 100, 100)]);
+    state.retypeLayoutNode('page-1', 'root-grid', 'horizontal');
+    const [slot1, slot2] = state.document.pages[0].rootNode.children!.map((child) => child.id);
+    state.assignImageToSlot('page-1', slot1, 'image-a');
+    state.updateLayoutNode('page-1', slot1, {
+      imageSlotConfig: { scalingRule: 'specificSize', specificSizeMm: { widthMm: 40, heightMm: 20, lockedAxis: 'width' } },
+    });
+
+    state.copySlotPropertiesToSiblings('page-1', slot1);
+
+    const nextSlot2 = state.document.pages[0].rootNode.children!.find((child) => child.id === slot2);
+    expect(nextSlot2?.imageSlotConfig?.specificSizeMm).toEqual({ widthMm: 40, heightMm: 20, lockedAxis: 'width' });
   });
 });
 
@@ -670,5 +743,20 @@ describe('copySlotPropertiesToPage', () => {
     state.copySlotPropertiesToPage('page-1', 'root-grid');
 
     expect(state.document.pages[0].rootNode).toBe(rootBefore);
+  });
+
+  it('carries specificSizeMm to every imageSlot on the page when the source is specificSize-configured', () => {
+    const state = createTestStore([createTestAsset('image-a', 100, 100)]);
+    state.retypeLayoutNode('page-1', 'root-grid', 'horizontal');
+    const [slot1, slot2] = state.document.pages[0].rootNode.children!.map((child) => child.id);
+    state.assignImageToSlot('page-1', slot1, 'image-a');
+    state.updateLayoutNode('page-1', slot1, {
+      imageSlotConfig: { scalingRule: 'specificSize', specificSizeMm: { widthMm: 40, heightMm: 20, lockedAxis: 'width' } },
+    });
+
+    state.copySlotPropertiesToPage('page-1', slot1);
+
+    const nextSlot2 = state.document.pages[0].rootNode.children!.find((child) => child.id === slot2);
+    expect(nextSlot2?.imageSlotConfig?.specificSizeMm).toEqual({ widthMm: 40, heightMm: 20, lockedAxis: 'width' });
   });
 });

@@ -2,6 +2,10 @@ import { app, BrowserWindow } from 'electron';
 import { pathToFileURL } from 'node:url';
 
 const LOAD_TIMEOUT_MS = 15_000;
+/** How long to wait, after the app regains OS focus, for `webContents.print()`'s own callback to
+ * fire before treating focus-return itself as evidence the native dialog closed -- see
+ * `printPdfFile`'s doc comment. */
+const PRINT_DIALOG_FOCUS_GRACE_MS = 1_000;
 
 let printWindow: BrowserWindow | null = null;
 let shuttingDown = false;
@@ -70,14 +74,46 @@ export interface PrintPageSizeMicrons {
  * achieve this -- passing portrait dimensions plus `landscape: true` was measured to still produce a
  * portrait sheet; the already-oriented width/height is what actually decides the paper. `marginType:
  * 'none'` and `scaleFactor: 100` keep the composed PDF at 1:1 instead of being shrunk to fit a
- * margined content area. */
+ * margined content area.
+ *
+ * On Linux, `webContents.print()`'s completion callback is not reliably invoked when the native
+ * GTK/CUPS dialog is dismissed -- a platform limitation outside this app's control. Without a
+ * fallback, that leaves this promise (and the processing overlay covering it) hung forever. As a
+ * safety net, once the app regains OS focus after the dialog was opened, a short grace period gives
+ * the real callback a chance to still win; if it hasn't fired by then, focus-return itself is
+ * treated as an implicit cancellation (resolves without error, same as an explicit `'cancelled'`
+ * result) so the promise always settles. */
 export async function printPdfFile(pdfFilePath: string, pageSize: PrintPageSizeMicrons): Promise<void> {
   const window = getPrintWindow();
 
   await withTimeout(window.loadURL(pathToFileURL(pdfFilePath).toString()), LOAD_TIMEOUT_MS, 'Timed out preparing the document for printing.');
 
   await new Promise<void>((resolve, reject) => {
+    let settled = false;
+    let fallbackTimer: NodeJS.Timeout | null = null;
+
+    const onFocusRegained = () => {
+      if (settled || fallbackTimer) {
+        return;
+      }
+      fallbackTimer = setTimeout(() => {
+        settled = true;
+        app.removeListener('browser-window-focus', onFocusRegained);
+        resolve();
+      }, PRINT_DIALOG_FOCUS_GRACE_MS);
+    };
+    app.on('browser-window-focus', onFocusRegained);
+
     window.webContents.print({ pageSize, margins: { marginType: 'none' }, scaleFactor: 100 }, (success, failureReason) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      app.removeListener('browser-window-focus', onFocusRegained);
+      if (fallbackTimer) {
+        clearTimeout(fallbackTimer);
+      }
+
       if (!success && failureReason !== 'cancelled') {
         reject(new Error(`Printing failed: ${failureReason}`));
         return;

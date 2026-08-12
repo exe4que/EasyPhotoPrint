@@ -1,0 +1,50 @@
+## 1. Versioning
+
+- [x] 1.1 Add a `version` field to `package.json` (start at `0.1.0` or similar, matching current pre-release state).
+- [x] 1.2 Document the semver bump convention (default `patch`, explicit `minor`/`major` override) somewhere discoverable (e.g. a short note in the new skill's own doc, or `AGENTS.md` if it belongs there). (Documented in `.claude/commands/cut-release.md`'s "Versioning convention" section.)
+
+## 2. Desktop packaging (electron-builder)
+
+- [x] 2.1 Add `electron-builder` as a devDependency.
+- [x] 2.2 Add `electron-builder` configuration (e.g. `electron-builder.yml` or a `build` key in `package.json`) with Linux targets `AppImage`, `deb`, `pacman`, and Windows target `nsis`.
+- [x] 2.3 Add a `build:desktop:release` (or similar) npm script that runs `electron-vite build` followed by `electron-builder` for the configured targets.
+- [x] 2.4 Verify locally that the Linux targets build successfully and produce a version-labeled `AppImage`, `.deb`, and pacman package. (Confirmed working; electron-builder's `pacman` target actually emits `<name>-<version>.pacman`, an xz-compressed tar that *is* a valid pacman package despite the non-standard extension — the publish workflow must rename it to the `<name>-<version>-<pkgrel>-<arch>.pkg.tar.xz` convention before `repo-add` will recognize it. Captured as a concrete step in task 4.4.)
+- [x] 2.5 Verify locally (with `wine` installed) that the Windows `nsis` target cross-builds successfully from Linux and produces a version-labeled installer `.exe`. (Confirmed unsigned — electron-builder's "signing with signtool.exe" log line is its internal asar-integrity stamping step, not real Authenticode signing, since no certificate is configured.)
+
+## 3. Android release build
+
+- [x] 3.1 Add a release build type / signing config to `android/app/build.gradle` that produces a release-mode APK using a stable key (debug-equivalent is acceptable per `design.md`'s signing decision). (Release build type signs with `signingConfigs.debug`; `versionName`/`versionCode` are derived from `package.json`'s semver via a Groovy `JsonSlurper` read, with `versionCode = major*1_000_000 + minor*1_000 + patch`.)
+- [x] 3.2 Add a script or documented command (e.g. `npm run build:android:release`) that runs `vite build --config vite.mobile.config.ts && cap sync android && ./gradlew assembleRelease`.
+- [x] 3.3 Verify locally that two successive release builds produce APKs that install over each other via `adb install -r` without needing an uninstall first (confirms stable signing key). (Verified on `emulator-5554`: installed 0.1.0, then installed 0.1.1 as a genuine update — not a `-r` reinstall of the same version — with no signature-mismatch error.)
+- [x] 3.4 Verify the release APK's filename embeds the current semver version. (Added an `applicationVariants.all` output-rename hook; filename is now `easy-photo-print-<version>-release.apk`.)
+
+## 4. GitHub Actions release workflow
+
+- [x] 4.1 Add `.github/workflows/release-build.yml`, triggered only by `workflow_dispatch` with a `version` input, targeting the self-hosted runner (`runs-on: self-hosted`). (Also verifies the dispatched `version` input matches `package.json`'s version and fails fast if they diverge, since `package.json` is the source of truth.)
+- [x] 4.2 In the workflow, run the Linux packaging step (2.3), the Windows cross-build step (also 2.3, since electron-builder handles both from one invocation or two explicit target flags), and the Android release build step (3.2).
+- [x] 4.3 In the workflow, write build outputs into the versioned directory layout on the runner's local filesystem (`/srv/easyphotoprint/{linux,windows,android}/vX.Y.Z/...`, per `design.md`). Also mirrors each published `.pkg.tar.xz` into a flat `arch/x86_64/` directory, since pacman clients fetch packages by filename from the repo database's directory, not from the human-browsable versioned tree.
+- [x] 4.4 In the workflow, run `repo-add` against the Linux `.pkg.tar.xz` outputs to update the pacman repository database. **Discovered during implementation**: `repo-add` isn't in Ubuntu's default package set, but Ubuntu/Debian's `pacman-package-manager` apt package (universe repo, confirmed available on the home server) ships `repo-add`/`repo-remove` alongside real `pacman` — added as a required package to the runner toolchain in task 6.3/`design.md`, no source build needed.
+- [x] 4.5 In the workflow, generate/update a simple `index.html` per platform directory listing available downloads (for Windows/Android, which aren't served through pacman).
+
+## 5. Release skill
+
+- [x] 5.1 Add a new Claude Code skill (`.claude/commands/cut-release.md`, following the existing `deploy-to-phone.md` pattern) that: bumps the semver version in `package.json` (default `patch`, optional argument for `minor`/`major`), lands that bump on `main` via a `release/vX.Y.Z` branch + PR (mirroring the standing PR/merge authorization already established in `AGENTS.md` §3.1, rather than pushing to `main` directly), then runs `gh workflow run release-build.yml --ref main -f version=X.Y.Z`.
+- [x] 5.2 Have the skill report the triggered workflow run's URL (e.g. via `gh run list` / `gh run watch`) so progress/failure is visible without needing to poll manually.
+- [x] 5.3 Explicitly document in the skill file that this is never invoked automatically by `/opsx:archive` or any other OpenSpec command — it is a standalone, user-invoked action.
+
+## 6. Server-side one-time setup (interactive — run together with the user, not unattended)
+
+- [x] 6.1 Create `/srv/easyphotoprint/{linux,windows,android}` on `192.168.0.198` (requires `sudo`). (Also created `arch/x86_64/` — the flat pacman-repo directory, see task 4.3 — and `chown`ed the whole tree to the runner's user so the workflow can write without `sudo`.)
+- [x] 6.2 Register a self-hosted GitHub Actions runner against this repository and install it as a systemd service on the home server. (Registered as `home-server-runner` via `gh api ... registration-token` + `config.sh --unattended`, installed with `svc.sh install exe4que` — confirmed `active (running)` and connected to GitHub.)
+- [x] 6.3 Install the runner's toolchain: Node.js, Android SDK (with licenses accepted), `wine`, and `pacman-package-manager` (apt, universe repo — provides `repo-add`/`repo-remove`; confirmed available on this server during implementation, see task 4.4). (Also installed `openjdk-21-jdk-headless`, required by AGP 8.13 for Android builds — not called out explicitly in `design.md`'s migration plan, added here since it's a hard requirement discovered during setup. Upgraded system Node.js from an EOL 18.19.1 to current LTS 24.19.0 via NodeSource, since this runner needs to keep working long-term. `ANDROID_HOME`/`ANDROID_SDK_ROOT` set via the runner's `.env` file, since the systemd service doesn't source `.bashrc`.)
+- [ ] 6.4 After the runner's first Android build, back up its generated signing keystore to a location outside the runner's own disk, per the risk noted in `design.md`. (Deferred to right after task 7.1's first real end-to-end run, once the keystore actually exists on the runner.)
+- [x] 6.5 Stand up the static-file-serving container (autoindex on) bind-mounted to `/srv/easyphotoprint`, published on `192.168.0.198:8899`. (`nginx:alpine` with a minimal `autoindex on` server block; confirmed serving a directory listing at `http://192.168.0.198:8899/`.)
+- [x] 6.6 Add a `ufw` rule restricting port `8899` to `192.168.0.0/24`. **Changed from plan, confirmed with user**: `ufw` is inactive for the entire server (not just unconfigured for this port) — every other service on this box (Jellyfin, Radarr, Nextcloud, etc.) already relies solely on the router not port-forwarding those ports, not on host firewalling. Enabling `ufw` now would require writing allow-rules for every existing service to avoid breaking something live. User chose to leave `ufw` as-is for consistency with the existing security posture rather than take on that risk for this change; port 8899 has the same LAN-only guarantee (router-NAT-only) as everything else already running here.
+- [x] 6.7 On the user's Arch/CachyOS machine, add the `[easyphotoprint]` block to `/etc/pacman.conf` pointing at `http://192.168.0.198:8899/arch/$arch` with `SigLevel = Optional TrustAll`.
+
+## 7. End-to-end verification
+
+- [ ] 7.1 Run `/cut-release` (or equivalent) once end-to-end: confirm version bump lands on `main`, the workflow dispatches and completes on the self-hosted runner, and all three platforms' artifacts land in `/srv/easyphotoprint`.
+- [ ] 7.2 From the Arch/CachyOS machine, confirm `pacman -Sy easy-photo-print` (or the chosen package name) installs the app, and that cutting a second release makes `pacman -Syu` offer an upgrade.
+- [ ] 7.3 Confirm the Windows and Android directories are reachable and browsable at `http://192.168.0.198:8899/` from a LAN device, and unreachable from outside the LAN.
+- [ ] 7.4 Confirm archiving an unrelated OpenSpec change via `/opsx:archive` does **not** trigger a release build.

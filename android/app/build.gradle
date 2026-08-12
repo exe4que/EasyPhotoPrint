@@ -1,5 +1,13 @@
 apply plugin: 'com.android.application'
 
+import groovy.json.JsonSlurper
+
+def rootPackageJson = new JsonSlurper().parse(file('../../package.json'))
+def appVersionName = rootPackageJson.version
+def (verMajor, verMinor, verPatch) = appVersionName.tokenize('.').collect { it.toInteger() }
+// Derived from semver so it stays monotonically increasing as long as version bumps follow semver ordering.
+def appVersionCode = verMajor * 1_000_000 + verMinor * 1_000 + verPatch
+
 android {
     namespace = "com.easyphotoprint.app"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +15,8 @@ android {
         applicationId "com.easyphotoprint.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode appVersionCode
+        versionName appVersionName
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -18,8 +26,16 @@ android {
     }
     buildTypes {
         release {
+            // Signed with the debug key (auto-generated, stable per machine) rather than a dedicated
+            // release keystore -- see openspec/changes/release-build-distribution/design.md's signing decision.
+            signingConfig signingConfigs.debug
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+    applicationVariants.all { variant ->
+        variant.outputs.all { output ->
+            outputFileName = "easy-photo-print-${variant.versionName}-${variant.buildType.name}.apk"
         }
     }
 }

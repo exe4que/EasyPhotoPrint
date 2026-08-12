@@ -128,15 +128,20 @@ export function ImageLibraryPanel({
   );
   const openImagesFromDialog = useEPPStore((state) => state.openImagesFromDialog);
   const relinkImage = useEPPStore((state) => state.relinkImage);
+  const showProcessingOverlay = useEPPStore((state) => state.showProcessingOverlay);
+  const hideProcessingOverlay = useEPPStore((state) => state.hideProcessingOverlay);
   const { createImageDragProps } = useDragAndDrop();
   const assignmentCounts = useMemo(() => countAssignments(activePage.assignments), [activePage.assignments]);
 
   const handleOpenImages = async () => {
+    setErrorMessage(null);
+    showProcessingOverlay();
     try {
-      setErrorMessage(null);
       await openImagesFromDialog();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Could not load the selected images.');
+    } finally {
+      hideProcessingOverlay();
     }
   };
 

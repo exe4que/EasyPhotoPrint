@@ -1,5 +1,7 @@
 import { isSimpleModeCompatible, type EPPProjectPage } from '@epp/layout-engine';
 
+import type { CopiedSlotProperties } from './documentSlice.js';
+
 /** At most one thing selected app-wide: a layout node, or an Image Library asset -- never both. */
 export type Selection = { kind: 'node'; id: string } | { kind: 'image'; id: string } | null;
 
@@ -12,6 +14,10 @@ export interface UiState {
   /** See the `processing-overlay` capability: set while adding images to the library, exporting to
    * PDF, or printing, and read by the app-root-mounted `ProcessingOverlay` to block the whole app. */
   processingOverlay: { visible: boolean };
+  /** See the `slot-clipboard` capability: the last imageSlot properties copied via the Properties
+   * panel's "⋮" menu, or `null` if nothing has been copied this session. In-memory only -- not
+   * persisted with the project, and (being `ui` state) not tracked by undo/redo. */
+  slotClipboard: CopiedSlotProperties | null;
 }
 
 export interface UiSlice {
@@ -34,6 +40,7 @@ export function createInitialUiState(): UiState {
     layoutMode: 'simple',
     viewMode: 'editor',
     processingOverlay: { visible: false },
+    slotClipboard: null,
   };
 }
 

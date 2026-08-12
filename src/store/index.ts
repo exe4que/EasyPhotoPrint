@@ -4,7 +4,14 @@ import { temporal } from 'zundo';
 import type { EPPProject } from '@epp/layout-engine';
 
 import { getEppApi } from '../lib/platform/contract.js';
-import { createDefaultPage, createDocumentSlice, createInitialDocumentState, type DocumentSlice } from './documentSlice.js';
+import {
+  captureSlotProperties,
+  createDefaultPage,
+  createDocumentSlice,
+  createInitialDocumentState,
+  findNodeById,
+  type DocumentSlice,
+} from './documentSlice.js';
 import { createImagePoolSlice, type ImagePoolSlice } from './imagePoolSlice.js';
 import { createInitialProjectState, createProjectSlice, type ProjectSlice } from './projectSlice.js';
 import { createSettingsSlice, type SettingsSlice } from './settingsSlice.js';
@@ -57,6 +64,10 @@ export type EPPStore = DocumentSlice &
     addPage: () => void;
     /** Removes a page. No-op if it's the only remaining page. If it was the active page, activates the neighboring page that shifts into its former position (or the previous page, if it was last). */
     removePage: (pageId: string) => void;
+    /** Captures `nodeId`'s image assignment, scaling rule, rotation, and padding into `ui.slotClipboard`. UI-only write, so it never adds an undo/redo entry. No-op if the node isn't an imageSlot. */
+    copySlotProperties: (pageId: string, nodeId: string) => void;
+    /** Applies `ui.slotClipboard` to `nodeId`, overwriting its image assignment, scaling rule, rotation, and padding in one undo step. No-op if nothing has been copied yet. */
+    pasteSlotProperties: (pageId: string, nodeId: string) => void;
   };
 
 export const useEPPStore = create<EPPStore>()(
@@ -188,6 +199,24 @@ export const useEPPStore = create<EPPStore>()(
             document: { ...s.document, pages: remainingPages },
             ui: computeActivePageUi(s.ui, neighbor.id, neighbor),
           }));
+        },
+        copySlotProperties: (pageId, nodeId) => {
+          const state = get();
+          const page = state.document.pages.find((entry) => entry.id === pageId);
+          const slotNode = page ? findNodeById(page.rootNode, nodeId) : undefined;
+          if (!page || !slotNode || slotNode.type !== 'imageSlot') {
+            return;
+          }
+
+          set((s) => ({ ui: { ...s.ui, slotClipboard: captureSlotProperties(slotNode, page.assignments[nodeId]) } }));
+        },
+        pasteSlotProperties: (pageId, nodeId) => {
+          const state = get();
+          if (!state.ui.slotClipboard) {
+            return;
+          }
+
+          state.applySlotProperties(pageId, state.ui.slotClipboard, [nodeId]);
         },
       };
     },

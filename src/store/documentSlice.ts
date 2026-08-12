@@ -16,6 +16,7 @@ import {
   type ImageRotationDeg,
   type LayoutNode,
   type ProjectPageConfig,
+  type ScalingRule,
   type SheetSize,
   type Sides,
   type SpecificSizeMm,
@@ -312,7 +313,7 @@ function updateNodeById(node: LayoutNode, nodeId: string, patch: Partial<LayoutN
   };
 }
 
-function findNodeById(node: LayoutNode, nodeId: string): LayoutNode | undefined {
+export function findNodeById(node: LayoutNode, nodeId: string): LayoutNode | undefined {
   if (node.id === nodeId) {
     return node;
   }
@@ -707,6 +708,49 @@ function findParentAndIndex(node: LayoutNode, targetId: string): { parent: Layou
   return null;
 }
 
+/** A snapshot of one imageSlot's image assignment, scaling rule, rotation, and padding -- the
+ * exact set the `slot-clipboard` capability copies/pastes. Captured by value (not a node/id
+ * reference) so it survives edits to, or deletion of, the slot it was copied from. */
+export interface CopiedSlotProperties {
+  imageAssetId: string | null;
+  scalingRule: ScalingRule;
+  imageRotationDeg: ImageRotationDeg;
+  paddingMm: Sides;
+}
+
+export function captureSlotProperties(sourceNode: LayoutNode, imageAssetId: string | undefined): CopiedSlotProperties {
+  return {
+    imageAssetId: imageAssetId ?? null,
+    scalingRule: sourceNode.imageSlotConfig?.scalingRule ?? 'fitInParent',
+    imageRotationDeg: sourceNode.imageSlotConfig?.imageRotationDeg ?? 0,
+    paddingMm: {
+      top: sourceNode.paddingMm?.top ?? 0,
+      right: sourceNode.paddingMm?.right ?? 0,
+      bottom: sourceNode.paddingMm?.bottom ?? 0,
+      left: sourceNode.paddingMm?.left ?? 0,
+    },
+  };
+}
+
+function applySlotPropertiesToNode(node: LayoutNode, targetIds: Set<string>, properties: CopiedSlotProperties): LayoutNode {
+  const children = node.children?.map((child) => applySlotPropertiesToNode(child, targetIds, properties));
+  const nextNode = children ? { ...node, children } : node;
+
+  if (!targetIds.has(node.id)) {
+    return nextNode;
+  }
+
+  return {
+    ...nextNode,
+    paddingMm: properties.paddingMm,
+    imageSlotConfig: {
+      ...nextNode.imageSlotConfig,
+      scalingRule: properties.scalingRule,
+      imageRotationDeg: properties.imageRotationDeg,
+    },
+  };
+}
+
 /**
  * §4.1.1 — when a slot's minimum required size grows (e.g. a specificSize is set), borrows
  * space from the one adjacent sibling on the growing side so the divider between them lands
@@ -788,6 +832,15 @@ export interface DocumentSlice {
   setSlotSpecificSize: (pageId: string, nodeId: string, axis: 'width' | 'height', valueMm: number | null) => void;
   rotateSlotImage: (pageId: string, nodeId: string) => void;
   clearImageFromSlot: (pageId: string, nodeId: string) => void;
+  /** Applies a copied/pasted `CopiedSlotProperties` snapshot to every target imageSlot in one
+   * undo step. No-ops (no `set()` call, no undo entry) when `targetNodeIds` is empty. */
+  applySlotProperties: (pageId: string, properties: CopiedSlotProperties, targetNodeIds: string[]) => void;
+  /** Applies `nodeId`'s own image/scaling rule/rotation/padding directly to every other imageSlot
+   * sharing its parent container -- independent of the copy/paste clipboard. */
+  copySlotPropertiesToSiblings: (pageId: string, nodeId: string) => void;
+  /** Applies `nodeId`'s own image/scaling rule/rotation/padding directly to every other imageSlot
+   * on the page, regardless of nesting -- independent of the copy/paste clipboard. */
+  copySlotPropertiesToPage: (pageId: string, nodeId: string) => void;
   resizeSiblingsByDrag: (pageId: string, parentNodeId: string, siblingIndexA: number, deltaMm: number) => void;
   /** Returns the id of the newly created shadow imageSlot node (`FreeformElement.imageNodeId`),
    * so a caller that needs to select the placed element afterward (e.g. tap-to-place) doesn't
@@ -821,6 +874,39 @@ export function createDocumentSlice(
   ) => void,
   get: () => DocumentSliceDependencies,
 ): DocumentSlice {
+  const applySlotPropertiesAction = (pageId: string, properties: CopiedSlotProperties, targetNodeIds: string[]) => {
+    if (targetNodeIds.length === 0) {
+      return;
+    }
+
+    const targetIdSet = new Set(targetNodeIds);
+    set((state) => ({
+      document: {
+        ...state.document,
+        pages: state.document.pages.map((entry) => {
+          if (entry.id !== pageId) {
+            return entry;
+          }
+
+          const assignments = { ...entry.assignments };
+          for (const targetNodeId of targetNodeIds) {
+            if (properties.imageAssetId) {
+              assignments[targetNodeId] = properties.imageAssetId;
+            } else {
+              delete assignments[targetNodeId];
+            }
+          }
+
+          return {
+            ...entry,
+            rootNode: applySlotPropertiesToNode(entry.rootNode, targetIdSet, properties),
+            assignments,
+          };
+        }),
+      },
+    }));
+  };
+
   return {
     document: createInitialDocumentState(),
     updateSheetSize: (patch) => {
@@ -1140,6 +1226,43 @@ export function createDocumentSlice(
           ),
         },
       }));
+    },
+    applySlotProperties: applySlotPropertiesAction,
+    copySlotPropertiesToSiblings: (pageId, nodeId) => {
+      const page = get().document.pages.find((entry) => entry.id === pageId);
+      if (!page) {
+        throw new Error(`Page ${pageId} does not exist.`);
+      }
+
+      const sourceNode = findNodeById(page.rootNode, nodeId);
+      if (!sourceNode || sourceNode.type !== 'imageSlot') {
+        throw new Error(`Node ${nodeId} is not an imageSlot.`);
+      }
+
+      const parentInfo = findParentAndIndex(page.rootNode, nodeId);
+      const siblings = parentInfo?.parent.children ?? [];
+      const targetNodeIds = siblings
+        .filter((sibling) => sibling.id !== nodeId && sibling.type === 'imageSlot')
+        .map((sibling) => sibling.id);
+
+      applySlotPropertiesAction(pageId, captureSlotProperties(sourceNode, page.assignments[nodeId]), targetNodeIds);
+    },
+    copySlotPropertiesToPage: (pageId, nodeId) => {
+      const page = get().document.pages.find((entry) => entry.id === pageId);
+      if (!page) {
+        throw new Error(`Page ${pageId} does not exist.`);
+      }
+
+      const sourceNode = findNodeById(page.rootNode, nodeId);
+      if (!sourceNode || sourceNode.type !== 'imageSlot') {
+        throw new Error(`Node ${nodeId} is not an imageSlot.`);
+      }
+
+      const slotIds = new Set<string>();
+      collectImageSlotIds(page.rootNode, slotIds);
+      slotIds.delete(nodeId);
+
+      applySlotPropertiesAction(pageId, captureSlotProperties(sourceNode, page.assignments[nodeId]), [...slotIds]);
     },
     resizeSiblingsByDrag: (pageId, parentNodeId, siblingIndexA, deltaMm) => {
       const page = get().document.pages.find((entry) => entry.id === pageId);

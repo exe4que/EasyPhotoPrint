@@ -65,6 +65,7 @@ describe('startNewProject', () => {
       layoutMode: 'simple',
       viewMode: 'editor',
       processingOverlay: { visible: false },
+      slotClipboard: null,
     });
     expect(useEPPStore.temporal.getState().pastStates).toHaveLength(0);
     expect(useEPPStore.temporal.getState().futureStates).toHaveLength(0);
@@ -398,6 +399,97 @@ describe('openProject', () => {
     expect(next.imagePool).toEqual(openedProject.imagePool);
     expect(next.project).toEqual({ id: 'opened-project', name: 'Opened Album', filePath: '/home/user/Opened.eppproj' });
     expect(useEPPStore.temporal.getState().pastStates).toHaveLength(0);
+  });
+});
+
+describe('copySlotProperties / pasteSlotProperties', () => {
+  afterEach(() => {
+    useEPPStore.getState().startNewProject();
+  });
+
+  it('copySlotProperties captures the slot\'s properties into ui.slotClipboard without pushing a history entry', () => {
+    useEPPStore.getState().assignImageToSlot('page-1', 'root-grid', 'image-a');
+    useEPPStore.getState().rotateSlotImage('page-1', 'root-grid');
+    const pastBefore = useEPPStore.temporal.getState().pastStates.length;
+
+    useEPPStore.getState().copySlotProperties('page-1', 'root-grid');
+
+    expect(useEPPStore.getState().ui.slotClipboard).toEqual({
+      imageAssetId: 'image-a',
+      scalingRule: 'fitInParent',
+      imageRotationDeg: 90,
+      paddingMm: { top: 5, right: 5, bottom: 5, left: 5 },
+    });
+    expect(useEPPStore.temporal.getState().pastStates.length).toBe(pastBefore);
+  });
+
+  it('pasteSlotProperties is a no-op when nothing has been copied yet', () => {
+    const before = useEPPStore.getState().document.pages[0].rootNode;
+
+    useEPPStore.getState().pasteSlotProperties('page-1', 'root-grid');
+
+    expect(useEPPStore.getState().document.pages[0].rootNode).toBe(before);
+  });
+
+  it('pasteSlotProperties overwrites a different target slot in exactly one undo step', () => {
+    useEPPStore.getState().retypeLayoutNode('page-1', 'root-grid', 'horizontal');
+    const [slot1, slot2] = useEPPStore.getState().document.pages[0].rootNode.children!.map((child) => child.id);
+    useEPPStore.getState().assignImageToSlot('page-1', slot1, 'image-a');
+    useEPPStore.getState().rotateSlotImage('page-1', slot1);
+    useEPPStore.getState().copySlotProperties('page-1', slot1);
+    const pastBefore = useEPPStore.temporal.getState().pastStates.length;
+
+    useEPPStore.getState().pasteSlotProperties('page-1', slot2);
+
+    expect(useEPPStore.temporal.getState().pastStates.length).toBe(pastBefore + 1);
+    const slot2Node = useEPPStore.getState().document.pages[0].rootNode.children!.find((child) => child.id === slot2)!;
+    expect(useEPPStore.getState().document.pages[0].assignments[slot2]).toBe('image-a');
+    expect(slot2Node.imageSlotConfig?.imageRotationDeg).toBe(90);
+
+    useEPPStore.temporal.getState().undo();
+    expect(useEPPStore.getState().document.pages[0].assignments[slot2]).toBeUndefined();
+  });
+
+  it('pasting onto the same slot that was copied reapplies its properties unchanged, without error', () => {
+    useEPPStore.getState().assignImageToSlot('page-1', 'root-grid', 'image-a');
+    useEPPStore.getState().copySlotProperties('page-1', 'root-grid');
+
+    expect(() => useEPPStore.getState().pasteSlotProperties('page-1', 'root-grid')).not.toThrow();
+
+    expect(useEPPStore.getState().document.pages[0].assignments['root-grid']).toBe('image-a');
+  });
+
+  it('the clipboard is a value snapshot: editing or removing the source slot afterward does not change what Paste applies', () => {
+    useEPPStore.getState().assignImageToSlot('page-1', 'root-grid', 'image-a');
+    useEPPStore.getState().copySlotProperties('page-1', 'root-grid');
+
+    // Mutate the source after copying.
+    useEPPStore.getState().rotateSlotImage('page-1', 'root-grid');
+    useEPPStore.getState().retypeLayoutNode('page-1', 'root-grid', 'grid'); // no longer even an imageSlot
+
+    useEPPStore.getState().addPage();
+    const newPageId = useEPPStore.getState().ui.activePageId;
+    const newSlotId = useEPPStore.getState().document.pages[1].rootNode.id;
+
+    useEPPStore.getState().pasteSlotProperties(newPageId, newSlotId);
+
+    const pastedNode = useEPPStore.getState().document.pages[1].rootNode;
+    expect(pastedNode.imageSlotConfig?.imageRotationDeg).toBe(0);
+    expect(useEPPStore.getState().document.pages[1].assignments[newSlotId]).toBe('image-a');
+  });
+
+  it('copySlotPropertiesToPage does not affect imageSlot nodes on other pages', () => {
+    useEPPStore.getState().retypeLayoutNode('page-1', 'root-grid', 'horizontal');
+    const [slot1] = useEPPStore.getState().document.pages[0].rootNode.children!.map((child) => child.id);
+    useEPPStore.getState().addPage();
+    const [firstPageId] = useEPPStore.getState().document.pages.map((page) => page.id);
+    const secondPageRootId = useEPPStore.getState().document.pages[1].rootNode.id;
+
+    useEPPStore.getState().assignImageToSlot(firstPageId, slot1, 'image-a');
+
+    useEPPStore.getState().copySlotPropertiesToPage(firstPageId, slot1);
+
+    expect(useEPPStore.getState().document.pages[1].assignments[secondPageRootId]).toBeUndefined();
   });
 });
 

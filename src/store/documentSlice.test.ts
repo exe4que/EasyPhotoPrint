@@ -2,7 +2,15 @@ import { describe, expect, it } from 'vitest';
 
 import type { EPPProjectPage, EPPTemplate, ImageAsset } from '@epp/layout-engine';
 
-import { assignImageToPage, clearImageFromPage, createDefaultPage, createDocumentSlice, reconcileGridChildren } from './documentSlice.js';
+import {
+  assignImageToPage,
+  captureSlotProperties,
+  clearImageFromPage,
+  createDefaultPage,
+  createDocumentSlice,
+  reconcileGridChildren,
+  type CopiedSlotProperties,
+} from './documentSlice.js';
 
 type StoreState = ReturnType<typeof createDocumentSlice>;
 
@@ -526,5 +534,141 @@ describe('document slice helpers', () => {
     const availableMain = 210 - 10 - 3; // page width - root padding (5+5) - gap
     const firstChildWidthMm = ((firstChild.sizeRatio ?? 1) / totalRatio) * availableMain;
     expect(firstChildWidthMm).toBeCloseTo(150, 1);
+  });
+});
+
+describe('captureSlotProperties', () => {
+  it('normalizes missing scaling rule, rotation, and padding to their displayed defaults', () => {
+    const node = createDefaultPage('page-1').rootNode; // fresh imageSlot: no rotation, no explicit padding beyond the default
+    node.paddingMm = undefined;
+
+    expect(captureSlotProperties(node, undefined)).toEqual({
+      imageAssetId: null,
+      scalingRule: 'fitInParent',
+      imageRotationDeg: 0,
+      paddingMm: { top: 0, right: 0, bottom: 0, left: 0 },
+    });
+  });
+
+  it('captures an explicitly configured slot as-is', () => {
+    const node = {
+      ...createDefaultPage('page-1').rootNode,
+      imageSlotConfig: { scalingRule: 'envelopeParent' as const, imageRotationDeg: 90 as const },
+      paddingMm: { top: 1, right: 2, bottom: 3, left: 4 },
+    };
+
+    expect(captureSlotProperties(node, 'image-a')).toEqual({
+      imageAssetId: 'image-a',
+      scalingRule: 'envelopeParent',
+      imageRotationDeg: 90,
+      paddingMm: { top: 1, right: 2, bottom: 3, left: 4 },
+    });
+  });
+});
+
+describe('applySlotProperties', () => {
+  const properties: CopiedSlotProperties = {
+    imageAssetId: 'image-a',
+    scalingRule: 'stretch',
+    imageRotationDeg: 180,
+    paddingMm: { top: 9, right: 9, bottom: 9, left: 9 },
+  };
+
+  it('overwrites every target imageSlot\'s image, scaling rule, rotation, and padding in one pass', () => {
+    const state = createTestStore();
+    state.retypeLayoutNode('page-1', 'root-grid', 'horizontal');
+    const [slot1, slot2] = state.document.pages[0].rootNode.children!.map((child) => child.id);
+
+    state.applySlotProperties('page-1', properties, [slot1, slot2]);
+
+    const [nextSlot1, nextSlot2] = state.document.pages[0].rootNode.children!;
+    for (const slot of [nextSlot1, nextSlot2]) {
+      expect(slot.imageSlotConfig?.scalingRule).toBe('stretch');
+      expect(slot.imageSlotConfig?.imageRotationDeg).toBe(180);
+      expect(slot.paddingMm).toEqual({ top: 9, right: 9, bottom: 9, left: 9 });
+    }
+    expect(state.document.pages[0].assignments).toEqual({ [slot1]: 'image-a', [slot2]: 'image-a' });
+  });
+
+  it('clears the assignment on targets when the copied clipboard had no image', () => {
+    const state = createTestStore([createTestAsset('image-a', 100, 100)]);
+    state.assignImageToSlot('page-1', 'root-grid', 'image-a');
+
+    state.applySlotProperties('page-1', { ...properties, imageAssetId: null }, ['root-grid']);
+
+    expect(state.document.pages[0].assignments).toEqual({});
+  });
+
+  it('is a no-op (no document mutation) when targetNodeIds is empty', () => {
+    const state = createTestStore();
+    const rootBefore = state.document.pages[0].rootNode;
+
+    state.applySlotProperties('page-1', properties, []);
+
+    expect(state.document.pages[0].rootNode).toBe(rootBefore);
+  });
+});
+
+describe('copySlotPropertiesToSiblings', () => {
+  it('applies the source slot\'s properties to imageSlot siblings only, skipping non-imageSlot siblings', () => {
+    const state = createTestStore([createTestAsset('image-a', 100, 100)]);
+    state.retypeLayoutNode('page-1', 'root-grid', 'horizontal');
+    state.addNestedChildNode('page-1', 'root-grid', 'grid'); // a non-imageSlot sibling
+    const [slot1, slot2] = state.document.pages[0].rootNode.children!.map((child) => child.id);
+    const gridSiblingId = state.document.pages[0].rootNode.children![2].id;
+
+    state.assignImageToSlot('page-1', slot1, 'image-a');
+    state.updateLayoutNode('page-1', slot1, { imageSlotConfig: { scalingRule: 'envelopeParent' } });
+
+    state.copySlotPropertiesToSiblings('page-1', slot1);
+
+    const [nextSlot1, nextSlot2, nextGridSibling] = state.document.pages[0].rootNode.children!;
+    expect(nextSlot2.imageSlotConfig?.scalingRule).toBe('envelopeParent');
+    expect(state.document.pages[0].assignments[slot2]).toBe('image-a');
+    expect(nextGridSibling.type).toBe('grid');
+    expect(nextGridSibling.id).toBe(gridSiblingId);
+    expect(nextSlot1.id).toBe(slot1);
+  });
+
+  it('is a no-op when the selected slot has no imageSlot siblings', () => {
+    const state = createTestStore();
+    const rootBefore = state.document.pages[0].rootNode;
+
+    state.copySlotPropertiesToSiblings('page-1', 'root-grid'); // root has no parent, so no siblings
+
+    expect(state.document.pages[0].rootNode).toBe(rootBefore);
+  });
+});
+
+describe('copySlotPropertiesToPage', () => {
+  it('applies the source slot\'s properties to every imageSlot on the page regardless of nesting', () => {
+    const state = createTestStore([createTestAsset('image-a', 100, 100)]);
+    state.retypeLayoutNode('page-1', 'root-grid', 'horizontal');
+    state.addNestedChildNode('page-1', 'root-grid', 'vertical'); // nested container with its own imageSlot children
+    const [slot1, slot2] = state.document.pages[0].rootNode.children!.map((child) => child.id);
+    const nestedContainer = state.document.pages[0].rootNode.children![2];
+    const [slot3, slot4] = nestedContainer.children!.map((child) => child.id);
+
+    state.assignImageToSlot('page-1', slot1, 'image-a');
+    state.rotateSlotImage('page-1', slot1);
+
+    state.copySlotPropertiesToPage('page-1', slot1);
+
+    const page = state.document.pages[0];
+    for (const targetId of [slot2, slot3, slot4]) {
+      expect(page.assignments[targetId]).toBe('image-a');
+    }
+    const nestedAfter = page.rootNode.children![2];
+    expect(nestedAfter.children!.every((slot) => slot.imageSlotConfig?.imageRotationDeg === 90)).toBe(true);
+    expect(page.rootNode.children![1].imageSlotConfig?.imageRotationDeg).toBe(90);
+  });
+
+  it('is a no-op when no other imageSlot exists on the page', () => {
+    const state = createTestStore();
+    const rootBefore = state.document.pages[0].rootNode;
+
+    state.copySlotPropertiesToPage('page-1', 'root-grid');
+
+    expect(state.document.pages[0].rootNode).toBe(rootBefore);
   });
 });

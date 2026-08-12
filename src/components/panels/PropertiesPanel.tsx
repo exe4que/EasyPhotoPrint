@@ -7,6 +7,7 @@ import { formatLength, inchesToMm, mmToInches } from '../../lib/units.js';
 import { useEPPStore } from '../../store/index.js';
 import { CollapsiblePanel } from '../ui/CollapsiblePanel.js';
 import { CommitIntegerInput } from '../ui/CommitIntegerInput.js';
+import { SlotClipboardMenu } from './SlotClipboardMenu.js';
 
 function FieldLabel({ children }: { children: ReactNode }) {
   return <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{children}</label>;
@@ -221,6 +222,11 @@ export function PropertiesPanel({ bare = false }: { bare?: boolean }) {
   const retypeLayoutNode = useEPPStore((state) => state.retypeLayoutNode);
   const setContainerChildCount = useEPPStore((state) => state.setContainerChildCount);
   const imagePool = useEPPStore((state) => state.imagePool);
+  const slotClipboard = useEPPStore((state) => state.ui.slotClipboard);
+  const copySlotProperties = useEPPStore((state) => state.copySlotProperties);
+  const pasteSlotProperties = useEPPStore((state) => state.pasteSlotProperties);
+  const copySlotPropertiesToSiblings = useEPPStore((state) => state.copySlotPropertiesToSiblings);
+  const copySlotPropertiesToPage = useEPPStore((state) => state.copySlotPropertiesToPage);
   const { layout } = useLayoutResolution();
 
   if (selection?.kind === 'image') {
@@ -299,6 +305,26 @@ export function PropertiesPanel({ bare = false }: { bare?: boolean }) {
         description="Configure how the selected image slot displays its assigned photo."
         defaultCollapsed={false}
         bare={bare}
+        headerAction={
+          <SlotClipboardMenu
+            items={[
+              { label: 'Copy', onSelect: () => copySlotProperties(activePage.id, slotPropertyNode.id) },
+              {
+                label: 'Copy to siblings',
+                onSelect: () => copySlotPropertiesToSiblings(activePage.id, slotPropertyNode.id),
+              },
+              {
+                label: 'Copy to page',
+                onSelect: () => copySlotPropertiesToPage(activePage.id, slotPropertyNode.id),
+              },
+              {
+                label: 'Paste',
+                disabled: !slotClipboard,
+                onSelect: () => pasteSlotProperties(activePage.id, slotPropertyNode.id),
+              },
+            ]}
+          />
+        }
       >
         <div className="grid gap-4">
           {nodeTypeSelector}

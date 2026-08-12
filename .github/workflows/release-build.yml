@@ -1,0 +1,96 @@
+name: Release Build
+
+# Deliberately workflow_dispatch-only. This must never run on push/PR -- cutting a release is a
+# separate, on-demand action (see the /cut-release skill), not a side effect of merging a change.
+# See openspec/changes/release-build-distribution/specs/build-distribution/spec.md
+# ("Release build is triggered on demand, independent of archiving").
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Semver version being released (must match package.json's version)"
+        required: true
+
+concurrency:
+  group: release-build
+  cancel-in-progress: false
+
+env:
+  BUILD_REPO_ROOT: /srv/easyphotoprint
+
+jobs:
+  build-and-publish:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify dispatched version matches package.json
+        env:
+          DISPATCHED_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          if [ "$DISPATCHED_VERSION" != "$PKG_VERSION" ]; then
+            echo "::error::Dispatched version $DISPATCHED_VERSION does not match package.json version $PKG_VERSION"
+            exit 1
+          fi
+          echo "VERSION=$PKG_VERSION" >> "$GITHUB_ENV"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build desktop (electron-vite)
+        run: npm run build:desktop
+
+      - name: Package Linux targets (AppImage, deb, pacman)
+        run: npx electron-builder --linux AppImage deb pacman
+
+      - name: Package Windows target (nsis, cross-built via wine)
+        run: npx electron-builder --win nsis
+
+      - name: Build Android release APK
+        run: npm run build:android:release
+
+      - name: Publish artifacts to the build repository
+        run: |
+          set -euo pipefail
+
+          LINUX_DIR="$BUILD_REPO_ROOT/linux/v$VERSION"
+          WIN_DIR="$BUILD_REPO_ROOT/windows/v$VERSION"
+          ANDROID_DIR="$BUILD_REPO_ROOT/android/v$VERSION"
+          ARCH_DIR="$BUILD_REPO_ROOT/arch/x86_64"
+          mkdir -p "$LINUX_DIR" "$WIN_DIR" "$ANDROID_DIR" "$ARCH_DIR"
+
+          cp release/*.AppImage "$LINUX_DIR/"
+          cp release/*.deb "$LINUX_DIR/"
+
+          # electron-builder's pacman target emits a nonstandard ".pacman" extension on an xz-compressed
+          # tar that IS a valid pacman package -- rename to the "<pkgname>-<pkgver>-<pkgrel>-<arch>.pkg.tar.xz"
+          # convention repo-add and pacman itself expect before it will be recognized as a repo member.
+          PACMAN_SRC=$(ls release/*.pacman)
+          PACMAN_FILENAME="easy-photo-print-${VERSION}-1-x86_64.pkg.tar.xz"
+          cp "$PACMAN_SRC" "$LINUX_DIR/$PACMAN_FILENAME"
+          cp "$PACMAN_SRC" "$ARCH_DIR/$PACMAN_FILENAME"
+
+          cp release/*.exe "$WIN_DIR/"
+          cp android/app/build/outputs/apk/release/*.apk "$ANDROID_DIR/"
+
+          # Rebuilds the repo database from every package that has ever been published to $ARCH_DIR --
+          # keeps prior versions installable/downgradable, not just the latest.
+          repo-add "$ARCH_DIR/easyphotoprint.db.tar.gz" "$ARCH_DIR"/*.pkg.tar.xz
+
+      - name: Generate per-platform download index pages
+        run: |
+          set -euo pipefail
+          for platform in linux windows android; do
+            DIR="$BUILD_REPO_ROOT/$platform"
+            {
+              echo "<!doctype html><meta charset=\"utf-8\"><title>Easy Photo Print - $platform</title>"
+              echo "<h1>Easy Photo Print &mdash; $platform builds</h1><ul>"
+              for v in $(ls -1 "$DIR" | grep '^v' | sort -Vr); do
+                echo "<li><a href=\"$v/\">$v</a></li>"
+              done
+              echo "</ul>"
+            } > "$DIR/index.html"
+          done

@@ -1,0 +1,20 @@
+appId: com.easyphotoprint.app
+productName: Easy Photo Print
+directories:
+  output: release
+files:
+  - out/**
+  - package.json
+linux:
+  target:
+    - AppImage
+    - deb
+    - pacman
+  category: Graphics
+  maintainer: Exequiel <exe4que@gmail.com>
+win:
+  target:
+    - nsis
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true

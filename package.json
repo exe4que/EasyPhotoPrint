@@ -1,5 +1,7 @@
 {
   "name": "easy-photo-print",
+  "version": "0.1.0",
+  "author": "Exequiel <exe4que@gmail.com>",
   "private": true,
   "type": "module",
   "main": "out/main/index.js",
@@ -11,7 +13,9 @@
     "dev": "electron-vite dev",
     "build": "npm run build --workspace @epp/layout-engine && npm run build --workspace @epp/migrations",
     "build:desktop": "electron-vite build",
+    "build:desktop:release": "electron-vite build && electron-builder",
     "build:android": "vite build --config vite.mobile.config.ts && cap sync android",
+    "build:android:release": "vite build --config vite.mobile.config.ts && cap sync android && cd android && ./gradlew assembleRelease",
     "preview": "electron-vite preview",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.web.json && tsc --noEmit -p packages/layout-engine/tsconfig.json && tsc --noEmit -p packages/migrations/tsconfig.json"
@@ -25,6 +29,7 @@
     "@vitejs/plugin-react": "^5.1.4",
     "autoprefixer": "^10.4.20",
     "electron": "^31.7.7",
+    "electron-builder": "^26.15.3",
     "electron-vite": "^5.0.0",
     "jsdom": "^30.0.1",
     "postcss": "^8.4.47",

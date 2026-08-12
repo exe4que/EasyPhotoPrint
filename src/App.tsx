@@ -29,6 +29,8 @@ export function App() {
   const missingImages = imagePool.filter((asset) => asset.missing);
   const clearSelection = useEPPStore((state) => state.clearSelection);
   const isProcessingOverlayVisible = useEPPStore((state) => state.ui.processingOverlay.visible);
+  const showProcessingOverlay = useEPPStore((state) => state.showProcessingOverlay);
+  const hideProcessingOverlay = useEPPStore((state) => state.hideProcessingOverlay);
   const { undo, redo } = useUndoRedo();
   const inertContentRef = useRef<HTMLDivElement>(null);
 
@@ -166,11 +168,16 @@ export function App() {
           destructive
           onConfirm={() => {
             setIsOpenProjectConfirmOpen(false);
-            void openProject().then((didLoad) => {
-              if (didLoad && useEPPStore.getState().imagePool.some((asset) => asset.missing)) {
-                setIsMissingImagesDialogOpen(true);
-              }
-            });
+            showProcessingOverlay();
+            void openProject()
+              .then((didLoad) => {
+                if (didLoad && useEPPStore.getState().imagePool.some((asset) => asset.missing)) {
+                  setIsMissingImagesDialogOpen(true);
+                }
+              })
+              .finally(() => {
+                hideProcessingOverlay();
+              });
           }}
           onCancel={() => setIsOpenProjectConfirmOpen(false)}
         />

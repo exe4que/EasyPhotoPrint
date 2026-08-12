@@ -78,7 +78,7 @@ The preview screen SHALL show an explicit, visible control to return to the edit
 - **AND** only exiting preview mode occurs, not the editor's separate "Escape clears selection" behavior
 
 ### Requirement: Export and Print Controls Are Wired
-The top of the preview screen SHALL show an "Export PDF" control and a "Print" control. Activating "Export PDF" SHALL trigger the behavior defined by the `pdf-export` capability; activating "Print" SHALL trigger the behavior defined by the `printing` capability. While either action is in progress, its control SHALL indicate a busy state and SHALL NOT be re-activatable until that action completes (successfully, with an error, or via user cancellation of a dialog it opened).
+The top of the preview screen SHALL show an "Export PDF" control and a "Print" control. Activating "Export PDF" SHALL trigger the behavior defined by the `pdf-export` capability; activating "Print" SHALL trigger the behavior defined by the `printing` capability. While either action is in progress, the application SHALL show the blocking overlay defined by the `processing-overlay` capability, and neither control SHALL be re-activatable until that action completes (successfully, with an error, or via user cancellation of a dialog it opened).
 
 #### Scenario: The controls are visible and wired
 - **WHEN** the user is in preview mode
@@ -86,7 +86,8 @@ The top of the preview screen SHALL show an "Export PDF" control and a "Print" c
 - **AND** activating "Export PDF" starts the PDF export flow defined by the `pdf-export` capability
 - **AND** activating "Print" starts the print flow defined by the `printing` capability
 
-#### Scenario: A control is busy while its action runs
+#### Scenario: The whole app is blocked while an action runs
 - **WHEN** the user activates "Export PDF" or "Print"
-- **THEN** that control SHALL show a busy state and SHALL NOT trigger a second, overlapping run of the same action if activated again before the first completes
-- **AND** the control SHALL return to its normal state once the action completes, fails, or is cancelled
+- **THEN** the application SHALL show the blocking overlay defined by the `processing-overlay` capability for the duration of that action
+- **AND** neither control, nor any other part of the preview screen, SHALL be interactable while the overlay is shown, so a second overlapping run of the same action cannot be triggered
+- **AND** the overlay SHALL be dismissed and both controls SHALL return to their normal state once the action completes, fails, or is cancelled

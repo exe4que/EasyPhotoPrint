@@ -1,3 +1,5 @@
+import { useRef, useState } from 'react';
+
 import { PageStage } from '../canvas/PageStage.js';
 import { ImageLibraryPanel } from '../panels/ImageLibraryPanel.js';
 import { LayoutTreePanel } from '../panels/LayoutTreePanel.js';
@@ -11,6 +13,9 @@ import { useTemplateLibrary } from '../../hooks/useTemplateLibrary.js';
 import { useUndoRedo } from '../../hooks/useUndoRedo.js';
 import { useEPPStore } from '../../store/index.js';
 import { DocumentSummary } from './DocumentSummary.js';
+import { EmptyLibraryBanner } from './EmptyLibraryBanner.js';
+
+const LIBRARY_HIGHLIGHT_DURATION_MS = 1_200;
 
 export interface ShellProps {
   onRequestNew: () => void;
@@ -32,6 +37,14 @@ export function DesktopShell({ onRequestNew, onRequestOpen, onSaveTemplate, onSa
   const setViewMode = useEPPStore((state) => state.setViewMode);
   const saveProject = useEPPStore((state) => state.saveProject);
   const { undo, redo } = useUndoRedo();
+  const imageLibraryRef = useRef<HTMLDivElement>(null);
+  const [isLibraryHighlighted, setIsLibraryHighlighted] = useState(false);
+
+  const highlightImageLibrary = () => {
+    imageLibraryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    setIsLibraryHighlighted(true);
+    setTimeout(() => setIsLibraryHighlighted(false), LIBRARY_HIGHLIGHT_DURATION_MS);
+  };
 
   return (
     <main className="flex h-screen flex-col overflow-hidden bg-slate-950 text-slate-100">
@@ -102,10 +115,16 @@ export function DesktopShell({ onRequestNew, onRequestOpen, onSaveTemplate, onSa
           </aside>
 
           <div className="flex h-full min-h-0 flex-col gap-4">
+            <EmptyLibraryBanner onActivate={highlightImageLibrary} />
             <div className="min-h-0 flex-1">
               <PageStage />
             </div>
-            <ImageLibraryPanel />
+            <div
+              ref={imageLibraryRef}
+              className={`rounded-xl transition ${isLibraryHighlighted ? 'animate-bounce ring-2 ring-amber-400' : ''}`}
+            >
+              <ImageLibraryPanel />
+            </div>
           </div>
 
           <aside className="min-h-0 space-y-4 overflow-y-auto pr-1">

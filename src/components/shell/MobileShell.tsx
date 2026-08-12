@@ -15,6 +15,7 @@ import { useEPPStore } from '../../store/index.js';
 import { BottomSheet } from './BottomSheet.js';
 import { BottomTabBar, type MobileTabId } from './BottomTabBar.js';
 import { DocumentSummary } from './DocumentSummary.js';
+import { EmptyLibraryBanner } from './EmptyLibraryBanner.js';
 import type { ShellProps } from './DesktopShell.js';
 
 const TAB_LABELS: Record<MobileTabId, string> = {
@@ -154,8 +155,11 @@ export function MobileShell({ onRequestNew, onRequestOpen, onSaveTemplate, onSav
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 px-3 py-3 pb-16">
-        <PageStage />
+      <div className="flex min-h-0 flex-1 flex-col px-3 py-3 pb-16">
+        <EmptyLibraryBanner onActivate={() => setOpenTab('photos')} />
+        <div className="min-h-0 flex-1">
+          <PageStage />
+        </div>
       </div>
 
       <BottomTabBar activeTab={isPropertiesOpen ? null : openTab} onSelect={handleSelectTab} />

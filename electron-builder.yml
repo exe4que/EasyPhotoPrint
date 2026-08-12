@@ -2,10 +2,10 @@ appId: com.easyphotoprint.app
 productName: Easy Photo Print
 directories:
   output: release
-# electron-builder auto-detects CI and defaults to publishing a GitHub Release unless told
-# otherwise. We publish artifacts ourselves (to the home-server build repo), not via GitHub
-# Releases, so this must stay explicit -- otherwise CI builds fail looking for a GH_TOKEN.
-publish: never
+# Publishing is disabled via the --publish never CLI flag (see package.json's
+# build:desktop:release script and .github/workflows/release-build.yml), not here --
+# "publish: never" as a config-file value doesn't work: electron-builder tries to resolve
+# "never" as a publish *provider* module and fails with "Cannot find module for publisher never".
 files:
   - out/**
   - package.json

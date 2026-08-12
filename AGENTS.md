@@ -82,5 +82,6 @@ El comando `/adversarial-review` (`.claude/commands/adversarial-review.md`) corr
 | `.github/copilot-instructions.md` | Punto de entrada para GitHub Copilot CLI/Chat. |
 | `.github/skills/`, `.github/prompts/` | Skills/prompts de OpenSpec para Copilot (equivalentes a los skills `/opsx:*` de Claude Code). |
 | `.claude/commands/adversarial-review.md` | Comando `/adversarial-review` — review de 5 agentes en paralelo, desacoplado de `/opsx:archive` (ver §3.2). No es parte del flujo generado por `openspec update`, así que no se pisa al actualizar la CLI. |
+| `.claude/commands/deploy-to-phone.md` | Comando `/deploy-to-phone` — `npm run build:android` + `./gradlew assembleDebug` (build fresco) seguido de `adb install -r` del APK debug en el teléfono de test. No es parte del flujo generado por `openspec update`. |
 
 La ubicación del código sigue la estructura de carpetas ya en uso (`electron/`, `packages/layout-engine/`, `packages/migrations/`, `src/`, `shared/`) — no hay un mapeo formal spec↔carpeta más allá del nombre de la capability; para encontrar qué código implementa una capability, `grep` es suficiente dado que los nombres de capability (`layout-engine`, `template-schema`, etc.) coinciden con los nombres de paquete/carpeta reales.

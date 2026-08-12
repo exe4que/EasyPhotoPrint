@@ -30,6 +30,16 @@ export function App() {
   const clearSelection = useEPPStore((state) => state.clearSelection);
   const isProcessingOverlayVisible = useEPPStore((state) => state.ui.processingOverlay.visible);
   const { undo, redo } = useUndoRedo();
+  const inertContentRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // `inert` isn't in this React version's JSX attribute types yet (@types/react 18), so it's set
+    // as a plain DOM property here instead of a JSX prop -- TypeScript's DOM lib already types
+    // `HTMLElement.inert`, and Electron's bundled Chromium has supported the attribute since M102.
+    if (inertContentRef.current) {
+      inertContentRef.current.inert = isProcessingOverlayVisible;
+    }
+  }, [isProcessingOverlayVisible]);
 
   useEffect(() => {
     void hydrateSettings();
@@ -121,78 +131,83 @@ export function App() {
 
   return (
     <>
-      {viewMode === 'preview' ? (
-        <PreviewScreen />
-      ) : isMobileViewport ? (
-        <MobileShell {...shellProps} />
-      ) : (
-        <DesktopShell {...shellProps} />
-      )}
+      {/* `inert` (not just the overlay's own pointer-capturing backdrop) is what actually keeps
+       * keyboard users from Tab-ing to a control behind the overlay and activating it via
+       * Enter/Space -- pointer-events stacking alone has no effect on keyboard focus order. */}
+      <div className="contents" ref={inertContentRef}>
+        {viewMode === 'preview' ? (
+          <PreviewScreen />
+        ) : isMobileViewport ? (
+          <MobileShell {...shellProps} />
+        ) : (
+          <DesktopShell {...shellProps} />
+        )}
+
+        <SaveTemplateDialog ref={saveTemplateDialogRef} templates={templateLibrary.templates} onSaved={templateLibrary.reload} />
+
+        <ConfirmDialog
+          open={isNewProjectConfirmOpen}
+          title="Start a new project?"
+          description="This discards every page, image, and undo/redo history in the current document and starts over with a single blank page, as if the app had just been opened. This can't be undone."
+          confirmLabel="Start new project"
+          destructive
+          onConfirm={() => {
+            startNewProject();
+            setIsNewProjectConfirmOpen(false);
+          }}
+          onCancel={() => setIsNewProjectConfirmOpen(false)}
+        />
+
+        <ConfirmDialog
+          open={isOpenProjectConfirmOpen}
+          title="Open a project?"
+          description="This discards every page, image, and undo/redo history in the current document. Choose a .eppproj file in the next dialog to replace it. This can't be undone."
+          confirmLabel="Choose file..."
+          destructive
+          onConfirm={() => {
+            setIsOpenProjectConfirmOpen(false);
+            void openProject().then((didLoad) => {
+              if (didLoad && useEPPStore.getState().imagePool.some((asset) => asset.missing)) {
+                setIsMissingImagesDialogOpen(true);
+              }
+            });
+          }}
+          onCancel={() => setIsOpenProjectConfirmOpen(false)}
+        />
+
+        <ConfirmDialog
+          open={isMissingImagesDialogOpen}
+          title={missingImages.length === 0 ? 'All reference problems resolved' : 'Some images could not be found'}
+          description={
+            missingImages.length === 0
+              ? 'Every missing image in this project has been relinked.'
+              : "These images' files have moved, been renamed, or been deleted since this project was last saved. The project loaded anyway — locate a replacement for each one now, or later from its card in the Image Library."
+          }
+          confirmLabel="Done"
+          onConfirm={() => setIsMissingImagesDialogOpen(false)}
+          onCancel={() => setIsMissingImagesDialogOpen(false)}
+        >
+          <ul className="space-y-2">
+            {missingImages.map((asset) => (
+              <li
+                key={asset.id}
+                className="flex items-center justify-between gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-sm"
+              >
+                <span className="truncate text-slate-200">{asset.fileName}</span>
+                <button
+                  type="button"
+                  onClick={() => void relinkImage(asset.id)}
+                  className="whitespace-nowrap rounded-lg border border-cyan-500/60 bg-cyan-500/10 px-2 py-1 text-xs font-medium text-cyan-200 hover:bg-cyan-500/20"
+                >
+                  Locate...
+                </button>
+              </li>
+            ))}
+          </ul>
+        </ConfirmDialog>
+      </div>
 
       <ProcessingOverlay />
-
-      <SaveTemplateDialog ref={saveTemplateDialogRef} templates={templateLibrary.templates} onSaved={templateLibrary.reload} />
-
-      <ConfirmDialog
-        open={isNewProjectConfirmOpen}
-        title="Start a new project?"
-        description="This discards every page, image, and undo/redo history in the current document and starts over with a single blank page, as if the app had just been opened. This can't be undone."
-        confirmLabel="Start new project"
-        destructive
-        onConfirm={() => {
-          startNewProject();
-          setIsNewProjectConfirmOpen(false);
-        }}
-        onCancel={() => setIsNewProjectConfirmOpen(false)}
-      />
-
-      <ConfirmDialog
-        open={isOpenProjectConfirmOpen}
-        title="Open a project?"
-        description="This discards every page, image, and undo/redo history in the current document. Choose a .eppproj file in the next dialog to replace it. This can't be undone."
-        confirmLabel="Choose file..."
-        destructive
-        onConfirm={() => {
-          setIsOpenProjectConfirmOpen(false);
-          void openProject().then((didLoad) => {
-            if (didLoad && useEPPStore.getState().imagePool.some((asset) => asset.missing)) {
-              setIsMissingImagesDialogOpen(true);
-            }
-          });
-        }}
-        onCancel={() => setIsOpenProjectConfirmOpen(false)}
-      />
-
-      <ConfirmDialog
-        open={isMissingImagesDialogOpen}
-        title={missingImages.length === 0 ? 'All reference problems resolved' : 'Some images could not be found'}
-        description={
-          missingImages.length === 0
-            ? 'Every missing image in this project has been relinked.'
-            : "These images' files have moved, been renamed, or been deleted since this project was last saved. The project loaded anyway — locate a replacement for each one now, or later from its card in the Image Library."
-        }
-        confirmLabel="Done"
-        onConfirm={() => setIsMissingImagesDialogOpen(false)}
-        onCancel={() => setIsMissingImagesDialogOpen(false)}
-      >
-        <ul className="space-y-2">
-          {missingImages.map((asset) => (
-            <li
-              key={asset.id}
-              className="flex items-center justify-between gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-sm"
-            >
-              <span className="truncate text-slate-200">{asset.fileName}</span>
-              <button
-                type="button"
-                onClick={() => void relinkImage(asset.id)}
-                className="whitespace-nowrap rounded-lg border border-cyan-500/60 bg-cyan-500/10 px-2 py-1 text-xs font-medium text-cyan-200 hover:bg-cyan-500/20"
-              >
-                Locate...
-              </button>
-            </li>
-          ))}
-        </ul>
-      </ConfirmDialog>
     </>
   );
 }

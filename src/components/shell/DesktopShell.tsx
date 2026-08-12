@@ -119,10 +119,7 @@ export function DesktopShell({ onRequestNew, onRequestOpen, onSaveTemplate, onSa
             <div className="min-h-0 flex-1">
               <PageStage />
             </div>
-            <div
-              ref={imageLibraryRef}
-              className={`rounded-xl transition ${isLibraryHighlighted ? 'animate-bounce ring-2 ring-amber-400' : ''}`}
-            >
+            <div ref={imageLibraryRef} className={`rounded-xl ${isLibraryHighlighted ? 'animate-flash-amber' : ''}`}>
               <ImageLibraryPanel />
             </div>
           </div>

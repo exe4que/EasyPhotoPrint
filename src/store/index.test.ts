@@ -64,6 +64,7 @@ describe('startNewProject', () => {
       activeTool: 'select',
       layoutMode: 'simple',
       viewMode: 'editor',
+      processingOverlay: { visible: false },
     });
     expect(useEPPStore.temporal.getState().pastStates).toHaveLength(0);
     expect(useEPPStore.temporal.getState().futureStates).toHaveLength(0);

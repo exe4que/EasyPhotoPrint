@@ -5,6 +5,7 @@ import { DesktopShell } from './components/shell/DesktopShell.js';
 import { MobileShell } from './components/shell/MobileShell.js';
 import { SaveTemplateDialog, type SaveTemplateDialogHandle } from './components/templates/SaveTemplateDialog.js';
 import { ConfirmDialog } from './components/ui/ConfirmDialog.js';
+import { ProcessingOverlay } from './components/ui/ProcessingOverlay.js';
 import { useIsMobileViewport } from './hooks/useIsMobileViewport.js';
 import { useTemplateLibrary } from './hooks/useTemplateLibrary.js';
 import { useUndoRedo } from './hooks/useUndoRedo.js';
@@ -27,6 +28,7 @@ export function App() {
   const imagePool = useEPPStore((state) => state.imagePool);
   const missingImages = imagePool.filter((asset) => asset.missing);
   const clearSelection = useEPPStore((state) => state.clearSelection);
+  const isProcessingOverlayVisible = useEPPStore((state) => state.ui.processingOverlay.visible);
   const { undo, redo } = useUndoRedo();
 
   useEffect(() => {
@@ -35,6 +37,13 @@ export function App() {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      // The processing overlay blocks all interaction with the rest of the app, keyboard
+      // shortcuts included (see the `processing-overlay` capability), while an image-library load,
+      // PDF export, or print is in flight.
+      if (isProcessingOverlayVisible) {
+        return;
+      }
+
       if (event.key === 'Escape') {
         // A ConfirmDialog has its own Escape listener (dismiss the dialog) that fires
         // independently of this one -- without this guard, Escape while a dialog is open in
@@ -96,6 +105,7 @@ export function App() {
     isNewProjectConfirmOpen,
     isOpenProjectConfirmOpen,
     isMissingImagesDialogOpen,
+    isProcessingOverlayVisible,
     saveProject,
     undo,
     redo,
@@ -118,6 +128,8 @@ export function App() {
       ) : (
         <DesktopShell {...shellProps} />
       )}
+
+      <ProcessingOverlay />
 
       <SaveTemplateDialog ref={saveTemplateDialogRef} templates={templateLibrary.templates} onSaved={templateLibrary.reload} />
 

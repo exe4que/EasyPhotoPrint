@@ -9,6 +9,9 @@ export interface UiState {
   activeTool: 'select' | 'pan' | 'crop';
   layoutMode: 'simple' | 'nested';
   viewMode: 'editor' | 'preview';
+  /** See the `processing-overlay` capability: set while adding images to the library, exporting to
+   * PDF, or printing, and read by the app-root-mounted `ProcessingOverlay` to block the whole app. */
+  processingOverlay: { visible: boolean };
 }
 
 export interface UiSlice {
@@ -19,6 +22,8 @@ export interface UiSlice {
   setLayoutMode: (mode: UiState['layoutMode']) => void;
   setViewMode: (mode: UiState['viewMode']) => void;
   clearSelection: () => void;
+  showProcessingOverlay: () => void;
+  hideProcessingOverlay: () => void;
 }
 
 export function createInitialUiState(): UiState {
@@ -28,6 +33,7 @@ export function createInitialUiState(): UiState {
     activeTool: 'select',
     layoutMode: 'simple',
     viewMode: 'editor',
+    processingOverlay: { visible: false },
   };
 }
 
@@ -115,6 +121,12 @@ export function createUiSlice(
       // sidebar content is unaffected; only the canvas's selection ring on the root no longer
       // persists through an explicit deselect click in Simple mode.
       set((current) => ({ ui: { ...current.ui, selection: null } }));
+    },
+    showProcessingOverlay: () => {
+      set((current) => ({ ui: { ...current.ui, processingOverlay: { visible: true } } }));
+    },
+    hideProcessingOverlay: () => {
+      set((current) => ({ ui: { ...current.ui, processingOverlay: { visible: false } } }));
     },
   };
 }

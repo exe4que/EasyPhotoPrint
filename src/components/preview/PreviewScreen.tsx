@@ -13,13 +13,17 @@ function describeActionError(error: unknown, fallback: string): string {
 }
 
 /** Full-screen, gizmo-free print preview -- replaces the entire editor layout while
- * `ui.viewMode === 'preview'`. "Export PDF" and "Print" each independently disable themselves and
- * show a busy label while their own IPC call is in flight, and surface an inline error message on
- * failure instead of failing silently -- per the `pdf-export`/`printing` capabilities. */
+ * `ui.viewMode === 'preview'`. "Export PDF" and "Print" each disable themselves and show a busy
+ * label while their own IPC call is in flight, block the whole app behind the shared
+ * `ProcessingOverlay` for that same duration (see the `processing-overlay` capability), and surface
+ * an inline error message on failure instead of failing silently -- per the `pdf-export`/`printing`
+ * capabilities. */
 export function PreviewScreen() {
   const setViewMode = useEPPStore((state) => state.setViewMode);
   const exportPdf = useEPPStore((state) => state.exportPdf);
   const printDocument = useEPPStore((state) => state.printDocument);
+  const showProcessingOverlay = useEPPStore((state) => state.showProcessingOverlay);
+  const hideProcessingOverlay = useEPPStore((state) => state.hideProcessingOverlay);
   const [exportState, setExportState] = useState<ActionState>(IDLE_ACTION_STATE);
   const [printState, setPrintState] = useState<ActionState>(IDLE_ACTION_STATE);
 
@@ -28,11 +32,14 @@ export function PreviewScreen() {
       return;
     }
     setExportState({ status: 'busy' });
+    showProcessingOverlay();
     try {
       await exportPdf();
       setExportState(IDLE_ACTION_STATE);
     } catch (error) {
       setExportState({ status: 'error', message: describeActionError(error, 'Could not export the PDF.') });
+    } finally {
+      hideProcessingOverlay();
     }
   };
 
@@ -41,11 +48,14 @@ export function PreviewScreen() {
       return;
     }
     setPrintState({ status: 'busy' });
+    showProcessingOverlay();
     try {
       await printDocument();
       setPrintState(IDLE_ACTION_STATE);
     } catch (error) {
       setPrintState({ status: 'error', message: describeActionError(error, 'Could not print the document.') });
+    } finally {
+      hideProcessingOverlay();
     }
   };
 

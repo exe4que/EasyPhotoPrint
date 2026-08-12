@@ -47,7 +47,9 @@ jobs:
         run: npx electron-builder --linux AppImage deb pacman --publish never
 
       - name: Package Windows target (nsis, cross-built via wine)
-        run: npx electron-builder --win nsis --publish never
+        # wine needs a display to fully initialize a fresh prefix (window creation calls during
+        # first-run setup), which a headless runner doesn't have -- xvfb-run supplies a virtual one.
+        run: xvfb-run -a npx electron-builder --win nsis --publish never
 
       - name: Build Android release APK
         run: npm run build:android:release

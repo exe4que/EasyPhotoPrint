@@ -2,10 +2,6 @@ appId: com.easyphotoprint.app
 productName: Easy Photo Print
 directories:
   output: release
-# electron-builder auto-detects CI and defaults to publishing a GitHub Release unless told
-# otherwise. We publish artifacts ourselves (to the home-server build repo), not via GitHub
-# Releases, so this must stay explicit -- otherwise CI builds fail looking for a GH_TOKEN.
-publish: never
 files:
   - out/**
   - package.json

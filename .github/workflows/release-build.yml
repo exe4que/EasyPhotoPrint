@@ -44,10 +44,10 @@ jobs:
         run: npm run build:desktop
 
       - name: Package Linux targets (AppImage, deb, pacman)
-        run: npx electron-builder --linux AppImage deb pacman
+        run: npx electron-builder --linux AppImage deb pacman --publish never
 
       - name: Package Windows target (nsis, cross-built via wine)
-        run: npx electron-builder --win nsis
+        run: npx electron-builder --win nsis --publish never
 
       - name: Build Android release APK
         run: npm run build:android:release

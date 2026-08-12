@@ -13,7 +13,7 @@
     "dev": "electron-vite dev",
     "build": "npm run build --workspace @epp/layout-engine && npm run build --workspace @epp/migrations",
     "build:desktop": "electron-vite build",
-    "build:desktop:release": "electron-vite build && electron-builder",
+    "build:desktop:release": "electron-vite build && electron-builder --publish never",
     "build:android": "vite build --config vite.mobile.config.ts && cap sync android",
     "build:android:release": "vite build --config vite.mobile.config.ts && cap sync android && cd android && ./gradlew assembleRelease",
     "preview": "electron-vite preview",

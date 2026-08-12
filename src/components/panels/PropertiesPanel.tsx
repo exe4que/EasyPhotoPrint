@@ -6,6 +6,7 @@ import { isSpecificSizeUnsatisfied } from '../../lib/imageDisplay.js';
 import { formatLength, inchesToMm, mmToInches } from '../../lib/units.js';
 import { useEPPStore } from '../../store/index.js';
 import { CollapsiblePanel } from '../ui/CollapsiblePanel.js';
+import { CommitIntegerInput } from '../ui/CommitIntegerInput.js';
 
 function FieldLabel({ children }: { children: ReactNode }) {
   return <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{children}</label>;
@@ -442,32 +443,24 @@ export function PropertiesPanel({ bare = false }: { bare?: boolean }) {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <FieldLabel>Rows</FieldLabel>
-              <input
-                type="number"
+              <CommitIntegerInput
                 min={1}
-                className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
                 value={gridConfig.rows}
-                onChange={(event) =>
+                onCommit={(rows) =>
                   updateGridNodeConfig(activePage.id, contextNode.id, {
-                    gridConfig: {
-                      rows: Number(event.target.value),
-                    },
+                    gridConfig: { rows },
                   })
                 }
               />
             </div>
             <div>
               <FieldLabel>Columns</FieldLabel>
-              <input
-                type="number"
+              <CommitIntegerInput
                 min={1}
-                className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
                 value={gridConfig.columns}
-                onChange={(event) =>
+                onCommit={(columns) =>
                   updateGridNodeConfig(activePage.id, contextNode.id, {
-                    gridConfig: {
-                      columns: Number(event.target.value),
-                    },
+                    gridConfig: { columns },
                   })
                 }
               />
@@ -518,14 +511,10 @@ export function PropertiesPanel({ bare = false }: { bare?: boolean }) {
         {contextNode.type === 'horizontal' || contextNode.type === 'vertical' ? (
           <div>
             <FieldLabel>Slots</FieldLabel>
-            <input
-              type="number"
+            <CommitIntegerInput
               min={1}
-              className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
               value={contextNode.children?.length ?? 0}
-              onChange={(event) =>
-                setContainerChildCount(activePage.id, contextNode.id, Number(event.target.value))
-              }
+              onCommit={(count) => setContainerChildCount(activePage.id, contextNode.id, count)}
             />
           </div>
         ) : null}

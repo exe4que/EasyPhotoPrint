@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { formatLength, parseLength } from '../../lib/units.js';
 import { useEPPStore } from '../../store/index.js';
 import { CollapsiblePanel } from '../ui/CollapsiblePanel.js';
+import { CommitIntegerInput } from '../ui/CommitIntegerInput.js';
 
 const PAGE_SIZE_OPTIONS = ['A4', 'Letter', 'Legal', '4x6', '5x7', 'A3', 'Custom'] as const;
 
@@ -107,12 +108,10 @@ export function PageSetupPanel({ bare = false }: { bare?: boolean }) {
 
         <div>
           <FieldLabel>DPI (this page)</FieldLabel>
-          <input
-            type="number"
+          <CommitIntegerInput
             min={72}
-            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
             value={page.pageConfig.dpi}
-            onChange={(event) => updatePageConfig(page.id, { dpi: Number(event.target.value) })}
+            onCommit={(dpi) => updatePageConfig(page.id, { dpi })}
           />
         </div>
       </div>

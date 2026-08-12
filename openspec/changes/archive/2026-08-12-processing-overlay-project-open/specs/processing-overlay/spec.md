@@ -1,10 +1,4 @@
-# processing-overlay Specification
-
-## Purpose
-
-Defines a full-app blocking overlay shown while a long-running operation (adding images to the library, exporting to PDF, printing) is in flight, so the user cannot interact with — or navigate away from — an operation while it is still processing.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Blocking Overlay Shown During In-Flight Processing
 The application SHALL show a full-viewport overlay, displaying a progress bar or, when determinate progress cannot be reported, a spinner, whenever one of the following operations is in flight: loading images into the Image Library, exporting the active document to PDF, printing the active document, or opening/loading a project via `File > Open`. While the overlay is shown, the application SHALL prevent all pointer and keyboard interaction with anything behind it, including navigation, other buttons, and keyboard shortcuts.
@@ -29,18 +23,3 @@ The application SHALL show a full-viewport overlay, displaying a progress bar or
 - **WHEN** the blocking overlay is shown
 - **THEN** clicks, taps, and keyboard input directed at any other part of the application SHALL have no effect
 - **AND** this SHALL include the preview screen's own page navigation, exit-preview control, and the export/print controls themselves
-
-### Requirement: Overlay Always Resolves
-The blocking overlay SHALL be dismissed as soon as the operation it is covering finishes, whether it finishes successfully, fails with an error, or is cancelled (for example, by the user dismissing a native file or print dialog). The application SHALL NOT leave the overlay visible once the underlying operation has settled.
-
-#### Scenario: Overlay is dismissed on success
-- **WHEN** an in-flight operation covered by the overlay completes successfully
-- **THEN** the overlay SHALL be dismissed immediately, returning control of the application to the user
-
-#### Scenario: Overlay is dismissed on failure
-- **WHEN** an in-flight operation covered by the overlay fails with an error
-- **THEN** the overlay SHALL be dismissed and any existing error-reporting behavior for that operation SHALL still occur
-
-#### Scenario: Overlay is dismissed on cancellation
-- **WHEN** the user cancels an in-flight operation covered by the overlay (for example, dismissing the native "Print" or file-open dialog without completing it)
-- **THEN** the overlay SHALL be dismissed without an error being reported

@@ -57,7 +57,7 @@ No existe ya el mecanismo de tags `@spec OPENSPEC.md §X` en comentarios ni el a
 2. **`/opsx:archive`** — además de lo que ya hace (sincronizar las specs delta a `openspec/specs/` y mover el change a `openspec/changes/archive/`), al cerrar:
    1. Committeá y pusheá el resultado del archive (specs sincronizadas + change movido) en esa misma rama de feature — esto actualiza el PR ya abierto por `/opsx:apply`, no crea uno nuevo.
    2. Si por algún motivo el PR no existiera todavía en este punto (p. ej. `/opsx:apply` no llegó a abrirlo), abrilo ahora con `gh pr create` — mismo fallback, misma autorización permanente.
-   3. Mergeá el PR a `main` vos mismo (`gh pr merge`) — sin gate de CI adicional, sin pedir confirmación puntual para el merge en sí. Esta es la única vía por la que código llega a `main`.
+   3. Mergeá el PR a `main` vos mismo (`gh pr merge --delete-branch`) — sin gate de CI adicional, sin pedir confirmación puntual para el merge en sí. Esta es la única vía por la que código llega a `main`. El flag `--delete-branch` borra la rama de feature tanto en el remoto (`origin`) como localmente como parte del mismo comando; si por algún motivo se mergeó sin ese flag (p. ej. merge manual desde la UI de GitHub), borrá la rama remota aparte con `git push origin --delete <rama>` — misma autorización permanente, no hace falta confirmar puntualmente.
    - `/opsx:archive` no incluye el adversarial code review — ver §3.2. Es un paso desacoplado y opcional: si querés que corra, invocalo vos (o pedímelo) antes de archivar. `/opsx:archive` no espera a que corra ni lo dispara automáticamente.
 
 ### 3.2 Adversarial code review — paso opcional, desacoplado de `/opsx:archive`

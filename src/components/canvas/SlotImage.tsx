@@ -1,6 +1,11 @@
-import type { ImageAsset, ImageRotationDeg, ScalingRule, SpecificSizeMm } from '@epp/layout-engine';
+import type { FocalPoint, ImageAsset, ImageRotationDeg, ScalingRule, SpecificSizeMm } from '@epp/layout-engine';
 
-import { computeImageRenderRectMm, isSpecificSizeUnsatisfied, scalingRuleToObjectFit } from '../../lib/imageDisplay.js';
+import {
+  computeEnvelopeParentPlacementMm,
+  computeImageRenderRectMm,
+  isSpecificSizeUnsatisfied,
+  scalingRuleToObjectFit,
+} from '../../lib/imageDisplay.js';
 import { mmToPx } from '../../lib/units.js';
 
 interface SlotImageProps {
@@ -9,6 +14,8 @@ interface SlotImageProps {
   heightMm: number;
   scalingRule: ScalingRule | undefined;
   specificSizeMm: SpecificSizeMm | undefined;
+  /** Only meaningful when scalingRule === 'envelopeParent'; defaults to center. */
+  focalPoint: FocalPoint | undefined;
   rotationDeg: ImageRotationDeg | undefined;
   zoom: number;
   /** Which noun the "specific size doesn't fit" tooltip uses — grid/flex imageSlots vs. freeform elements word it differently. */
@@ -38,6 +45,7 @@ export function SlotImage({
   heightMm,
   scalingRule,
   specificSizeMm,
+  focalPoint,
   rotationDeg,
   zoom,
   unsatisfiedSizeContext,
@@ -89,6 +97,35 @@ export function SlotImage({
           maxHeight: 'none',
           transform: rotationTransform,
           transformOrigin: 'center',
+        }}
+      />
+    );
+  }
+
+  if (scalingRule === 'envelopeParent') {
+    // Unlike every other branch, this <img> is deliberately larger than the slot -- it's the
+    // *uncropped* source, sized to cover the slot and shifted by focalPoint (see
+    // computeEnvelopeParentPlacementMm) -- clipped to the slot's bounds by the parent's own
+    // `overflow: hidden`, the same way computeEnvelopeCrop's pixel crop stands in for it in the
+    // exported PDF. No object-fit is needed: the explicit width/height already match the source's
+    // own aspect ratio exactly. transformOrigin is explicit (not 'center') because a panned crop's
+    // own center generally isn't the point imageRotationDeg must pivot around -- see the function's
+    // doc comment.
+    const placement = computeEnvelopeParentPlacementMm(asset, slotBox, focalPoint, rotationDeg);
+    return (
+      <img
+        src={src}
+        alt={asset.fileName}
+        className="pointer-events-none absolute"
+        style={{
+          left: mmToPx(placement.leftMm, zoom),
+          top: mmToPx(placement.topMm, zoom),
+          width: mmToPx(placement.widthMm, zoom),
+          height: mmToPx(placement.heightMm, zoom),
+          maxWidth: 'none',
+          maxHeight: 'none',
+          transform: rotationTransform,
+          transformOrigin: `${mmToPx(placement.transformOriginXMm, zoom)}px ${mmToPx(placement.transformOriginYMm, zoom)}px`,
         }}
       />
     );

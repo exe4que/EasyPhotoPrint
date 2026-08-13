@@ -65,7 +65,7 @@ export function MobileShell({ onRequestNew, onRequestOpen, onSaveTemplate, onSav
       const dropElement = document.elementFromPoint(clientX, clientY)?.closest<HTMLElement>('[data-drop-target]');
       const dropTarget = dropElement?.dataset.dropTarget;
       if (dropTarget?.startsWith('slot:')) {
-        assignImageToSlot(page.id, dropTarget.slice('slot:'.length), imageAssetId, 'library');
+        assignImageToSlot(page.id, dropTarget.slice('slot:'.length), imageAssetId);
       } else if (dropTarget?.startsWith('freeform:')) {
         const canvasNodeId = dropTarget.slice('freeform:'.length);
         const box = layout.get(canvasNodeId);

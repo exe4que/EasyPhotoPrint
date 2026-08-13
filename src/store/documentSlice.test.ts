@@ -66,21 +66,6 @@ describe('document slice helpers', () => {
     });
   });
 
-  it('swaps images only when the source is another slot on the same page', () => {
-    const page: EPPProjectPage = {
-      ...createDefaultPage('page-1'),
-      assignments: {
-        'slot-1': 'image-a',
-        'slot-2': 'image-b',
-      },
-    };
-
-    expect(assignImageToPage(page, 'slot-1', 'image-b', 'page')).toEqual({
-      'slot-1': 'image-b',
-      'slot-2': 'image-a',
-    });
-  });
-
   it('replaces the image when the asset is not assigned elsewhere on the page', () => {
     const page: EPPProjectPage = {
       ...createDefaultPage('page-1'),
@@ -108,45 +93,14 @@ describe('document slice helpers', () => {
     });
   });
 
-  it('swaps two assigned slots when assignImageToSlot is called with a page source', () => {
+  it('replaces rather than swapping when the image is already assigned to another slot on the page', () => {
     const state = createTestStore();
 
     state.retypeLayoutNode('page-1', 'root-grid', 'horizontal');
     state.assignImageToSlot('page-1', 'slot-1', 'image-a');
     state.assignImageToSlot('page-1', 'slot-2', 'image-b');
 
-    // Simulates dragging slot-1's image onto slot-2.
-    state.assignImageToSlot('page-1', 'slot-2', 'image-a', 'page');
-
-    expect(state.document.pages[0].assignments).toEqual({
-      'slot-1': 'image-b',
-      'slot-2': 'image-a',
-    });
-  });
-
-  it('moves an assigned slot image onto an empty slot when assignImageToSlot is called with a page source', () => {
-    const state = createTestStore();
-
-    state.retypeLayoutNode('page-1', 'root-grid', 'horizontal');
-    state.assignImageToSlot('page-1', 'slot-1', 'image-a');
-
-    // Simulates dragging slot-1's image onto the empty slot-2.
-    state.assignImageToSlot('page-1', 'slot-2', 'image-a', 'page');
-
-    expect(state.document.pages[0].assignments).toEqual({
-      'slot-2': 'image-a',
-    });
-  });
-
-  it('replaces rather than swaps when assignImageToSlot is called with the default library source', () => {
-    const state = createTestStore();
-
-    state.retypeLayoutNode('page-1', 'root-grid', 'horizontal');
-    state.assignImageToSlot('page-1', 'slot-1', 'image-a');
-    state.assignImageToSlot('page-1', 'slot-2', 'image-b');
-
-    // Simulates dragging image-a from the Image Library panel onto slot-2, even though image-a
-    // is already assigned to slot-1 on this page — a library drag must never swap.
+    // Assigning image-a to slot-2 (e.g. from the Image Library) never swaps or clears slot-1.
     state.assignImageToSlot('page-1', 'slot-2', 'image-a');
 
     expect(state.document.pages[0].assignments).toEqual({

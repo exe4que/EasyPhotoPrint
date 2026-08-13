@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { computeEnvelopeCrop, computeFitInParent, computeSpecificSize, computeStretch, orientBoxMm } from './imageFit.js';
+import { computeEnvelopeCrop, computeEnvelopeParent, computeFitInParent, computeSpecificSize, computeStretch, orientBoxMm } from './imageFit.js';
 import type { ImageAsset } from './types.js';
 
 const asset: ImageAsset = {
@@ -51,6 +51,35 @@ describe('imageFit', () => {
     const rect = computeSpecificSize({ widthMm: 120, heightMm: 40, lockedAxis: 'width' }, { x: 0, y: 0, w: 100, h: 100 });
     expect(rect.widthMm).toBe(120);
     expect(rect.offsetXMm).toBe(-10);
+  });
+
+  it('covers a square slot with the wider-than-target asset, centered by default', () => {
+    expect(computeEnvelopeParent(asset, { x: 0, y: 0, w: 100, h: 100 })).toEqual({
+      offsetXMm: -50,
+      offsetYMm: 0,
+      widthMm: 200,
+      heightMm: 100,
+    });
+  });
+
+  it('shifts the covering image to the source edge at focalPoint 0 and 1', () => {
+    expect(computeEnvelopeParent(asset, { x: 0, y: 0, w: 100, h: 100 }, { x: 0, y: 0 })).toEqual({
+      offsetXMm: 0,
+      offsetYMm: 0,
+      widthMm: 200,
+      heightMm: 100,
+    });
+    expect(computeEnvelopeParent(asset, { x: 0, y: 0, w: 100, h: 100 }, { x: 1, y: 1 })).toEqual({
+      offsetXMm: -100,
+      offsetYMm: 0,
+      widthMm: 200,
+      heightMm: 100,
+    });
+  });
+
+  it('never offsets an axis the covering image does not overflow', () => {
+    const rect = computeEnvelopeParent(asset, { x: 0, y: 0, w: 100, h: 100 }, { x: 0.3, y: 0.9 });
+    expect(rect.offsetYMm).toBe(0);
   });
 });
 

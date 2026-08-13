@@ -66,6 +66,7 @@ function PreviewImageSlot({
         heightMm={box.h}
         scalingRule={imageSlotConfig?.scalingRule}
         specificSizeMm={imageSlotConfig?.specificSizeMm}
+        focalPoint={imageSlotConfig?.focalPoint}
         rotationDeg={imageSlotConfig?.imageRotationDeg}
         zoom={zoom}
         unsatisfiedSizeContext="slot"
@@ -132,6 +133,7 @@ function PreviewFreeformImage({
         heightMm={heightMm}
         scalingRule={imageSlotConfig?.scalingRule}
         specificSizeMm={imageSlotConfig?.specificSizeMm}
+        focalPoint={imageSlotConfig?.focalPoint}
         rotationDeg={undefined}
         zoom={zoom}
         unsatisfiedSizeContext="element"

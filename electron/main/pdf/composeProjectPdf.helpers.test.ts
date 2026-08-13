@@ -58,9 +58,9 @@ describe('computePagePlacements', () => {
     expect(result.imageSlots).toHaveLength(0);
   });
 
-  it('includes an assigned imageSlot with its box, scaling rule, and rotation', () => {
+  it('includes an assigned imageSlot with its box, scaling rule, rotation, and focal point', () => {
     const root = imageSlotNode('root', {
-      imageSlotConfig: { scalingRule: 'envelopeParent', imageRotationDeg: 90 },
+      imageSlotConfig: { scalingRule: 'envelopeParent', imageRotationDeg: 90, focalPoint: { x: 0.2, y: 0.8 } },
     });
     const assetMap = new Map([['asset-1', asset()]]);
     const result = computePagePlacements(A4, page(root, { root: 'asset-1' }), assetMap);
@@ -71,13 +71,16 @@ describe('computePagePlacements', () => {
     expect(placed.scalingRule).toBe('envelopeParent');
     expect(placed.discreteRotationDeg).toBe(90);
     expect(placed.finalRotationDeg).toBe(90);
+    expect(placed.focalPoint).toEqual({ x: 0.2, y: 0.8 });
   });
 
   it('computes a freeform canvas element placement, using the element rotation and no discrete rotation', () => {
     const canvas: LayoutNode = {
       id: 'canvas',
       type: 'freeformCanvas',
-      children: [{ id: 'shadow-1', type: 'imageSlot', imageSlotConfig: { scalingRule: 'fitInParent' } }],
+      children: [
+        { id: 'shadow-1', type: 'imageSlot', imageSlotConfig: { scalingRule: 'fitInParent', focalPoint: { x: 0.1, y: 0.9 } } },
+      ],
       freeformElements: [
         {
           id: 'el-1',
@@ -99,6 +102,7 @@ describe('computePagePlacements', () => {
     expect(element.scalingRule).toBe('fitInParent');
     expect(element.discreteRotationDeg).toBeUndefined();
     expect(element.finalRotationDeg).toBe(15);
+    expect(element.focalPoint).toEqual({ x: 0.1, y: 0.9 });
   });
 
   it('insets the freeform canvas clip box by its own padding', () => {

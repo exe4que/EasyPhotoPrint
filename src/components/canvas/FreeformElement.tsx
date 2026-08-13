@@ -1,5 +1,6 @@
 import {
   MIN_FREEFORM_SIZE_MM,
+  type FocalPoint,
   type FreeformElement,
   type FreeformTransform,
   type ImageAsset,
@@ -25,6 +26,7 @@ interface FreeformElementViewProps {
   asset: ImageAsset | undefined;
   scalingRule: ScalingRule | undefined;
   specificSizeMm?: SpecificSizeMm;
+  focalPoint?: FocalPoint;
   isSelected: boolean;
   previewZoom: number;
   unitSystem: UnitSystem;
@@ -65,6 +67,7 @@ export function FreeformElementView({
   asset,
   scalingRule,
   specificSizeMm,
+  focalPoint,
   isSelected,
   previewZoom,
   unitSystem,
@@ -260,6 +263,7 @@ export function FreeformElementView({
             heightMm={heightMm}
             scalingRule={scalingRule}
             specificSizeMm={specificSizeMm}
+            focalPoint={focalPoint}
             rotationDeg={undefined}
             zoom={previewZoom}
             unsatisfiedSizeContext="element"

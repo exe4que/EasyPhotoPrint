@@ -2,6 +2,7 @@ import { isDividerLocked, type LayoutNode } from '@epp/layout-engine';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useDragAndDrop } from '../../hooks/useDragAndDrop.js';
+import { useEnvelopeParentPanGesture } from '../../hooks/useEnvelopeParentPanGesture.js';
 import { computeImageDisplayRectMm } from '../../lib/imageDisplay.js';
 import { formatLength, mmToPx, pxToMm } from '../../lib/units.js';
 import { useLayoutResolution } from '../../hooks/useLayoutResolution.js';
@@ -81,10 +82,26 @@ export function PageStage() {
   const addFreeformElement = useEPPStore((state) => state.addFreeformElement);
   const removeFreeformElement = useEPPStore((state) => state.removeFreeformElement);
   const updateFreeformElementTransform = useEPPStore((state) => state.updateFreeformElementTransform);
+  const updateLayoutNode = useEPPStore((state) => state.updateLayoutNode);
   const resizeSiblingsByDrag = useEPPStore((state) => state.resizeSiblingsByDrag);
   const pauseHistory = useEPPStore((state) => state.pauseHistory);
   const resumeHistory = useEPPStore((state) => state.resumeHistory);
-  const { createImageDragProps, createSlotDropProps, createPositionalDropProps } = useDragAndDrop();
+  const { createSlotDropProps, createPositionalDropProps } = useDragAndDrop();
+  const { createPanProps } = useEnvelopeParentPanGesture({
+    onArm: () => {
+      suppressNextClickRef.current = true;
+    },
+    onFocalPointChange: (pageId, nodeId, focalPoint) => {
+      updateLayoutNode(pageId, nodeId, { imageSlotConfig: { focalPoint } });
+    },
+    pauseHistory,
+    resumeHistory,
+    onDragEnd: () => {
+      setTimeout(() => {
+        suppressNextClickRef.current = false;
+      }, 0);
+    },
+  });
   const pageWidthAtZoomOne = mmToPx(pageBox.w, 1);
   const pageHeightAtZoomOne = mmToPx(pageBox.h, 1);
   const previewWidthPx = mmToPx(pageBox.w, previewZoom);
@@ -354,11 +371,23 @@ export function PageStage() {
 
                   setSelection({ kind: 'node', id });
                 }}
-                {...(page.assignments[id] ? createImageDragProps(page.assignments[id], 'page') : {})}
-                {...createSlotDropProps((imageAssetId, source) => {
+                {...createSlotDropProps((imageAssetId) => {
                   setSelection({ kind: 'node', id });
-                  assignImageToSlot(page.id, id, imageAssetId, source);
+                  assignImageToSlot(page.id, id, imageAssetId);
                 })}
+                {...(page.assignments[id] &&
+                imageSlotMap.get(id)?.imageSlotConfig?.scalingRule === 'envelopeParent' &&
+                imageAssetMap.get(page.assignments[id])
+                  ? createPanProps({
+                      pageId: page.id,
+                      nodeId: id,
+                      asset: imageAssetMap.get(page.assignments[id])!,
+                      slotBoxMm: box,
+                      rotationDeg: imageSlotMap.get(id)?.imageSlotConfig?.imageRotationDeg,
+                      focalPoint: imageSlotMap.get(id)?.imageSlotConfig?.focalPoint,
+                      previewZoom,
+                    })
+                  : {})}
                 onMouseEnter={() => setHoveredSlotId(id)}
                 onMouseMove={(event) => {
                   const asset = imageAssetMap.get(page.assignments[id] ?? '');
@@ -406,6 +435,7 @@ export function PageStage() {
                           heightMm={box.h}
                           scalingRule={imageSlotConfig?.scalingRule}
                           specificSizeMm={imageSlotConfig?.specificSizeMm}
+                          focalPoint={imageSlotConfig?.focalPoint}
                           rotationDeg={imageSlotConfig?.imageRotationDeg}
                           zoom={previewZoom}
                           unsatisfiedSizeContext="slot"
@@ -548,6 +578,7 @@ export function PageStage() {
                         asset={imageAssetMap.get(page.assignments[element.imageNodeId] ?? '')}
                         scalingRule={imageSlotMap.get(element.imageNodeId)?.imageSlotConfig?.scalingRule}
                         specificSizeMm={imageSlotMap.get(element.imageNodeId)?.imageSlotConfig?.specificSizeMm}
+                        focalPoint={imageSlotMap.get(element.imageNodeId)?.imageSlotConfig?.focalPoint}
                         isSelected={selectedSlotId === element.imageNodeId}
                         previewZoom={previewZoom}
                         unitSystem={unitSystem}

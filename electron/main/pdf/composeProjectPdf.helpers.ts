@@ -2,6 +2,7 @@ import { resolveLayout } from '@epp/layout-engine';
 import type {
   BoxMm,
   EPPProjectPage,
+  FocalPoint,
   ImageAsset,
   ImageRotationDeg,
   LayoutNode,
@@ -39,6 +40,8 @@ export interface ImagePlacementSpec {
   boxMm: BoxMm;
   scalingRule: ScalingRule | undefined;
   specificSizeMm: SpecificSizeMm | undefined;
+  /** Only meaningful when scalingRule === 'envelopeParent'; undefined defaults to center. */
+  focalPoint: FocalPoint | undefined;
   /** imageSlot's own discrete pre-fit rotation (undefined for a freeform element -- its rotation
    * is a whole-box rotation applied afterward, not baked into the fit math). */
   discreteRotationDeg: ImageRotationDeg | undefined;
@@ -91,6 +94,7 @@ export function computePagePlacements(
       boxMm,
       scalingRule: node.imageSlotConfig?.scalingRule,
       specificSizeMm: node.imageSlotConfig?.specificSizeMm,
+      focalPoint: node.imageSlotConfig?.focalPoint,
       discreteRotationDeg: node.imageSlotConfig?.imageRotationDeg,
       finalRotationDeg: node.imageSlotConfig?.imageRotationDeg ?? 0,
     });
@@ -126,6 +130,7 @@ export function computePagePlacements(
         boxMm: elementBoxMm,
         scalingRule: imageSlotConfig?.scalingRule,
         specificSizeMm: imageSlotConfig?.specificSizeMm,
+        focalPoint: imageSlotConfig?.focalPoint,
         discreteRotationDeg: undefined,
         finalRotationDeg: element.transform.rotationDeg,
       });

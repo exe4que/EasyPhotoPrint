@@ -533,3 +533,51 @@ describe('relinkImage', () => {
     expect(useEPPStore.getState().imagePool[0].missing).toBe(true);
   });
 });
+
+describe('envelopeParent focalPoint pan gesture batches into a single undo step', () => {
+  afterEach(() => {
+    useEPPStore.getState().startNewProject();
+  });
+
+  it('multiple live focalPoint updates collapse into one undo entry, when only the first is tracked before pausing', () => {
+    // Mirrors useEnvelopeParentPanGesture's actual sequencing: the first update must land while
+    // history is still tracking (so its pre-drag snapshot is captured), and pauseHistory only
+    // takes effect starting with the *second* update -- pausing before the first update would
+    // mean that update's own "before" state is never recorded, leaving zero undo entries for the
+    // whole gesture instead of one (confirmed against zundo's actual pause/resume semantics,
+    // which do not retroactively record what changed during a paused span).
+    const pastBefore = useEPPStore.temporal.getState().pastStates.length;
+
+    useEPPStore.getState().updateLayoutNode('page-1', 'root-grid', { imageSlotConfig: { focalPoint: { x: 0.3, y: 0.4 } } });
+    useEPPStore.getState().pauseHistory();
+    useEPPStore.getState().updateLayoutNode('page-1', 'root-grid', { imageSlotConfig: { focalPoint: { x: 0.6, y: 0.7 } } });
+    useEPPStore.getState().updateLayoutNode('page-1', 'root-grid', { imageSlotConfig: { focalPoint: { x: 0.9, y: 1 } } });
+    useEPPStore.getState().resumeHistory();
+
+    expect(useEPPStore.temporal.getState().pastStates.length).toBe(pastBefore + 1);
+    expect(useEPPStore.getState().document.pages[0].rootNode.imageSlotConfig?.focalPoint).toEqual({ x: 0.9, y: 1 });
+
+    useEPPStore.getState().undo();
+    expect(useEPPStore.getState().document.pages[0].rootNode.imageSlotConfig?.focalPoint).toBeUndefined();
+  });
+
+  it('pausing before the very first update loses that update from history entirely (documents the underlying zundo behavior this hook works around)', () => {
+    const pastBefore = useEPPStore.temporal.getState().pastStates.length;
+
+    useEPPStore.getState().pauseHistory();
+    useEPPStore.getState().updateLayoutNode('page-1', 'root-grid', { imageSlotConfig: { focalPoint: { x: 0.3, y: 0.4 } } });
+    useEPPStore.getState().resumeHistory();
+
+    expect(useEPPStore.getState().document.pages[0].rootNode.imageSlotConfig?.focalPoint).toEqual({ x: 0.3, y: 0.4 });
+    expect(useEPPStore.temporal.getState().pastStates.length).toBe(pastBefore);
+  });
+
+  it('a pause/resume cycle with no focalPoint change in between creates no undo entry', () => {
+    const pastBefore = useEPPStore.temporal.getState().pastStates.length;
+
+    useEPPStore.getState().pauseHistory();
+    useEPPStore.getState().resumeHistory();
+
+    expect(useEPPStore.temporal.getState().pastStates.length).toBe(pastBefore);
+  });
+});

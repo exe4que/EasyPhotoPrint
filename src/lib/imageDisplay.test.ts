@@ -1,7 +1,13 @@
 import { computeStretch, orientBoxMm, type BoxMm, type ImageAsset, type ImageRotationDeg } from '@epp/layout-engine';
 import { describe, expect, it } from 'vitest';
 
-import { computeImageDisplayRectMm, computeImageRenderRectMm, isSpecificSizeUnsatisfied } from './imageDisplay.js';
+import {
+  computeEnvelopeParentPlacementMm,
+  computeImageDisplayRectMm,
+  computeImageRenderRectMm,
+  isSpecificSizeUnsatisfied,
+  panEnvelopeParentFocalPoint,
+} from './imageDisplay.js';
 import { formatLength } from './units.js';
 
 const portraitAsset: ImageAsset = {
@@ -135,6 +141,83 @@ describe('isSpecificSizeUnsatisfied compares against the slot\'s real box regard
   it('does not flag a specific size that fits within the slot', () => {
     const specificSizeMm = { widthMm: 20, heightMm: 20, lockedAxis: 'both' as const };
     expect(isSpecificSizeUnsatisfied(specificSizeMm, landscapeSlot)).toBe(false);
+  });
+});
+
+describe('computeEnvelopeParentPlacementMm', () => {
+  it('matches hand-computed offset and transform-origin for an off-center pan at 0deg', () => {
+    const placement = computeEnvelopeParentPlacementMm(portraitAsset, landscapeSlot, { x: 0.5, y: 0 }, 0);
+    expect(placement).toEqual({
+      leftMm: 0,
+      topMm: 0,
+      widthMm: 100,
+      heightMm: 200,
+      transformOriginXMm: 50,
+      transformOriginYMm: 25,
+    });
+  });
+
+  it('reduces to plain center-of-element pivoting at the default center focalPoint, at every rotation', () => {
+    for (const rotationDeg of ALL_ROTATIONS) {
+      const placement = computeEnvelopeParentPlacementMm(portraitAsset, landscapeSlot, { x: 0.5, y: 0.5 }, rotationDeg);
+      expect(placement.transformOriginXMm).toBeCloseTo(placement.widthMm / 2);
+      expect(placement.transformOriginYMm).toBeCloseTo(placement.heightMm / 2);
+    }
+  });
+
+  it('always pivots imageRotationDeg around the slot\'s own center in actual (post-rotation) coordinates, regardless of pan or rotation', () => {
+    const focalPoints = [
+      { x: 0, y: 0 },
+      { x: 0.3, y: 0.9 },
+      { x: 1, y: 1 },
+    ];
+    for (const rotationDeg of ALL_ROTATIONS) {
+      for (const focalPoint of focalPoints) {
+        const placement = computeEnvelopeParentPlacementMm(landscapeAsset, landscapeSlot, focalPoint, rotationDeg);
+        expect(placement.leftMm + placement.transformOriginXMm).toBeCloseTo(landscapeSlot.w / 2);
+        expect(placement.topMm + placement.transformOriginYMm).toBeCloseTo(landscapeSlot.h / 2);
+      }
+    }
+  });
+});
+
+describe('panEnvelopeParentFocalPoint', () => {
+  const squareSlot: BoxMm = { x: 0, y: 0, w: 100, h: 100 };
+
+  it('ignores a drag on the axis the image does not overflow, at 0deg', () => {
+    const next = panEnvelopeParentFocalPoint(portraitAsset, landscapeSlot, 0, { x: 0.5, y: 0.5 }, 10, 0);
+    expect(next).toEqual({ x: 0.5, y: 0.5 });
+  });
+
+  it('moves the overflowing axis proportionally to the drag distance, at 0deg', () => {
+    const next = panEnvelopeParentFocalPoint(portraitAsset, landscapeSlot, 0, { x: 0.5, y: 0.5 }, 0, 15);
+    // overflowHeightMm is 150 (200 covered - 50 slot); a 15mm drag is 10% of that range.
+    expect(next.x).toBe(0.5);
+    expect(next.y).toBeCloseTo(0.4);
+  });
+
+  it('clamps at the edges instead of overshooting', () => {
+    const next = panEnvelopeParentFocalPoint(portraitAsset, landscapeSlot, 0, { x: 0.5, y: 0.9 }, 0, 1000);
+    expect(next.y).toBe(0);
+  });
+
+  it('defaults the starting focal point to center when the slot has none set yet', () => {
+    const next = panEnvelopeParentFocalPoint(portraitAsset, landscapeSlot, 0, undefined, 0, 0);
+    expect(next).toEqual({ x: 0.5, y: 0.5 });
+  });
+
+  it('remaps which screen axis moves the stored focal point at 90deg, rotating the delta back to unrotated space', () => {
+    // Square slot: the portrait asset only overflows the (unrotated) height axis at 90deg.
+    const next = panEnvelopeParentFocalPoint(portraitAsset, squareSlot, 90, { x: 0.5, y: 0.5 }, 10, 0);
+    expect(next.x).toBe(0.5);
+    expect(next.y).not.toBe(0.5);
+  });
+
+  it('two half-sized drags land on the same focal point as one full-sized drag (no drift)', () => {
+    const oneStep = panEnvelopeParentFocalPoint(portraitAsset, landscapeSlot, 0, { x: 0.5, y: 0.5 }, 0, 30);
+    const halfway = panEnvelopeParentFocalPoint(portraitAsset, landscapeSlot, 0, { x: 0.5, y: 0.5 }, 0, 15);
+    const twoSteps = panEnvelopeParentFocalPoint(portraitAsset, landscapeSlot, 0, halfway, 0, 15);
+    expect(twoSteps.y).toBeCloseTo(oneStep.y);
   });
 });
 

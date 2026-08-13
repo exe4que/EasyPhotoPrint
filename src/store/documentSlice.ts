@@ -552,34 +552,8 @@ function setFreeformElementTransformById(
   };
 }
 
-export function assignImageToPage(
-  page: EPPProjectPage,
-  nodeId: string,
-  imageAssetId: string,
-  source: 'library' | 'page' = 'library',
-): Record<string, string> {
-  const nextAssignments = { ...page.assignments };
-
-  if (source === 'library') {
-    nextAssignments[nodeId] = imageAssetId;
-    return nextAssignments;
-  }
-
-  const currentOccupant = nextAssignments[nodeId];
-  const sourceNodeId = Object.entries(nextAssignments).find(
-    ([slotId, assignedImageId]) => assignedImageId === imageAssetId && slotId !== nodeId,
-  )?.[0];
-
-  if (sourceNodeId) {
-    if (currentOccupant) {
-      nextAssignments[sourceNodeId] = currentOccupant;
-    } else {
-      delete nextAssignments[sourceNodeId];
-    }
-  }
-
-  nextAssignments[nodeId] = imageAssetId;
-  return nextAssignments;
+export function assignImageToPage(page: EPPProjectPage, nodeId: string, imageAssetId: string): Record<string, string> {
+  return { ...page.assignments, [nodeId]: imageAssetId };
 }
 
 export function clearImageFromPage(page: EPPProjectPage, nodeId: string): Record<string, string> {
@@ -833,7 +807,7 @@ export interface DocumentSlice {
   retypeLayoutNode: (pageId: string, nodeId: string, nextType: NestedNodeType) => void;
   addNestedChildNode: (pageId: string, parentNodeId: string, childType: 'imageSlot' | 'horizontal' | 'vertical' | 'grid' | 'freeformCanvas') => void;
   removeLayoutNode: (pageId: string, nodeId: string) => void;
-  assignImageToSlot: (pageId: string, nodeId: string, imageAssetId: string, source?: 'library' | 'page') => void;
+  assignImageToSlot: (pageId: string, nodeId: string, imageAssetId: string) => void;
   setSlotSpecificSize: (pageId: string, nodeId: string, axis: 'width' | 'height', valueMm: number | null) => void;
   rotateSlotImage: (pageId: string, nodeId: string) => void;
   clearImageFromSlot: (pageId: string, nodeId: string) => void;
@@ -1087,7 +1061,7 @@ export function createDocumentSlice(
         },
       }));
     },
-    assignImageToSlot: (pageId, nodeId, imageAssetId, source = 'library') => {
+    assignImageToSlot: (pageId, nodeId, imageAssetId) => {
       const page = get().document.pages.find((entry) => entry.id === pageId);
       const slotNode = page ? findNodeById(page.rootNode, nodeId) : undefined;
       const specificSizeMm = slotNode?.imageSlotConfig?.specificSizeMm;
@@ -1124,7 +1098,7 @@ export function createDocumentSlice(
             return {
               ...entry,
               rootNode,
-              assignments: assignImageToPage(entry, nodeId, imageAssetId, source),
+              assignments: assignImageToPage(entry, nodeId, imageAssetId),
             };
           }),
         },

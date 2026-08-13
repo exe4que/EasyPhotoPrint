@@ -1,4 +1,4 @@
-import type { BoxMm, EnvelopeCrop, FitInParentBox, ImageAsset, ImageRotationDeg, SpecificSizeMm, StretchResult } from './types.js';
+import type { BoxMm, EnvelopeCrop, FitInParentBox, FocalPoint, ImageAsset, ImageRotationDeg, SpecificSizeMm, StretchResult } from './types.js';
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -77,6 +77,41 @@ export function computeSpecificSize(specificSizeMm: SpecificSizeMm, slotBoxMm: B
     offsetYMm: (slotBoxMm.h - specificSizeMm.heightMm) / 2,
     widthMm: specificSizeMm.widthMm,
     heightMm: specificSizeMm.heightMm,
+  };
+}
+
+/**
+ * The on-screen counterpart to `computeEnvelopeCrop`: instead of a pixel crop rectangle, this
+ * returns the mm-space box for an *uncropped* `<img>` element sized to fully cover `slotBoxMm`
+ * (matching the source's own aspect ratio, so no `object-fit` is needed) and positioned so a
+ * `slotBoxMm`-sized `overflow: hidden` viewport around it shows exactly the crop `focalPoint`
+ * selects. `offsetXMm`/`offsetYMm` are always `<= 0` (the covering image only ever needs to shift
+ * left/up to reveal its right/bottom edge, never shrink) and their magnitude is bounded by how
+ * much the covering size overflows the slot on that axis -- at `focalPoint` 0 the offset is 0
+ * (showing the source's own top-left edge), at 1 it's the full overflow (showing the bottom-right
+ * edge), mirroring `computeEnvelopeCrop`'s `left`/`top` convention exactly.
+ */
+export function computeEnvelopeParent(asset: ImageAsset, slotBoxMm: BoxMm, focalPoint: FocalPoint = { x: 0.5, y: 0.5 }): FitInParentBox {
+  const sourceAspect = asset.widthPx / asset.heightPx;
+  const slotAspect = slotBoxMm.w / slotBoxMm.h;
+  const coveredSize =
+    sourceAspect > slotAspect
+      ? { widthMm: slotBoxMm.h * sourceAspect, heightMm: slotBoxMm.h }
+      : { widthMm: slotBoxMm.w, heightMm: slotBoxMm.w / sourceAspect };
+
+  const overflowWidthMm = coveredSize.widthMm - slotBoxMm.w;
+  const overflowHeightMm = coveredSize.heightMm - slotBoxMm.h;
+  const clampedFocalX = clamp(focalPoint.x, 0, 1);
+  const clampedFocalY = clamp(focalPoint.y, 0, 1);
+
+  return {
+    // `|| 0` normalizes the `-0` that `-overflow * focal` produces whenever either factor is 0
+    // (no overflow on this axis, or focalPoint sitting exactly at 0) -- a real offset is never
+    // `-0` (only ever a genuine negative or exactly `0`), so this can't mask an actual value.
+    offsetXMm: -overflowWidthMm * clampedFocalX || 0,
+    offsetYMm: -overflowHeightMm * clampedFocalY || 0,
+    widthMm: coveredSize.widthMm,
+    heightMm: coveredSize.heightMm,
   };
 }
 

@@ -62,7 +62,7 @@ async function embedPlacedImage(pdfDoc: PDFDocument, page: PDFPage, spec: ImageP
   }
 
   if (spec.scalingRule === 'envelopeParent') {
-    const crop = computeEnvelopeCrop(spec.asset, renderRect.widthMm / renderRect.heightMm);
+    const crop = computeEnvelopeCrop(spec.asset, renderRect.widthMm / renderRect.heightMm, spec.focalPoint);
     bitmap = bitmap.crop({
       x: Math.round(crop.left),
       y: Math.round(crop.top),

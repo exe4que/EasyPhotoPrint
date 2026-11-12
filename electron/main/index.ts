@@ -2,6 +2,8 @@ import { app, BrowserWindow } from 'electron';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import appIcon from '../../resources/icon.png?asset';
+
 import { registerIpcHandlers } from './ipc/index.js';
 import { buildApplicationMenu } from './menu.js';
 import { cleanupWorkingDirectoryOnQuit } from './workingDirectory.js';
@@ -16,6 +18,8 @@ function createMainWindow(): BrowserWindow {
     minWidth: 1180,
     minHeight: 760,
     backgroundColor: '#0f172a',
+    // Window/taskbar icon on Linux; Windows takes it from the installer's executable instead.
+    icon: appIcon,
     show: false,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),

@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#22d3ee"/>
+      <stop offset="0.55" stop-color="#0891b2"/>
+      <stop offset="1" stop-color="#3730a3"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.3" cy="0.22" r="0.75">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fb7185"/>
+      <stop offset="0.55" stop-color="#fb923c"/>
+      <stop offset="1" stop-color="#fde68a"/>
+    </linearGradient>
+    <linearGradient id="hillBack" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0e7490"/>
+      <stop offset="1" stop-color="#155e75"/>
+    </linearGradient>
+    <linearGradient id="hillFront" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1e3a8a"/>
+      <stop offset="1" stop-color="#172554"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="22"/>
+      <feOffset dx="0" dy="22" result="b"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.35"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <clipPath id="photo"><rect x="-224" y="-290" width="448" height="430" rx="10"/></clipPath>
+  </defs><rect width="1024" height="1024" rx="228" fill="url(#bg)"/><rect width="1024" height="1024" rx="228" fill="url(#glow)"/><g transform="translate(512 512) scale(0.86) translate(-512 -512)">
+  <g filter="url(#shadow)">
+    <g transform="translate(470 530) rotate(-11)">
+      <rect x="-260" y="-320" width="520" height="640" rx="26" fill="#e2e8f0"/>
+      <rect x="-224" y="-290" width="448" height="430" rx="10" fill="#a5b4fc"/>
+    </g>
+  </g>
+  <g filter="url(#shadow)">
+    <g transform="translate(548 500) rotate(7)">
+      <rect x="-260" y="-320" width="520" height="640" rx="26" fill="#ffffff"/>
+      <g clip-path="url(#photo)">
+        <rect x="-224" y="-290" width="448" height="430" fill="url(#sky)"/>
+        <circle cx="70" cy="-120" r="62" fill="#fff7ed"/>
+        <path d="M-240 60 L-110 -70 L-20 20 L70 -50 L240 90 L240 150 L-240 150 Z" fill="url(#hillBack)"/>
+        <path d="M-240 150 L-240 70 C-150 20 -60 40 20 90 C110 140 180 70 240 40 L240 150 Z" fill="url(#hillFront)"/>
+      </g>
+      <rect x="-150" y="200" width="300" height="22" rx="11" fill="#cbd5e1"/>
+    </g>
+  </g></g></svg>

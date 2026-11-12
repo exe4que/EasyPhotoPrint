@@ -6,9 +6,38 @@ const LOAD_TIMEOUT_MS = 15_000;
  * fire before treating focus-return itself as evidence the native dialog closed -- see
  * `printPdfFile`'s doc comment. */
 const PRINT_DIALOG_FOCUS_GRACE_MS = 1_000;
+/** `failureReason`s Electron reports for a dialog the user dismissed without printing. Electron
+ * documents `'cancelled'`, but with Linux's GTK dialog it was measured to report `'Print job
+ * canceled'` instead -- both are a non-error outcome per the `printing` spec. */
+const CANCELLED_FAILURE_REASONS = new Set(['cancelled', 'Print job canceled']);
 
 let printWindow: BrowserWindow | null = null;
 let shuttingDown = false;
+/** True from the moment `webContents.print()` is called until Chromium invokes its callback --
+ * deliberately NOT cleared by the focus-return fallback in `printPdfFile`. See `isPrintDialogPending`. */
+let printRequestPending = false;
+
+/** Thrown by `printPdfFile` (and checked up front by the `print:document` handler) when the native
+ * dialog from a previous print is still open, per the `printing` spec's "Print While a Print Dialog
+ * Is Still Open" requirement. */
+export class PrintDialogAlreadyOpenError extends Error {
+  constructor() {
+    super('A print dialog is already open — it may be behind this window. Close it before printing again.');
+    this.name = 'PrintDialogAlreadyOpenError';
+  }
+}
+
+/** Whether Chromium still has a print request awaiting the user's answer in its native dialog.
+ *
+ * The GTK dialog belongs to the hidden print window, not the app window, so when the app window
+ * regains focus with the dialog open (e.g. the user clicks it), the window manager can stack the
+ * dialog *behind* it. The focus-return fallback then releases our promise -- but Chromium won't
+ * open another dialog while that request is pending: a new `print()` (or even `loadURL` on the
+ * same window) just hangs. So a new job must not start until this is false again, which happens
+ * as soon as the user actually closes that dialog. */
+export function isPrintDialogPending(): boolean {
+  return printRequestPending;
+}
 
 function createPrintWindow(): BrowserWindow {
   const window = new BrowserWindow({
@@ -81,9 +110,14 @@ export interface PrintPageSizeMicrons {
  * fallback, that leaves this promise (and the processing overlay covering it) hung forever. As a
  * safety net, once the app regains OS focus after the dialog was opened, a short grace period gives
  * the real callback a chance to still win; if it hasn't fired by then, focus-return itself is
- * treated as an implicit cancellation (resolves without error, same as an explicit `'cancelled'`
- * result) so the promise always settles. */
+ * treated as an implicit cancellation (resolves without error, same as an explicit cancellation
+ * result) so the promise always settles. Chromium's request may in fact still be pending at that
+ * point (dialog hidden behind the app window), which is why `isPrintDialogPending` is tracked
+ * separately and a new job refuses to start until it clears. */
 export async function printPdfFile(pdfFilePath: string, pageSize: PrintPageSizeMicrons): Promise<void> {
+  if (printRequestPending) {
+    throw new PrintDialogAlreadyOpenError();
+  }
   const window = getPrintWindow();
 
   await withTimeout(window.loadURL(pathToFileURL(pdfFilePath).toString()), LOAD_TIMEOUT_MS, 'Timed out preparing the document for printing.');
@@ -104,7 +138,9 @@ export async function printPdfFile(pdfFilePath: string, pageSize: PrintPageSizeM
     };
     app.on('browser-window-focus', onFocusRegained);
 
+    printRequestPending = true;
     window.webContents.print({ pageSize, margins: { marginType: 'none' }, scaleFactor: 100 }, (success, failureReason) => {
+      printRequestPending = false;
       if (settled) {
         return;
       }
@@ -114,7 +150,7 @@ export async function printPdfFile(pdfFilePath: string, pageSize: PrintPageSizeM
         clearTimeout(fallbackTimer);
       }
 
-      if (!success && failureReason !== 'cancelled') {
+      if (!success && !CANCELLED_FAILURE_REASONS.has(failureReason)) {
         reject(new Error(`Printing failed: ${failureReason}`));
         return;
       }

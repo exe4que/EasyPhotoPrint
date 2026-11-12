@@ -8,8 +8,12 @@ type ActionState = { status: 'idle' | 'busy' | 'error'; message?: string };
 
 const IDLE_ACTION_STATE: ActionState = { status: 'idle' };
 
+/** Electron prefixes errors rejected across `ipcRenderer.invoke` with this wrapper, which means
+ * nothing to the user -- only the original message after it is shown. */
+const IPC_ERROR_PREFIX = /^Error invoking remote method '[^']*': (?:\w*Error: )?/;
+
 function describeActionError(error: unknown, fallback: string): string {
-  return error instanceof Error ? error.message : fallback;
+  return error instanceof Error ? error.message.replace(IPC_ERROR_PREFIX, '') : fallback;
 }
 
 /** Full-screen, gizmo-free print preview -- replaces the entire editor layout while

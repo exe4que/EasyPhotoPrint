@@ -7,7 +7,7 @@ import type { EPPProject } from '@epp/layout-engine';
 import { resolvePageSizeMm } from '../../../src/lib/page.js';
 import { mmToMicrons } from '../../../src/lib/units.js';
 import { composeProjectPdf } from '../pdf/composeProjectPdf.js';
-import { printPdfFile, type PrintPageSizeMicrons } from '../print-render/pdfPrintWindow.js';
+import { isPrintDialogPending, PrintDialogAlreadyOpenError, printPdfFile, type PrintPageSizeMicrons } from '../print-render/pdfPrintWindow.js';
 
 const PRINT_DOCUMENT_CHANNEL = 'print:document';
 
@@ -29,6 +29,10 @@ function resolveJobPageSize(project: EPPProject): PrintPageSizeMicrons {
 export function registerPrintHandlers(): void {
   ipcMain.removeHandler(PRINT_DOCUMENT_CHANNEL);
   ipcMain.handle(PRINT_DOCUMENT_CHANNEL, async (_event, project: EPPProject): Promise<void> => {
+    // Checked before composing (the expensive part) so the notice is instant -- see `isPrintDialogPending`.
+    if (isPrintDialogPending()) {
+      throw new PrintDialogAlreadyOpenError();
+    }
     const pageSize = resolveJobPageSize(project);
     const pdfBytes = await composeProjectPdf(project);
     const tempFilePath = join(app.getPath('temp'), `easy-photo-print-${crypto.randomUUID()}.pdf`);
